@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
 
 // SVG Icon Components
@@ -15,28 +16,40 @@ const Haven7Icon = ({ className = "" }: { className?: string }) => (
     viewBox="0 0 32 32"
     className={className}
   >
-    {/* Modern "H7" design */}
     <defs>
       <linearGradient id="haven7Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#6366F1" />
+        <stop offset="0%" stopColor="#3B82F6" />
+        <stop offset="100%" stopColor="#1E40AF" />
+      </linearGradient>
+      <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#A855F7" />
         <stop offset="100%" stopColor="#8B5CF6" />
       </linearGradient>
     </defs>
     
-    {/* Background circle */}
-    <circle cx="16" cy="16" r="15" fill="url(#haven7Gradient)" />
+    {/* Central hub circle */}
+    <circle cx="16" cy="16" r="12" fill="url(#haven7Gradient)" />
     
-    {/* H letter */}
+    {/* Connection lines radiating outward */}
     <path
-      fill="white"
-      d="M8 10h2v12h-2V10zm6 0h2v12h-2V10zm-4 5h6v2h-6v-2z"
+      stroke="url(#accentGradient)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      d="M16 4L16 8M16 24L16 28M4 16L8 16M24 16L28 16M6.34 6.34L9.17 9.17M22.83 22.83L25.66 25.66M6.34 25.66L9.17 22.83M22.83 9.17L25.66 6.34"
     />
     
-    {/* 7 number */}
-    <path
-      fill="white"
-      d="M20 10h6v2h-4v10h-2V10z"
-    />
+    {/* Central dot */}
+    <circle cx="16" cy="16" r="3" fill="white" />
+    
+    {/* Small connection dots */}
+    <circle cx="16" cy="6" r="1.5" fill="url(#accentGradient)" />
+    <circle cx="16" cy="26" r="1.5" fill="url(#accentGradient)" />
+    <circle cx="6" cy="16" r="1.5" fill="url(#accentGradient)" />
+    <circle cx="26" cy="16" r="1.5" fill="url(#accentGradient)" />
+    <circle cx="9.17" cy="9.17" r="1.5" fill="url(#accentGradient)" />
+    <circle cx="22.83" cy="22.83" r="1.5" fill="url(#accentGradient)" />
+    <circle cx="9.17" cy="22.83" r="1.5" fill="url(#accentGradient)" />
+    <circle cx="22.83" cy="9.17" r="1.5" fill="url(#accentGradient)" />
   </svg>
 );
 
@@ -76,9 +89,9 @@ const GoogleDriveIcon = ({ className = "" }: { className?: string }) => (
     viewBox="0 0 512 512"
     className={className}
   >
-    {/* Left (green) */}
+    {/* Left (purple) */}
     <path
-      fill="#0F9D58"
+      fill="#8B5CF6"
       d="M160 32L0 320l96 160 160-288z"
     />
     {/* Right (yellow) */}
@@ -110,9 +123,170 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+// Enhanced dummy data with more detailed results
+const dummyConversations = [
+  {
+    id: '1',
+    title: 'Q3 Performance Metrics',
+    timestamp: '2024-01-15T10:30:00Z',
+    query: 'Show me Q3 performance metrics and team productivity data',
+    results: [
+      { 
+        source: 'Slack', 
+        content: 'Team standup notes from Q3 showing 15% productivity increase',
+        author: 'Sarah Chen',
+        timestamp: '2024-01-15T09:00:00Z',
+        type: 'message',
+        channel: '#general'
+      },
+      { 
+        source: 'Google Drive', 
+        content: 'Q3 Performance Report.pdf - Revenue up 23%',
+        author: 'Mike Johnson',
+        timestamp: '2024-01-14T16:30:00Z',
+        type: 'pdf',
+        filename: 'Q3_Performance_Report.pdf'
+      },
+      { 
+        source: 'Notion', 
+        content: 'Q3 OKR tracking - 8/10 goals achieved',
+        author: 'Alex Rivera',
+        timestamp: '2024-01-13T11:15:00Z',
+        type: 'doc',
+        page: 'Q3 OKRs'
+      }
+    ]
+  },
+  {
+    id: '2',
+    title: 'Product Roadmap Planning',
+    timestamp: '2024-01-14T14:20:00Z',
+    query: 'Find all documents related to product roadmap and feature planning',
+    results: [
+      { 
+        source: 'Notion', 
+        content: 'Product Roadmap 2024 - Next quarter priorities',
+        author: 'Emma Wilson',
+        timestamp: '2024-01-14T13:00:00Z',
+        type: 'doc',
+        page: 'Product Roadmap'
+      },
+      { 
+        source: 'Google Drive', 
+        content: 'Feature Requirements v2.1.docx',
+        author: 'David Kim',
+        timestamp: '2024-01-13T15:45:00Z',
+        type: 'doc',
+        filename: 'Feature_Requirements_v2.1.docx'
+      },
+      { 
+        source: 'Slack', 
+        content: 'Product team discussion about MVP features',
+        author: 'Lisa Park',
+        timestamp: '2024-01-12T10:30:00Z',
+        type: 'message',
+        channel: '#product'
+      }
+    ]
+  },
+  {
+    id: '3',
+    title: 'User Feedback Analysis',
+    timestamp: '2024-01-13T09:15:00Z',
+    query: 'Compile user feedback from support tickets and surveys',
+    results: [
+      { 
+        source: 'Slack', 
+        content: 'Support team feedback summary - 47 tickets resolved',
+        author: 'Tom Anderson',
+        timestamp: '2024-01-12T14:20:00Z',
+        type: 'message',
+        channel: '#support'
+      },
+      { 
+        source: 'Google Drive', 
+        content: 'User Survey Results Q4 2023.xlsx',
+        author: 'Maria Garcia',
+        timestamp: '2024-01-11T11:00:00Z',
+        type: 'excel',
+        filename: 'User_Survey_Results_Q4_2023.xlsx'
+      },
+      { 
+        source: 'Notion', 
+        content: 'Customer feedback database - 89% satisfaction rate',
+        author: 'James Lee',
+        timestamp: '2024-01-10T16:15:00Z',
+        type: 'doc',
+        page: 'Customer Feedback'
+      }
+    ]
+  },
+  {
+    id: '4',
+    title: 'Team Meeting Notes',
+    timestamp: '2024-01-12T16:45:00Z',
+    query: 'Find all team meeting notes from this week',
+    results: [
+      { 
+        source: 'Slack', 
+        content: 'Weekly standup notes - Sprint 23 progress',
+        author: 'Rachel Green',
+        timestamp: '2024-01-12T09:00:00Z',
+        type: 'message',
+        channel: '#standup'
+      },
+      { 
+        source: 'Notion', 
+        content: 'All-hands meeting notes - Company updates',
+        author: 'CEO',
+        timestamp: '2024-01-11T14:00:00Z',
+        type: 'doc',
+        page: 'All-Hands Meeting'
+      },
+      { 
+        source: 'Google Drive', 
+        content: 'Design review meeting - UI/UX feedback',
+        author: 'Sophie Chen',
+        timestamp: '2024-01-10T15:30:00Z',
+        type: 'pdf',
+        filename: 'Design_Review_Meeting.pdf'
+      }
+    ]
+  }
+];
+
 const SearchInterface = () => {
   const [searchValue, setSearchValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [conversations, setConversations] = useState(dummyConversations);
+  const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  const [editingThread, setEditingThread] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    applications: [] as string[],
+    authors: [] as string[],
+    timeRange: 'latest' as string,
+    dateRange: { start: '', end: '' },
+    documentTypes: [] as string[],
+    quickPreset: '' as string
+  });
+
+  // Dropdown states
+  const [openDropdowns, setOpenDropdowns] = useState({
+    applications: false,
+    authors: false,
+    documentTypes: false,
+    sort: false
+  });
+
+  const dropdownRefs = {
+    applications: useRef<HTMLDivElement>(null),
+    authors: useRef<HTMLDivElement>(null),
+    documentTypes: useRef<HTMLDivElement>(null),
+    sort: useRef<HTMLDivElement>(null)
+  };
 
   const recentSearches = [
     'Q3 performance metrics',
@@ -148,12 +322,277 @@ const SearchInterface = () => {
     console.log('Searching for:', searchValue);
   };
 
+  const handleThreadClick = (threadId: string) => {
+    setSelectedThread(threadId);
+  };
+
+  const handleRenameThread = (threadId: string, newTitle: string) => {
+    setConversations(prev => 
+      prev.map(thread => 
+        thread.id === threadId ? { ...thread, title: newTitle } : thread
+      )
+    );
+    setEditingThread(null);
+    setEditTitle('');
+  };
+
+  const handleDeleteThread = (threadId: string) => {
+    setConversations(prev => prev.filter(thread => thread.id !== threadId));
+    if (selectedThread === threadId) {
+      setSelectedThread(null);
+    }
+  };
+
+  const startEditing = (threadId: string, currentTitle: string) => {
+    setEditingThread(threadId);
+    setEditTitle(currentTitle);
+  };
+
+  const cancelEditing = () => {
+    setEditingThread(null);
+    setEditTitle('');
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays}d ago`;
+    }
+  };
+
+  // Filter logic
+  const getFilteredResults = () => {
+    if (!selectedThread) return [];
+    
+    const thread = conversations.find(t => t.id === selectedThread);
+    if (!thread) return [];
+    
+    let filteredResults = [...thread.results];
+    
+    // Filter by applications
+    if (filters.applications.length > 0) {
+      filteredResults = filteredResults.filter(result => 
+        filters.applications.includes(result.source)
+      );
+    }
+    
+    // Filter by authors
+    if (filters.authors.length > 0) {
+      filteredResults = filteredResults.filter(result => 
+        filters.authors.includes(result.author)
+      );
+    }
+    
+    // Filter by document types
+    if (filters.documentTypes.length > 0) {
+      filteredResults = filteredResults.filter(result => 
+        filters.documentTypes.includes(result.type)
+      );
+    }
+    
+    // Filter by time
+    if (filters.timeRange === 'oldest') {
+      filteredResults.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    } else {
+      filteredResults.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
+    
+    return filteredResults;
+  };
+
+  const toggleFilter = (filterType: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: prev[filterType as keyof typeof prev].includes(value)
+        ? (prev[filterType as keyof typeof prev] as string[]).filter(item => item !== value)
+        : [...(prev[filterType as keyof typeof prev] as string[]), value]
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      applications: [],
+      authors: [],
+      timeRange: 'latest',
+      dateRange: { start: '', end: '' },
+      documentTypes: [],
+      quickPreset: ''
+    });
+  };
+
+  const getUniqueValues = (key: string) => {
+    if (!selectedThread) return [];
+    const thread = conversations.find(t => t.id === selectedThread);
+    if (!thread) return [];
+    return [...new Set(thread.results.map(result => result[key as keyof typeof result]))];
+  };
+
+  // Dropdown management
+  const toggleDropdown = (dropdown: keyof typeof openDropdowns) => {
+    setOpenDropdowns(prev => ({
+      ...prev,
+      [dropdown]: !prev[dropdown]
+    }));
+  };
+
+  const closeAllDropdowns = () => {
+    setOpenDropdowns({
+      applications: false,
+      authors: false,
+      documentTypes: false,
+      sort: false
+    });
+  };
+
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const isOutside = Object.values(dropdownRefs).every(ref => 
+        ref.current && !ref.current.contains(target)
+      );
+      if (isOutside) {
+        closeAllDropdowns();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Get filter counts for badges
+  const getFilterCounts = () => ({
+    applications: filters.applications.length,
+    authors: filters.authors.length,
+    documentTypes: filters.documentTypes.length,
+    sort: filters.timeRange !== 'latest' ? 1 : 0
+  });
+
+  // Get application icon
+  const getApplicationIcon = (source: string) => {
+    switch (source) {
+      case 'Slack': return <SlackIcon className="w-4 h-4" />;
+      case 'Google Drive': return <GoogleDriveIcon className="w-4 h-4" />;
+      case 'Notion': return <NotionIcon className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  // Get document type icon
+  const getDocumentTypeIcon = (type: string) => {
+    switch (type) {
+      case 'pdf': return <File className="w-4 h-4" />;
+      case 'doc': return <FileText className="w-4 h-4" />;
+      case 'excel': return <Table className="w-4 h-4" />;
+      case 'message': return <MessageSquare className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background relative flex flex-col items-center justify-center p-6 overflow-hidden">
-      {/* Haven7 Logo - Top Left */}
-      <div className="absolute top-6 left-6 z-20">
-        <span className="text-xl font-semibold text-foreground">Haven7</span>
+    <div className="min-h-screen bg-background flex">
+      {/* Left Sidebar - Threaded Conversations */}
+      <div className="w-80 bg-card/50 backdrop-blur-sm border-r border-border/50 flex flex-col">
+        {/* Sidebar Header */}
+        <div className="p-6 border-b border-border/30">
+          <div className="flex items-center gap-3 mb-4">
+            <MessageSquare className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Conversations</h2>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <Plus className="w-4 h-4" />
+            New Conversation
+          </Button>
+        </div>
+
+        {/* Thread List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {conversations.map((thread) => (
+            <div
+              key={thread.id}
+              className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                selectedThread === thread.id
+                  ? 'bg-primary/10 border border-primary/20'
+                  : 'hover:bg-secondary/50 border border-transparent'
+              }`}
+              onClick={() => handleThreadClick(thread.id)}
+            >
+              {editingThread === thread.id ? (
+                <div className="space-y-2">
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="text-sm"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRenameThread(thread.id, editTitle);
+                      } else if (e.key === 'Escape') {
+                        cancelEditing();
+                      }
+                    }}
+                    onBlur={() => handleRenameThread(thread.id, editTitle)}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-foreground truncate">
+                        {thread.title}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatTimestamp(thread.timestamp)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditing(thread.id, thread.title);
+                        }}
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteThread(thread.id);
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        {/* Haven7 Logo - Top Left */}
+        <div className="absolute top-6 left-6 z-20">
+          <span className="text-xl font-semibold text-foreground">Haven7</span>
+        </div>
 
       {/* Subtle background elements */}
       <div className="absolute inset-0 pointer-events-none">
@@ -161,17 +600,305 @@ const SearchInterface = () => {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
       </div>
 
-      {/* Main search interface */}
+        {/* Main search interface or conversation view */}
+        {selectedThread ? (
+          <div className="w-full max-w-4xl space-y-6 animate-fade-in relative z-10">
+            {/* Conversation Header */}
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl font-semibold text-foreground">
+                {conversations.find(t => t.id === selectedThread)?.title}
+              </h1>
+              <p className="text-muted-foreground">
+                {conversations.find(t => t.id === selectedThread)?.query}
+              </p>
+            </div>
+
+            {/* Modern Dropdown Filters */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Filters</span>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Clear all
+                </Button>
+              </div>
+
+              {/* Dropdown Filters Row */}
+              <div className="flex flex-wrap gap-3">
+                {/* Applications Dropdown */}
+                <div className="relative" ref={dropdownRefs.applications}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('applications')}
+                    className={`h-9 px-3 py-2 text-sm font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.applications ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>Applications</span>
+                      {getFilterCounts().applications > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {getFilterCounts().applications}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 ml-2 transition-transform duration-200 ${
+                      openDropdowns.applications ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.applications && (
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {getUniqueValues('source').map((source) => (
+                            <button
+                              key={source}
+                              onClick={() => toggleFilter('applications', source as string)}
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                            >
+                              <div className="flex items-center gap-2">
+                                {getApplicationIcon(source as string)}
+                                <span>{source}</span>
+                              </div>
+                              {filters.applications.includes(source as string) && (
+                                <Check className="w-4 h-4 text-primary ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Authors Dropdown */}
+                <div className="relative" ref={dropdownRefs.authors}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('authors')}
+                    className={`h-9 px-3 py-2 text-sm font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.authors ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>Authors</span>
+                      {getFilterCounts().authors > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {getFilterCounts().authors}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 ml-2 transition-transform duration-200 ${
+                      openDropdowns.authors ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.authors && (
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {getUniqueValues('author').map((author) => (
+                            <button
+                              key={author}
+                              onClick={() => toggleFilter('authors', author as string)}
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
+                                  {(author as string).charAt(0)}
+                                </div>
+                                <span>{author}</span>
+                              </div>
+                              {filters.authors.includes(author as string) && (
+                                <Check className="w-4 h-4 text-primary ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Document Types Dropdown */}
+                <div className="relative" ref={dropdownRefs.documentTypes}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('documentTypes')}
+                    className={`h-9 px-3 py-2 text-sm font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.documentTypes ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>Types</span>
+                      {getFilterCounts().documentTypes > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {getFilterCounts().documentTypes}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 ml-2 transition-transform duration-200 ${
+                      openDropdowns.documentTypes ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.documentTypes && (
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {getUniqueValues('type').map((type) => (
+                            <button
+                              key={type}
+                              onClick={() => toggleFilter('documentTypes', type as string)}
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                            >
+                              <div className="flex items-center gap-2">
+                                {getDocumentTypeIcon(type as string)}
+                                <span className="capitalize">{type}</span>
+                              </div>
+                              {filters.documentTypes.includes(type as string) && (
+                                <Check className="w-4 h-4 text-primary ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sort Dropdown */}
+                <div className="relative" ref={dropdownRefs.sort}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('sort')}
+                    className={`h-9 px-3 py-2 text-sm font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.sort ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Sort</span>
+                      {getFilterCounts().sort > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {filters.timeRange === 'oldest' ? 'Oldest' : 'Latest'}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 ml-2 transition-transform duration-200 ${
+                      openDropdowns.sort ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.sort && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          <button
+                            onClick={() => setFilters(prev => ({ ...prev, timeRange: 'latest' }))}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                          >
+                            <Clock className="w-4 h-4" />
+                            <span>Latest</span>
+                            {filters.timeRange === 'latest' && (
+                              <Check className="w-4 h-4 text-primary ml-auto" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setFilters(prev => ({ ...prev, timeRange: 'oldest' }))}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                          >
+                            <Clock className="w-4 h-4" />
+                            <span>Oldest</span>
+                            {filters.timeRange === 'oldest' && (
+                              <Check className="w-4 h-4 text-primary ml-auto" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Filtered Results */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {getFilteredResults().length} result{getFilteredResults().length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              
+              {getFilteredResults().map((result, index) => (
+                <div key={index} className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-lg p-4 hover:bg-card/80 transition-colors duration-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {result.source}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {result.author}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {formatTimestamp(result.timestamp)}
+                    </span>
+                  </div>
+                  
+                  <p className="text-sm text-foreground/90 mb-2">{result.content}</p>
+                  
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {result.type === 'message' && result.channel && (
+                      <span>#{result.channel}</span>
+                    )}
+                    {result.filename && (
+                      <span>{result.filename}</span>
+                    )}
+                    {result.page && (
+                      <span>📄 {result.page}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Back to Search Button */}
+            <div className="text-center">
+              <Button 
+                variant="outline" 
+                onClick={() => setSelectedThread(null)}
+                className="gap-2"
+              >
+                <Search className="w-4 h-4" />
+                New Search
+              </Button>
+            </div>
+          </div>
+        ) : (
       <div className="w-full max-w-3xl space-y-10 animate-scale-in relative z-10">
-        {/* Heading and tagline */}
-        <div className="text-center space-y-4 animate-fade-in">
-          <h1 className="text-5xl font-light text-foreground tracking-tight">
-            Your Work, Connected
-          </h1>
-          <p className="text-xl text-muted-foreground/80 font-light max-w-2xl mx-auto leading-relaxed">
-            All your scattered knowledge, one search away.
-          </p>
-        </div>
+            {/* Heading and tagline */}
+            <div className="text-center space-y-4 animate-fade-in">
+              <h1 className="text-5xl font-light text-foreground tracking-tight">
+                Your Work, Connected
+              </h1>
+              <p className="text-xl text-muted-foreground/80 font-light max-w-2xl mx-auto leading-relaxed">
+                All your scattered knowledge, one search away.
+              </p>
+            </div>
 
         {/* Search form */}
         <form onSubmit={handleSearch} className="relative">
@@ -223,43 +950,45 @@ const SearchInterface = () => {
         </div>
 
         {/* Connected sources */}
-        <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
-          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
+            <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
             <span className="font-medium">Connected sources:</span>
-            <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
               {connectedSources.map((source, index) => (
-                <TooltipProvider key={source.name}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div 
-                        className={`
-                          group relative w-8 h-8 rounded-md flex items-center justify-center cursor-pointer
-                          transition-all duration-200 ease-in-out
-                          hover:scale-105
-                          text-muted-foreground/70 hover:text-foreground
-                          ${source.color === 'slack' ? 
-                            'hover:text-[#4A154B]' :
-                            source.color === 'google' ?
-                            'hover:text-[#4285F4]' :
-                            'hover:text-[#000000]'
-                          }
-                        `}
-                        style={{ 
-                          animationDelay: `${0.7 + index * 0.1}s`
-                        }}
-                      >
-                        <source.icon className="w-4 h-4 transition-colors duration-200 ease-in-out" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="bg-card/95 backdrop-blur-sm border border-border/50 text-foreground text-xs">
-                      <p>{source.tooltip}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ))}
+                    <TooltipProvider key={source.name}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div 
+                            className={`
+                              group relative w-8 h-8 rounded-md flex items-center justify-center cursor-pointer
+                              transition-all duration-200 ease-in-out
+                              hover:scale-105
+                              text-muted-foreground/70 hover:text-foreground
+                              ${source.color === 'slack' ? 
+                                'hover:text-[#4A154B]' :
+                                source.color === 'google' ?
+                                'hover:text-[#4285F4]' :
+                                'hover:text-[#000000]'
+                              }
+                            `}
+                            style={{ 
+                              animationDelay: `${0.7 + index * 0.1}s`
+                            }}
+                          >
+                            <source.icon className="w-4 h-4 transition-colors duration-200 ease-in-out" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-card/95 backdrop-blur-sm border border-border/50 text-foreground text-xs">
+                          <p>{source.tooltip}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

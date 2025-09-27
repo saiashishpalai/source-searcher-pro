@@ -29,8 +29,8 @@
     --muted: 220 13% 16%;
     --muted-foreground: 215 16% 70%;
 
-    /* Accent - soft teal */
-    --accent: 180 100% 75%;
+    /* Accent - soft purple/lavender */
+    --accent: 270 85% 75%;
     --accent-foreground: 220 13% 8%;
 
     /* Destructive colors */
@@ -49,10 +49,10 @@
 
     /* Gradients and effects */
     --gradient-dark: linear-gradient(135deg, hsl(220 13% 8%), hsl(220 13% 12%));
-    --gradient-elegant: linear-gradient(135deg, hsl(262 83% 70% / 0.05), hsl(180 100% 75% / 0.03));
-    --gradient-search: linear-gradient(135deg, hsl(262 83% 70% / 0.1), hsl(180 100% 75% / 0.05));
+    --gradient-elegant: linear-gradient(135deg, hsl(262 83% 70% / 0.05), hsl(270 85% 75% / 0.03));
+    --gradient-search: linear-gradient(135deg, hsl(262 83% 70% / 0.1), hsl(270 85% 75% / 0.05));
     --glow-primary: 0 0 30px hsl(262 83% 70% / 0.4);
-    --glow-accent: 0 0 20px hsl(180 100% 75% / 0.3);
+    --glow-accent: 0 0 20px hsl(270 85% 75% / 0.3);
     --shadow-elegant: 0 8px 32px hsl(220 13% 5% / 0.6);
 
     /* Animations */
