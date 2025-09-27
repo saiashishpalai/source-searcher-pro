@@ -7,6 +7,39 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
 
 // SVG Icon Components
+const Haven7Icon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="32"
+    height="32"
+    viewBox="0 0 32 32"
+    className={className}
+  >
+    {/* Modern "H7" design */}
+    <defs>
+      <linearGradient id="haven7Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#6366F1" />
+        <stop offset="100%" stopColor="#8B5CF6" />
+      </linearGradient>
+    </defs>
+    
+    {/* Background circle */}
+    <circle cx="16" cy="16" r="15" fill="url(#haven7Gradient)" />
+    
+    {/* H letter */}
+    <path
+      fill="white"
+      d="M8 10h2v12h-2V10zm6 0h2v12h-2V10zm-4 5h6v2h-6v-2z"
+    />
+    
+    {/* 7 number */}
+    <path
+      fill="white"
+      d="M20 10h6v2h-4v10h-2V10z"
+    />
+  </svg>
+);
+
 const SlackIcon = ({ className = "" }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -117,6 +150,11 @@ const SearchInterface = () => {
 
   return (
     <div className="min-h-screen bg-background relative flex flex-col items-center justify-center p-6 overflow-hidden">
+      {/* Haven7 Logo - Top Left */}
+      <div className="absolute top-6 left-6 z-20">
+        <span className="text-xl font-semibold text-foreground">Haven7</span>
+      </div>
+
       {/* Subtle background elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
