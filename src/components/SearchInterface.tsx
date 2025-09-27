@@ -515,7 +515,7 @@ const SearchInterface = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex">
       {/* Mobile Sidebar Overlay */}
       {showMobileSidebar && (
         <div 
@@ -529,14 +529,14 @@ const SearchInterface = () => {
         fixed lg:relative lg:translate-x-0 transition-all duration-300 ease-in-out z-50
         ${sidebarCollapsed ? 'w-16' : 'w-80'} 
         ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        bg-card/50 backdrop-blur-sm border-r border-border/50 flex flex-col h-full
+        bg-card/50 backdrop-blur-sm border-r border-border/50 flex flex-col h-screen
         ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-80'}
       `}>
         {/* Sidebar Header */}
         <div className={`border-b border-border/30 ${sidebarCollapsed ? 'p-4 lg:p-6' : 'p-6'}`}>
           {sidebarCollapsed ? (
-            <div className="flex flex-col items-start gap-4">
-              {/* Toggle sidebar icon - aligned with Haven7 text */}
+            <div className="flex flex-col items-center gap-4">
+              {/* Toggle sidebar icon - centered */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -545,7 +545,7 @@ const SearchInterface = () => {
               >
                 <Menu className="w-4 h-4" />
               </Button>
-              {/* New conversation icon - positioned below */}
+              {/* New conversation icon - centered below */}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -674,7 +674,7 @@ const SearchInterface = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <div className="flex-1 flex flex-col relative overflow-hidden h-screen">
         {/* Main Header - Clean and minimal */}
         <div className="flex items-center justify-between p-4 lg:p-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
           {/* Left side: Haven7 text */}
