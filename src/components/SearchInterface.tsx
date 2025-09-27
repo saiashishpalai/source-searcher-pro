@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw } from 'lucide-react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -89,9 +89,9 @@ const GoogleDriveIcon = ({ className = "" }: { className?: string }) => (
     viewBox="0 0 512 512"
     className={className}
   >
-    {/* Left (purple) */}
+    {/* Left (blue) */}
     <path
-      fill="#8B5CF6"
+      fill="#4285F4"
       d="M160 32L0 320l96 160 160-288z"
     />
     {/* Right (yellow) */}
@@ -99,9 +99,9 @@ const GoogleDriveIcon = ({ className = "" }: { className?: string }) => (
       fill="#FFBB00"
       d="M352 32h-192l160 288h192z"
     />
-    {/* Bottom (blue) */}
+    {/* Bottom (green) */}
     <path
-      fill="#4285F4"
+      fill="#34A853"
       d="M96 480h320l96-160H192z"
     />
   </svg>
@@ -262,6 +262,8 @@ const SearchInterface = () => {
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [editingThread, setEditingThread] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -324,6 +326,21 @@ const SearchInterface = () => {
 
   const handleThreadClick = (threadId: string) => {
     setSelectedThread(threadId);
+    setShowMobileSidebar(false); // Close mobile sidebar when selecting a thread
+  };
+
+  const handleBackToSearch = () => {
+    setSelectedThread(null);
+  };
+
+  const handleNewConversation = () => {
+    setSelectedThread(null);
+    setSearchValue(''); // Clear any existing search
+  };
+
+  const handleResultClick = (result: any) => {
+    // Handle result card click - could open a detailed view or continue conversation
+    console.log('Result clicked:', result);
   };
 
   const handleRenameThread = (threadId: string, newTitle: string) => {
@@ -499,112 +516,240 @@ const SearchInterface = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left Sidebar - Threaded Conversations */}
-      <div className="w-80 bg-card/50 backdrop-blur-sm border-r border-border/50 flex flex-col">
+      {/* Mobile Sidebar Overlay */}
+      {showMobileSidebar && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+
+      {/* Left Sidebar - Claude-style minimal design */}
+      <div className={`
+        fixed lg:relative lg:translate-x-0 transition-all duration-300 ease-in-out z-50
+        ${sidebarCollapsed ? 'w-16' : 'w-80'} 
+        ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        bg-card/50 backdrop-blur-sm border-r border-border/50 flex flex-col h-full
+        ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-80'}
+      `}>
         {/* Sidebar Header */}
-        <div className="p-6 border-b border-border/30">
-          <div className="flex items-center gap-3 mb-4">
-            <MessageSquare className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Conversations</h2>
-          </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <Plus className="w-4 h-4" />
-            New Conversation
-          </Button>
+        <div className={`border-b border-border/30 ${sidebarCollapsed ? 'p-4 lg:p-6' : 'p-6'}`}>
+          {sidebarCollapsed ? (
+            <div className="flex flex-col items-start gap-4">
+              {/* Toggle sidebar icon - aligned with Haven7 text */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="h-8 w-8 p-0"
+              >
+                <Menu className="w-4 h-4" />
+              </Button>
+              {/* New conversation icon - positioned below */}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 w-8 p-0"
+                title="New Conversation"
+                onClick={handleNewConversation}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-semibold text-foreground">Haven7</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="h-8 w-8 p-0"
+                >
+                  <Menu className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                onClick={handleNewConversation}
+              >
+                <Plus className="w-4 h-4" />
+                New Conversation
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Thread List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {conversations.map((thread) => (
-            <div
-              key={thread.id}
-              className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-                selectedThread === thread.id
-                  ? 'bg-primary/10 border border-primary/20'
-                  : 'hover:bg-secondary/50 border border-transparent'
-              }`}
-              onClick={() => handleThreadClick(thread.id)}
-            >
-              {editingThread === thread.id ? (
-                <div className="space-y-2">
-                  <Input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="text-sm"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleRenameThread(thread.id, editTitle);
-                      } else if (e.key === 'Escape') {
-                        cancelEditing();
-                      }
-                    }}
-                    onBlur={() => handleRenameThread(thread.id, editTitle)}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-foreground truncate">
-                        {thread.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatTimestamp(thread.timestamp)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(thread.id, thread.title);
-                        }}
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteThread(thread.id);
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
+        {!sidebarCollapsed && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {conversations.map((thread) => (
+              <div
+                key={thread.id}
+                className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                  selectedThread === thread.id
+                    ? 'bg-primary/10 border border-primary/20'
+                    : 'hover:bg-secondary/50 border border-transparent'
+                }`}
+                onClick={() => handleThreadClick(thread.id)}
+              >
+                {editingThread === thread.id ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleRenameThread(thread.id, editTitle);
+                        } else if (e.key === 'Escape') {
+                          cancelEditing();
+                        }
+                      }}
+                      onBlur={() => handleRenameThread(thread.id, editTitle)}
+                    />
                   </div>
-                </>
-              )}
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-foreground truncate">
+                          {thread.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatTimestamp(thread.timestamp)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditing(thread.id, thread.title);
+                          }}
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteThread(thread.id);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* User Profile at bottom */}
+        {!sidebarCollapsed && (
+          <div className="p-4 border-t border-border/30">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                <User className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">User</p>
+                <p className="text-xs text-muted-foreground">user@example.com</p>
+              </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        {/* Haven7 Logo - Top Left */}
-        <div className="absolute top-6 left-6 z-20">
-          <span className="text-xl font-semibold text-foreground">Haven7</span>
+      <div className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Main Header - Clean and minimal */}
+        <div className="flex items-center justify-between p-4 lg:p-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
+          {/* Left side: Haven7 text */}
+          <div className="flex items-center gap-4">
+            <span className="text-lg font-semibold text-foreground">Haven7</span>
+            
+            {/* Mobile Menu Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMobileSidebar(true)}
+              className="lg:hidden h-8 w-8 p-0"
+            >
+              <Menu className="w-4 h-4" />
+            </Button>
+          </div>
+          
+          {/* Right side: Settings + Profile */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="h-8 w-8 p-0"
+            >
+              <Menu className="w-4 h-4" />
+            </Button>
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+              <User className="w-4 h-4 text-primary" />
+            </div>
+          </div>
         </div>
 
-      {/* Subtle background elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
-      </div>
+        {/* Secondary Header - Navigation elements */}
+        {selectedThread && (
+          <div className="flex items-center justify-between p-4 lg:p-6 border-b border-border/20 bg-background/60 backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBackToSearch}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Search
+              </Button>
+            </div>
+            
+            {/* Center: Current page title */}
+            <div className="flex-1 flex justify-center">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Home className="w-4 h-4" />
+                <span>/</span>
+                <span className="text-foreground font-medium">
+                  {conversations.find(t => t.id === selectedThread)?.title}
+                </span>
+              </div>
+            </div>
+            
+            {/* Right side: Empty for balance */}
+            <div className="w-16"></div>
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="flex-1 flex items-center justify-center p-4 lg:p-6 relative">
+          {/* Subtle background elements */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
+            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
+          </div>
 
         {/* Main search interface or conversation view */}
         {selectedThread ? (
-          <div className="w-full max-w-4xl space-y-6 animate-fade-in relative z-10">
+          <div className="w-full max-w-4xl space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 relative z-10">
             {/* Conversation Header */}
             <div className="text-center space-y-2">
               <h1 className="text-2xl font-semibold text-foreground">
@@ -846,7 +991,11 @@ const SearchInterface = () => {
               </div>
               
               {getFilteredResults().map((result, index) => (
-                <div key={index} className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-lg p-4 hover:bg-card/80 transition-colors duration-200">
+                <div 
+                  key={index} 
+                  className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-lg p-4 hover:bg-card/80 hover:border-primary/30 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                  onClick={() => handleResultClick(result)}
+                >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="text-xs">
@@ -861,9 +1010,11 @@ const SearchInterface = () => {
                     </span>
                   </div>
                   
-                  <p className="text-sm text-foreground/90 mb-2">{result.content}</p>
+                  <p className="text-sm text-foreground/90 mb-2 group-hover:text-foreground transition-colors">
+                    {result.content}
+                  </p>
                   
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground group-hover:text-muted-foreground/80 transition-colors">
                     {result.type === 'message' && result.channel && (
                       <span>#{result.channel}</span>
                     )}
@@ -874,30 +1025,22 @@ const SearchInterface = () => {
                       <span>📄 {result.page}</span>
                     )}
                   </div>
+                  
+                  {/* Hover indicator */}
+                  <div className="absolute inset-0 rounded-lg border-2 border-primary/0 group-hover:border-primary/20 transition-colors duration-200 pointer-events-none" />
                 </div>
               ))}
             </div>
 
-            {/* Back to Search Button */}
-            <div className="text-center">
-              <Button 
-                variant="outline" 
-                onClick={() => setSelectedThread(null)}
-                className="gap-2"
-              >
-                <Search className="w-4 h-4" />
-                New Search
-              </Button>
-            </div>
           </div>
         ) : (
-      <div className="w-full max-w-3xl space-y-10 animate-scale-in relative z-10">
+      <div className="w-full max-w-3xl space-y-10 animate-in fade-in-0 slide-in-from-top-4 duration-700 relative z-10">
             {/* Heading and tagline */}
             <div className="text-center space-y-4 animate-fade-in">
-              <h1 className="text-5xl font-light text-foreground tracking-tight">
+              <h1 className="text-3xl lg:text-5xl font-light text-foreground tracking-tight">
                 Your Work, Connected
               </h1>
-              <p className="text-xl text-muted-foreground/80 font-light max-w-2xl mx-auto leading-relaxed">
+              <p className="text-lg lg:text-xl text-muted-foreground/80 font-light max-w-2xl mx-auto leading-relaxed">
                 All your scattered knowledge, one search away.
               </p>
             </div>
@@ -911,22 +1054,22 @@ const SearchInterface = () => {
             `}
           >
             <div className={`absolute inset-0 rounded-2xl transition-all duration-500 ${isFocused ? 'shadow-[0_0_50px_hsl(262_83%_70%_/_0.3)]' : 'shadow-[var(--shadow-elegant)]'}`} />
-            <div className="relative bg-card/90 backdrop-blur-md border border-border/50 rounded-2xl p-8 shadow-2xl">
-              <div className="flex items-center gap-6">
-                <Search className="w-7 h-7 text-muted-foreground flex-shrink-0" />
+            <div className="relative bg-card/90 backdrop-blur-md border border-border/50 rounded-2xl p-4 lg:p-8 shadow-2xl">
+              <div className="flex items-center gap-3 lg:gap-6">
+                <Search className="w-5 h-5 lg:w-7 lg:h-7 text-muted-foreground flex-shrink-0" />
                 <Input
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   placeholder="Search across Slack, Google Drive, and Notion…"
-                  className="flex-1 border-0 bg-transparent text-xl placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-light"
+                  className="flex-1 border-0 bg-transparent text-lg lg:text-xl placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-light"
                 />
                 <Button 
                   type="submit" 
                   variant="search"
                   size="lg"
-                  className="px-10 py-3 font-medium text-base rounded-xl"
+                  className="px-6 lg:px-10 py-2 lg:py-3 font-medium text-sm lg:text-base rounded-xl"
                 >
                   Search
                 </Button>
@@ -991,6 +1134,7 @@ const SearchInterface = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
