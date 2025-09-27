@@ -264,6 +264,12 @@ const SearchInterface = () => {
   const [editTitle, setEditTitle] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([
+    'Q3 performance metrics',
+    'Team standup notes',
+    'Product roadmap draft',
+    'User feedback analysis',
+  ]);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -290,12 +296,9 @@ const SearchInterface = () => {
     sort: useRef<HTMLDivElement>(null)
   };
 
-  const recentSearches = [
-    'Q3 performance metrics',
-    'Team standup notes',
-    'Product roadmap draft',
-    'User feedback analysis',
-  ];
+  const handleRemoveRecentSearch = (index: number) => {
+    setRecentSearches(prev => prev.filter((_, i) => i !== index));
+  };
 
   const connectedSources = [
     { 
@@ -1077,10 +1080,20 @@ const SearchInterface = () => {
             {recentSearches.map((search, index) => (
               <div
                 key={index}
-                className="px-5 py-3 bg-secondary/60 text-secondary-foreground rounded-full cursor-pointer hover:bg-secondary/80 hover:scale-105 transition-all duration-300 text-sm font-medium border border-border/30 hover:border-border/60 backdrop-blur-sm animate-fade-in"
+                className="group relative px-5 py-3 bg-secondary/60 text-secondary-foreground rounded-full cursor-pointer hover:bg-secondary/80 hover:scale-105 transition-all duration-300 text-sm font-medium border border-border/30 hover:border-border/60 backdrop-blur-sm animate-fade-in"
                 style={{ animationDelay: `${0.4 + index * 0.1}s` }}
+                onClick={() => setSearchValue(search)}
               >
-                {search}
+                <span>{search}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveRecentSearch(index);
+                  }}
+                  className="absolute -top-1 -right-1 w-6 h-6 bg-muted-foreground/80 text-background rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-muted-foreground text-sm font-bold"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>
