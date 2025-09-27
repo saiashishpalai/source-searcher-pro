@@ -17,20 +17,20 @@
     --popover: 220 13% 12%;
     --popover-foreground: 210 20% 95%;
 
-    /* Primary - AI accent blue */
-    --primary: 217 91% 60%;
+    /* Primary - elegant violet */
+    --primary: 262 83% 70%;
     --primary-foreground: 220 13% 8%;
 
-    /* Secondary - subtle dark surface */
-    --secondary: 220 13% 15%;
-    --secondary-foreground: 210 20% 90%;
+    /* Secondary - elevated dark surface */
+    --secondary: 220 13% 18%;
+    --secondary-foreground: 210 20% 95%;
 
     /* Muted surfaces */
-    --muted: 220 13% 14%;
-    --muted-foreground: 215 16% 65%;
+    --muted: 220 13% 16%;
+    --muted-foreground: 215 16% 70%;
 
-    /* Accent - search focus glow */
-    --accent: 217 91% 60%;
+    /* Accent - soft teal */
+    --accent: 180 100% 75%;
     --accent-foreground: 220 13% 8%;
 
     /* Destructive colors */
@@ -49,13 +49,15 @@
 
     /* Gradients and effects */
     --gradient-dark: linear-gradient(135deg, hsl(220 13% 8%), hsl(220 13% 12%));
-    --gradient-search: linear-gradient(135deg, hsl(220 13% 15%), hsl(220 13% 18%));
-    --glow-primary: 0 0 20px hsl(217 91% 60% / 0.3);
-    --glow-search: 0 0 40px hsl(217 91% 60% / 0.2);
+    --gradient-elegant: linear-gradient(135deg, hsl(262 83% 70% / 0.05), hsl(180 100% 75% / 0.03));
+    --gradient-search: linear-gradient(135deg, hsl(262 83% 70% / 0.1), hsl(180 100% 75% / 0.05));
+    --glow-primary: 0 0 30px hsl(262 83% 70% / 0.4);
+    --glow-accent: 0 0 20px hsl(180 100% 75% / 0.3);
+    --shadow-elegant: 0 8px 32px hsl(220 13% 5% / 0.6);
 
     /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-search: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-search: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     --radius: 0.75rem;
 
