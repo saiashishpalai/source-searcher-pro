@@ -409,9 +409,11 @@ const SearchInterface = () => {
   const toggleFilter = (filterType: string, value: string) => {
     setFilters(prev => ({
       ...prev,
-      [filterType]: prev[filterType as keyof typeof prev].includes(value)
-        ? (prev[filterType as keyof typeof prev] as string[]).filter(item => item !== value)
-        : [...(prev[filterType as keyof typeof prev] as string[]), value]
+      [filterType]: Array.isArray(prev[filterType as keyof typeof prev])
+        ? (prev[filterType as keyof typeof prev] as string[]).includes(value)
+          ? (prev[filterType as keyof typeof prev] as string[]).filter(item => item !== value)
+          : [...(prev[filterType as keyof typeof prev] as string[]), value]
+        : prev[filterType as keyof typeof prev]
     }));
   };
 
