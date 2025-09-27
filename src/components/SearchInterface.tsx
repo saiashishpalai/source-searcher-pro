@@ -38,6 +38,16 @@ const SearchInterface = () => {
 
       {/* Main search interface */}
       <div className="w-full max-w-3xl space-y-10 animate-scale-in relative z-10">
+        {/* Heading and tagline */}
+        <div className="text-center space-y-4 animate-fade-in">
+          <h1 className="text-5xl font-light text-foreground tracking-tight">
+            Your Work, Connected
+          </h1>
+          <p className="text-xl text-muted-foreground/80 font-light max-w-2xl mx-auto leading-relaxed">
+            All your scattered knowledge, one search away.
+          </p>
+        </div>
+
         {/* Search form */}
         <form onSubmit={handleSearch} className="relative">
           <div 
