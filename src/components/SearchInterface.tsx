@@ -679,7 +679,7 @@ const SearchInterface = () => {
         <div className="flex items-center justify-between p-4 lg:p-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
           {/* Left side: Haven7 text */}
           <div className="flex items-center gap-4">
-            <span className="text-lg font-semibold text-foreground">Haven7</span>
+            <span className="text-lg font-semibold text-foreground leading-none">Haven7</span>
             
             {/* Mobile Menu Button */}
             <Button
@@ -698,7 +698,7 @@ const SearchInterface = () => {
               variant="ghost"
               size="sm"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 flex items-center justify-center"
             >
               <Menu className="w-4 h-4" />
             </Button>
