@@ -692,16 +692,8 @@ const SearchInterface = () => {
             </Button>
           </div>
           
-          {/* Right side: Settings + Profile */}
+          {/* Right side: Profile */}
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-8 w-8 p-0 flex items-center justify-center"
-            >
-              <Menu className="w-4 h-4" />
-            </Button>
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
               <User className="w-4 h-4 text-primary" />
             </div>
