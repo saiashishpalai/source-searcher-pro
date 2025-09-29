@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -191,7 +191,7 @@ const dummyConversations = [
   },
   {
     id: '3',
-    title: 'User Feedback Analysis',
+    title: 'Profile Feedback Analysis',
     timestamp: '2024-01-13T09:15:00Z',
     query: 'Compile user feedback from support tickets and surveys',
     results: [
@@ -205,11 +205,11 @@ const dummyConversations = [
       },
       { 
         source: 'Google Drive', 
-        content: 'User Survey Results Q4 2023.xlsx',
+        content: 'Profile Survey Results Q4 2023.xlsx',
         author: 'Maria Garcia',
         timestamp: '2024-01-11T11:00:00Z',
         type: 'excel',
-        filename: 'User_Survey_Results_Q4_2023.xlsx'
+        filename: 'Profile_Survey_Results_Q4_2023.xlsx'
       },
       { 
         source: 'Notion', 
@@ -268,7 +268,7 @@ const SearchInterface = () => {
     'Q3 performance metrics',
     'Team standup notes',
     'Product roadmap draft',
-    'User feedback analysis',
+    'Profile feedback analysis',
   ]);
   
   // Filter states
@@ -341,7 +341,7 @@ const SearchInterface = () => {
     setSearchValue(''); // Clear any existing search
   };
 
-  const handleResultClick = (result: any) => {
+  const handleResultClick = (result: unknown) => {
     // Handle result card click - could open a detailed view or continue conversation
     console.log('Result clicked:', result);
   };
@@ -660,20 +660,6 @@ const SearchInterface = () => {
           </div>
         )}
 
-        {/* User Profile at bottom */}
-        {!sidebarCollapsed && (
-          <div className="p-4 border-t border-border/30">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <User className="w-4 h-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">User</p>
-                <p className="text-xs text-muted-foreground">user@example.com</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Main Content Area */}

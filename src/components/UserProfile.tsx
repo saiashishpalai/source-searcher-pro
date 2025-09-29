@@ -59,9 +59,6 @@ const UserProfile = () => {
             <DropdownMenuItem className="hover:bg-accent/50">
               Connected Sources
             </DropdownMenuItem>
-            <DropdownMenuItem className="hover:bg-accent/50">
-              Search History
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="hover:bg-destructive/10 text-destructive hover:text-destructive"

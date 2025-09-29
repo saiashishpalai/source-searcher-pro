@@ -187,10 +187,10 @@ const ConnectSources = () => {
               {availableSources.map((source) => (
                 <Card 
                   key={source.id}
-                  className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-lg group cursor-pointer"
+                  className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-lg group cursor-pointer h-full flex flex-col"
                   onClick={() => handleConnect(source.id)}
                 >
-                  <CardHeader className="pb-4">
+                  <CardHeader className="pb-4 flex-shrink-0">
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-xl ${source.color} flex items-center justify-center text-white`}>
                         <source.icon className="w-6 h-6" />
@@ -214,32 +214,34 @@ const ConnectSources = () => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0">
-                    <CardDescription className="text-sm text-muted-foreground mb-4">
+                  <CardContent className="pt-0 flex-1 flex flex-col">
+                    <CardDescription className="text-sm text-muted-foreground mb-4 flex-1">
                       {source.description}
                     </CardDescription>
-                    <Button 
-                      variant="outline" 
-                      className="w-full group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors"
-                      disabled={connectingSource === source.id || source.connected}
-                    >
-                      {connectingSource === source.id ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : source.connected ? (
-                        <>
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Connected
-                        </>
-                      ) : (
-                        <>
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Connect {source.name}
-                        </>
-                      )}
-                    </Button>
+                    <div className="mt-auto">
+                      <Button 
+                        variant="outline" 
+                        className="w-full group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors h-10"
+                        disabled={connectingSource === source.id || source.connected}
+                      >
+                        {connectingSource === source.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Connecting...
+                          </>
+                        ) : source.connected ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Connected
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Connect
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
