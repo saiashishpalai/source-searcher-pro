@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Plus, ArrowRight } from 'lucide-react';
+import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink } from 'lucide-react';
 
 // SVG Icon Components (reusing from SearchInterface)
 const SlackIcon = ({ className = "" }: { className?: string }) => (
@@ -73,6 +73,13 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 
 const ConnectSources = () => {
   const { user } = useAuth();
+  const [connections, setConnections] = useState({
+    slack: false,
+    googleDrive: false,
+    notion: false
+  });
+  const [connectingSource, setConnectingSource] = useState<string | null>(null);
+  const [isIndexing, setIsIndexing] = useState(false);
 
   const availableSources = [
     {
@@ -80,38 +87,52 @@ const ConnectSources = () => {
       name: 'Slack',
       description: 'Connect your Slack workspace to search messages, files, and conversations',
       icon: SlackIcon,
-      connected: false,
-      color: 'bg-[#4A154B]'
+      connected: connections.slack,
+      color: 'bg-[#4A154B]',
+      available: true
     },
     {
-      id: 'google-drive',
+      id: 'googleDrive',
       name: 'Google Drive',
       description: 'Access and search your Google Drive files, documents, and folders',
       icon: GoogleDriveIcon,
-      connected: false,
-      color: 'bg-[#4285F4]'
+      connected: connections.googleDrive,
+      color: 'bg-[#4285F4]',
+      available: true
     },
     {
       id: 'notion',
       name: 'Notion',
       description: 'Search through your Notion pages, databases, and knowledge base',
       icon: NotionIcon,
-      connected: false,
-      color: 'bg-[#000000]'
+      connected: connections.notion,
+      color: 'bg-[#000000]',
+      available: true
     }
   ];
 
-  const handleConnect = (sourceId: string) => {
-    // In a real app, this would initiate OAuth flow
-    console.log(`Connecting to ${sourceId}`);
-    // For demo purposes, we'll just show a success message
-    alert(`Connecting to ${sourceId}... (This is a demo)`);
+  const handleConnect = async (sourceId: string) => {
+    setConnectingSource(sourceId);
+    
+    // Simulate OAuth flow
+    setTimeout(() => {
+      setConnections(prev => ({ ...prev, [sourceId]: true }));
+      setConnectingSource(null);
+      setIsIndexing(true);
+      
+      // Simulate indexing process
+      setTimeout(() => {
+        setIsIndexing(false);
+      }, 3000);
+    }, 2000);
   };
 
   const handleContinue = () => {
     // Navigate to main app
     window.location.href = '/';
   };
+
+  const hasAnyConnection = Object.values(connections).some(Boolean);
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,11 +175,10 @@ const ConnectSources = () => {
                 Email Verified
               </div>
               <h1 className="text-3xl lg:text-4xl font-light text-foreground tracking-tight">
-                Welcome to Haven7!
+                Connect Your Knowledge
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Connect your work sources to start searching across all your knowledge. 
-                Choose which sources you'd like to connect now, or skip and add them later.
+                Haven7 searches your work tools to answer questions with your actual context
               </p>
             </div>
 
@@ -180,8 +200,15 @@ const ConnectSources = () => {
                           {source.name}
                         </CardTitle>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {source.connected ? 'Connected' : 'Not Connected'}
+                          <Badge 
+                            variant={source.connected ? "default" : "outline"} 
+                            className={`text-xs ${
+                              source.connected 
+                                ? 'bg-green-500/20 text-green-400 border-green-500/30' 
+                                : ''
+                            }`}
+                          >
+                            {source.connected ? 'Connected ✓' : 'Not connected'}
                           </Badge>
                         </div>
                       </div>
@@ -194,14 +221,44 @@ const ConnectSources = () => {
                     <Button 
                       variant="outline" 
                       className="w-full group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors"
+                      disabled={connectingSource === source.id || source.connected}
                     >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Connect {source.name}
+                      {connectingSource === source.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : source.connected ? (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Connected
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Connect {source.name}
+                        </>
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
+
+            {/* Indexing State */}
+            {isIndexing && (
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center gap-3">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="text-lg font-medium text-foreground">
+                    Indexing your connected sources...
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  This may take a few minutes depending on your data size
+                </p>
+              </div>
+            )}
 
             {/* Continue Button */}
             <div className="text-center space-y-4">
@@ -209,12 +266,25 @@ const ConnectSources = () => {
                 onClick={handleContinue}
                 size="lg"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3"
+                disabled={!hasAnyConnection || isIndexing}
               >
-                Continue to Haven7
-                <ArrowRight className="w-4 h-4 ml-2" />
+                {isIndexing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Indexing...
+                  </>
+                ) : (
+                  <>
+                    Continue to Haven7
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </>
+                )}
               </Button>
               <p className="text-sm text-muted-foreground">
-                You can always connect more sources later from your settings
+                {!hasAnyConnection 
+                  ? 'Connect at least one source to continue' 
+                  : 'You can always connect more sources later from your settings'
+                }
               </p>
             </div>
           </div>
