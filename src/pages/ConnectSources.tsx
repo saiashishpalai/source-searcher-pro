@@ -6,7 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink, Shield, Eye, Lock, X } from 'lucide-react';
 
 // SVG Icon Components (reusing from SearchInterface)
 const SlackIcon = ({ className = "" }: { className?: string }) => (
@@ -74,6 +75,163 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+// Permission Modal Component
+const PermissionModal = ({ 
+  isOpen, 
+  onClose, 
+  source, 
+  onConnect 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  source: any; 
+  onConnect: () => void; 
+}) => {
+  const getPermissionData = (sourceId: string) => {
+    switch (sourceId) {
+      case 'slack':
+        return {
+          willAccess: [
+            'Read messages in channels you\'re in',
+            'Read files shared in channels',
+            'View channel names and team members',
+            'Search message history',
+            'Access public channel information'
+          ],
+          wontAccess: [
+            'Cannot send messages on your behalf',
+            'Cannot modify channels or settings',
+            'Cannot access private DMs without permission',
+            'Cannot invite or remove team members'
+          ]
+        };
+      case 'googleDrive':
+        return {
+          willAccess: [
+            'Read files and folders you can access',
+            'View file metadata and structure',
+            'Access shared drives you\'re part of',
+            'Read document content for search',
+            'View folder organization'
+          ],
+          wontAccess: [
+            'Cannot modify or delete your files',
+            'Cannot share files on your behalf',
+            'Cannot create new files or folders',
+            'Cannot change file permissions'
+          ]
+        };
+      case 'notion':
+        return {
+          willAccess: [
+            'Read pages you have access to',
+            'View database content and structure',
+            'Access page comments and discussions',
+            'Read workspace content',
+            'Search through your knowledge base'
+          ],
+          wontAccess: [
+            'Cannot edit or delete your pages',
+            'Cannot modify database structures',
+            'Cannot create new pages or databases',
+            'Cannot change workspace settings'
+          ]
+        };
+      default:
+        return { willAccess: [], wontAccess: [] };
+    }
+  };
+
+  const permissionData = getPermissionData(source?.id);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl bg-card/95 backdrop-blur-sm border-border/50">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className={`w-8 h-8 rounded-lg ${source?.color} flex items-center justify-center text-white`}>
+              {source?.icon && React.createElement(source.icon, { className: "w-5 h-5" })}
+            </div>
+            Connect {source?.name}
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Review what Haven7 will access and how your data is used
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 max-h-96 overflow-y-auto">
+          {/* What Haven7 will access */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" />
+              What Haven7 will access
+            </h3>
+            <ul className="space-y-2">
+              {permissionData.willAccess.map((item, index) => (
+                <li key={index} className="flex items-start gap-3 text-sm text-muted-foreground">
+                  <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* What Haven7 won't access */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Lock className="w-5 h-5 text-red-500" />
+              What Haven7 won't access
+            </h3>
+            <ul className="space-y-2">
+              {permissionData.wontAccess.map((item, index) => (
+                <li key={index} className="flex items-start gap-3 text-sm text-muted-foreground">
+                  <X className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* How your data is used */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              How your data is used
+            </h3>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-3 text-sm text-muted-foreground">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>Your data is used only to answer your search queries</span>
+              </li>
+              <li className="flex items-start gap-3 text-sm text-muted-foreground">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>We use OAuth tokens securely encrypted in our database</span>
+              </li>
+              <li className="flex items-start gap-3 text-sm text-muted-foreground">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>Your data is never shared with third parties or used for training AI models</span>
+              </li>
+              <li className="flex items-start gap-3 text-sm text-muted-foreground">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>You can disconnect anytime and we'll immediately revoke access</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-3">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={onConnect} className="bg-primary hover:bg-primary/90">
+            Continue to {source?.name}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const ConnectSources = () => {
   const router = useRouter();
   const { user } = useAuth();
@@ -84,6 +242,8 @@ const ConnectSources = () => {
   });
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
   const [isIndexing, setIsIndexing] = useState(false);
+  const [permissionModalOpen, setPermissionModalOpen] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<any>(null);
 
   const availableSources = [
     {
@@ -93,7 +253,12 @@ const ConnectSources = () => {
       icon: SlackIcon,
       connected: connections.slack,
       color: 'bg-[#4A154B]',
-      available: true
+      available: true,
+      permissions: [
+        'Channels you\'re in',
+        'Messages and files',
+        'Team member names'
+      ]
     },
     {
       id: 'googleDrive',
@@ -102,7 +267,12 @@ const ConnectSources = () => {
       icon: GoogleDriveIcon,
       connected: connections.googleDrive,
       color: 'bg-[#4285F4]',
-      available: true
+      available: true,
+      permissions: [
+        'Files you can access',
+        'Folder structure',
+        'Document content'
+      ]
     },
     {
       id: 'notion',
@@ -111,24 +281,42 @@ const ConnectSources = () => {
       icon: NotionIcon,
       connected: connections.notion,
       color: 'bg-[#000000]',
-      available: true
+      available: true,
+      permissions: [
+        'Pages you have access to',
+        'Database content',
+        'Page comments'
+      ]
     }
   ];
 
+  const handleConnectClick = (source: any) => {
+    if (source.connected) return;
+    
+    setSelectedSource(source);
+    setPermissionModalOpen(true);
+  };
+
   const handleConnect = async (sourceId: string) => {
+    setPermissionModalOpen(false);
     setConnectingSource(sourceId);
     
-    // Simulate OAuth flow
-    setTimeout(() => {
-      setConnections(prev => ({ ...prev, [sourceId]: true }));
-      setConnectingSource(null);
-      setIsIndexing(true);
-      
-      // Simulate indexing process
-      setTimeout(() => {
-        setIsIndexing(false);
-      }, 3000);
-    }, 2000);
+    // Redirect to OAuth endpoint
+    const oauthEndpoints = {
+      slack: '/api/auth/slack/connect',
+      googleDrive: '/api/auth/google/connect',
+      notion: '/api/auth/notion/connect'
+    };
+    
+    const endpoint = oauthEndpoints[sourceId as keyof typeof oauthEndpoints];
+    if (endpoint) {
+      window.location.href = endpoint;
+    }
+  };
+
+  const handleViewPermissions = (source: any) => {
+    setSelectedSource(source);
+    setPermissionModalOpen(true);
   };
 
   const handleContinue = () => {
@@ -191,13 +379,12 @@ const ConnectSources = () => {
               {availableSources.map((source) => (
                 <Card 
                   key={source.id}
-                  className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-lg group cursor-pointer h-full flex flex-col"
-                  onClick={() => handleConnect(source.id)}
+                  className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-lg group h-full flex flex-col"
                 >
                   <CardHeader className="pb-4 flex-shrink-0">
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-xl ${source.color} flex items-center justify-center text-white`}>
-                        <source.icon className="w-6 h-6" />
+                        {React.createElement(source.icon, { className: "w-6 h-6" })}
                       </div>
                       <div className="flex-1">
                         <CardTitle className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
@@ -219,14 +406,29 @@ const ConnectSources = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 flex-1 flex flex-col">
-                    <CardDescription className="text-sm text-muted-foreground mb-4 flex-1">
+                    <CardDescription className="text-sm text-muted-foreground mb-4">
                       {source.description}
                     </CardDescription>
-                    <div className="mt-auto">
+                    
+                    {/* Permission Preview */}
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">What we'll access</h4>
+                      <ul className="space-y-1">
+                        {source.permissions.map((permission, index) => (
+                          <li key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                            <span>{permission}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    <div className="mt-auto space-y-3">
                       <Button 
                         variant="outline" 
                         className="w-full group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors h-10"
                         disabled={connectingSource === source.id || source.connected}
+                        onClick={() => handleConnectClick(source)}
                       >
                         {connectingSource === source.id ? (
                           <>
@@ -245,6 +447,14 @@ const ConnectSources = () => {
                           </>
                         )}
                       </Button>
+                      
+                      {/* Footer link */}
+                      <button
+                        onClick={() => handleViewPermissions(source)}
+                        className="w-full text-xs text-primary hover:text-primary/80 hover:underline transition-colors"
+                      >
+                        View all permissions
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
@@ -296,6 +506,14 @@ const ConnectSources = () => {
           </div>
         </div>
       </div>
+
+      {/* Permission Modal */}
+      <PermissionModal
+        isOpen={permissionModalOpen}
+        onClose={() => setPermissionModalOpen(false)}
+        source={selectedSource}
+        onConnect={() => handleConnect(selectedSource?.id)}
+      />
     </div>
   );
 };
