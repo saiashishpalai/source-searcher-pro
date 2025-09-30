@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Mail, Lock, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -65,29 +65,45 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Background elements */}
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Enhanced Background elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-primary/5 to-accent/3 rounded-full blur-2xl animate-background-drift" style={{ animationDelay: '5s' }} />
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        {/* Haven7 Logo */}
-        <div className="text-center mb-8">
+        {/* Back to Landing Link */}
+        <div className="mb-6">
+          <Link 
+            to="/" 
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group animate-fade-in"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            Back to Haven7
+          </Link>
+        </div>
+
+        {/* Haven7 Logo with Animation */}
+        <div className="text-center mb-8 animate-fade-in-up">
           <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center animate-pulse">
               <span className="text-white font-bold text-lg">H7</span>
             </div>
             <span className="text-2xl font-semibold text-foreground">Haven7</span>
           </div>
-          <p className="text-muted-foreground">Create your account to get started</p>
+          <p className="text-muted-foreground animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+            Create your account to get started
+          </p>
         </div>
 
-        <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-2xl">
+        <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-2xl animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-semibold text-foreground">Create Account</CardTitle>
-            <CardDescription className="text-muted-foreground">
+            <CardTitle className="text-2xl font-semibold text-foreground animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+              Create Account
+            </CardTitle>
+            <CardDescription className="text-muted-foreground animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
               Join Haven7 and connect your work sources
             </CardDescription>
           </CardHeader>
@@ -100,12 +116,12 @@ const Signup = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
+              <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: '1s' }}>
                 <Label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email Address
                 </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <div className="relative group">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     id="email"
                     name="email"
@@ -113,18 +129,18 @@ const Signup = () => {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="Enter your email"
-                    className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                    className="pl-10 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     required
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: '1.2s' }}>
                 <Label htmlFor="password" className="text-sm font-medium text-foreground">
                   Password
                 </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     id="password"
                     name="password"
@@ -132,14 +148,14 @@ const Signup = () => {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="Create a password"
-                    className="pl-10 pr-10 bg-background/50 border-border/50 focus:border-primary/50"
+                    className="pl-10 pr-10 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     required
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -150,12 +166,12 @@ const Signup = () => {
                 </p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: '1.4s' }}>
                 <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
                   Confirm Password
                 </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     id="confirmPassword"
                     name="confirmPassword"
@@ -163,14 +179,14 @@ const Signup = () => {
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
                     placeholder="Confirm your password"
-                    className="pl-10 pr-10 bg-background/50 border-border/50 focus:border-primary/50"
+                    className="pl-10 pr-10 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     required
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent transition-colors"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -178,21 +194,39 @@ const Signup = () => {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Creating Account...' : 'Create Account'}
-              </Button>
+              <div className="animate-fade-in-up" style={{ animationDelay: '1.6s' }}>
+                <Button
+                  type="submit"
+                  className="group relative w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
+                  disabled={isLoading}
+                >
+                  {/* Animated background shimmer */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                  
+                  {/* Button content */}
+                  <span className="relative flex items-center justify-center gap-2">
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Create Account
+                      </>
+                    )}
+                  </span>
+                </Button>
+              </div>
             </form>
 
-            <div className="text-center">
+            <div className="text-center animate-fade-in-up" style={{ animationDelay: '1.8s' }}>
               <p className="text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <Link
                   to="/login"
-                  className="text-primary hover:text-primary/80 font-medium transition-colors"
+                  className="text-primary hover:text-primary/80 font-medium transition-colors hover:underline"
                 >
                   Sign in
                 </Link>
@@ -201,12 +235,63 @@ const Signup = () => {
           </CardContent>
         </Card>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center animate-fade-in-up" style={{ animationDelay: '2s' }}>
           <p className="text-xs text-muted-foreground/60">
             By creating an account, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>
       </div>
+
+      {/* Custom CSS for animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes fade-in-up {
+          from { 
+            opacity: 0; 
+            transform: translateY(30px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        
+        @keyframes background-drift {
+          0%, 100% { 
+            transform: translate(0, 0) scale(1); 
+            opacity: 0.3; 
+          }
+          25% { 
+            transform: translate(20px, -20px) scale(1.05); 
+            opacity: 0.4; 
+          }
+          50% { 
+            transform: translate(-10px, 10px) scale(0.95); 
+            opacity: 0.2; 
+          }
+          75% { 
+            transform: translate(15px, 5px) scale(1.02); 
+            opacity: 0.35; 
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.8s ease-out forwards;
+        }
+        
+        .animate-fade-in-up {
+          animation: fade-in-up 0.8s ease-out forwards;
+          opacity: 0;
+        }
+        
+        .animate-background-drift {
+          animation: background-drift 20s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };

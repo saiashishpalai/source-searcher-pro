@@ -563,7 +563,9 @@ const SearchInterface = () => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-lg font-semibold text-foreground">Haven7</span>
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">H7</span>
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
