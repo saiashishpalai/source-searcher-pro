@@ -51,7 +51,7 @@ const UserProfile = () => {
             <div className="px-2 py-1.5">
               <p className="text-sm font-medium text-foreground">{user?.email}</p>
               <p className="text-xs text-muted-foreground">
-                {user?.isVerified ? 'Verified' : 'Unverified'}
+                {user?.email_confirmed_at ? 'Verified' : 'Unverified'}
               </p>
             </div>
             <DropdownMenuSeparator />
