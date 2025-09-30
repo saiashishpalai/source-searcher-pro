@@ -102,6 +102,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     await supabase.auth.signOut();
+    // Redirect to login page after logout
+    window.location.href = '/login';
   };
 
   const resetPassword = async (email: string) => {

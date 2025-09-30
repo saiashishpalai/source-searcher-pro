@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User } from 'lucide-react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
 
 // SVG Icon Components
@@ -258,6 +261,9 @@ const dummyConversations = [
 ];
 
 const SearchInterface = () => {
+  // Auth context
+  const { user, logout } = useAuth();
+  
   const [searchValue, setSearchValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [conversations, setConversations] = useState(dummyConversations);
@@ -668,28 +674,77 @@ const SearchInterface = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col relative overflow-hidden h-screen">
-        {/* Main Header - Clean and minimal */}
-        <div className="flex items-center justify-between p-4 lg:p-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
-          {/* Left side: Haven7 text */}
-          <div className="flex items-center gap-4">
-            <span className="text-lg font-semibold text-foreground leading-none">Haven7</span>
-            
-            {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="sm"
+        {/* Main Header - Fixed layout */}
+        <div className="flex items-center justify-between h-16 px-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
+          {/* Left section: Sidebar toggle + Haven7 logo */}
+          <div className="flex items-center gap-3">
+            {/* Sidebar toggle button */}
+            <button
               onClick={() => setShowMobileSidebar(true)}
-              className="lg:hidden h-8 w-8 p-0"
+              className="lg:hidden h-10 w-10 flex items-center justify-center rounded-lg hover:bg-accent/10 transition-colors"
             >
-              <Menu className="w-4 h-4" />
-            </Button>
+              <Menu className="w-5 h-5" />
+            </button>
+            
+            {/* Haven7 logo */}
+            <span className="text-xl font-semibold text-white leading-none">Haven7</span>
           </div>
           
-          {/* Right side: Profile */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <User className="w-4 h-4 text-primary" />
-            </div>
+          {/* Right section: Settings + Profile */}
+          <div className="flex items-center gap-4 pr-6">
+            {/* Settings button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full bg-card/50 backdrop-blur-sm border border-border/50 hover:bg-card/80 transition-all duration-200 flex items-center justify-center"
+            >
+              <Settings className="w-5 h-5" />
+            </Button>
+
+            {/* User avatar with dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-10 w-10 rounded-full p-0 bg-card/50 backdrop-blur-sm border border-border/50 hover:bg-card/80 transition-all duration-200 flex items-center justify-center"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/api/placeholder/32/32" alt="User" />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                      {user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                align="end" 
+                className="w-56 bg-card/95 backdrop-blur-sm border-border/50 z-[9999] shadow-lg"
+                sideOffset={8}
+                alignOffset={-8}
+              >
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {user?.email_confirmed_at ? 'Verified' : 'Unverified'}
+                  </p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="hover:bg-accent/50">
+                  Profile Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem className="hover:bg-accent/50">
+                  Connected Sources
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="hover:bg-destructive/10 text-destructive hover:text-destructive"
+                  onClick={() => logout()}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -1048,7 +1103,7 @@ const SearchInterface = () => {
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   placeholder="Search across Slack, Google Drive, and Notion…"
-                  className="flex-1 border-0 bg-transparent text-lg lg:text-xl placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-light"
+                  className="flex-1 border-0 bg-transparent text-sm sm:text-base md:text-lg lg:text-xl placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-light"
                 />
                 <Button 
                   type="submit" 

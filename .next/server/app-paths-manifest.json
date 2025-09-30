@@ -1,6 +1,8 @@
 {
-  "/(auth)/verify-email/page": "app/(auth)/verify-email/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/connect-sources/page": "app/connect-sources/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/dashboard/page": "app/dashboard/page.js",
+  "/page": "app/page.js",
+  "/(auth)/signup/page": "app/(auth)/signup/page.js",
+  "/_not-found/page": "app/_not-found/page.js"
 }
