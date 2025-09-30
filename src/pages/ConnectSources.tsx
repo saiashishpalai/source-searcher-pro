@@ -128,8 +128,8 @@ const ConnectSources = () => {
   };
 
   const handleContinue = () => {
-    // Navigate to main app
-    window.location.href = '/';
+    // Navigate to main app dashboard
+    window.location.href = '/dashboard';
   };
 
   const hasAnyConnection = Object.values(connections).some(Boolean);
