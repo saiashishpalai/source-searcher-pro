@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
@@ -14,10 +14,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requireVerification = false 
 }) => {
-  const { user, isLoading } = useAuth();
-  const location = useLocation();
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -29,13 +29,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
-    // Redirect to login with return url
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Redirect to login
+    router.push('/login');
+    return null;
   }
 
-  if (requireVerification && !user.isVerified) {
+  if (requireVerification && !user.email_verified) {
     // Redirect to email verification
-    return <Navigate to="/verify-email" state={{ email: user.email }} replace />;
+    router.push('/verify-email');
+    return null;
   }
 
   return <>{children}</>;

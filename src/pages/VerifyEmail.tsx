@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,23 +15,23 @@ const VerifyEmail = () => {
   const [isVerified, setIsVerified] = useState(false);
   const [email, setEmail] = useState('');
   
-  const { verifyEmail } = useAuth();
-  const location = useLocation();
+  const { resendVerificationEmail } = useAuth();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Get email from location state
-    if (location.state?.email) {
-      setEmail(location.state.email);
+    // Get email from URL params
+    const emailParam = searchParams.get('email');
+    if (emailParam) {
+      setEmail(emailParam);
     }
 
     // Check if there's a verification token in the URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    const token = searchParams.get('token');
     
     if (token) {
       handleVerification(token);
     }
-  }, [location]);
+  }, [searchParams]);
 
   const handleVerification = async (token: string) => {
     setIsLoading(true);
@@ -98,12 +99,11 @@ const VerifyEmail = () => {
               </div>
 
               <div className="text-center">
-                <Button
-                  onClick={() => navigate('/connect-sources')}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-                >
-                  Continue to Haven7
-                </Button>
+                <Link href="/connect-sources">
+                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
+                    Continue to Haven7
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -187,7 +187,7 @@ const VerifyEmail = () => {
               </Button>
 
               <Link
-                to="/login"
+                href="/login"
                 className="inline-flex items-center justify-center gap-2 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />

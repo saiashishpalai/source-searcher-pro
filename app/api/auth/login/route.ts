@@ -1,36 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, message: 'Supabase not configured' },
+        { status: 500 }
+      )
+    }
+
     const { email, password } = await request.json()
     
-    // TODO: Get user from database
-    // const user = await getUserByEmail(email)
+    // Use Supabase Admin client for server-side authentication
+    const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password,
+    })
     
-    // TODO: Verify password
-    // const isValid = await bcrypt.compare(password, user.password)
-    
-    // Mock implementation for now
-    if (email && password) {
-      const token = jwt.sign(
-        { userId: '1', email },
-        process.env.JWT_SECRET || 'fallback-secret',
-        { expiresIn: '7d' }
+    if (error) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 401 }
       )
-      
-      return NextResponse.json({
-        success: true,
-        token,
-        user: { id: '1', email, isVerified: true }
-      })
     }
     
-    return NextResponse.json(
-      { success: false, message: 'Invalid credentials' },
-      { status: 401 }
-    )
+    return NextResponse.json({
+      success: true,
+      user: data.user,
+      session: data.session
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, message: 'Server error' },
