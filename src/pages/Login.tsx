@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,10 +63,10 @@ const Login = () => {
       <div className="w-full max-w-md relative z-10">
         {/* Back to Landing Link */}
         <div className="mb-6">
-          <Link 
-            to="/" 
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group animate-fade-in"
-          >
+            <Link 
+              href="/" 
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group animate-fade-in"
+            >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Back to Haven7
           </Link>
@@ -160,7 +162,7 @@ const Login = () => {
                   </Label>
                 </div>
                 <Link
-                  to="/forgot-password"
+                  href="/forgot-password"
                   className="text-sm text-primary hover:text-primary/80 font-medium transition-colors hover:underline"
                 >
                   Forgot password?
@@ -198,7 +200,7 @@ const Login = () => {
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{' '}
                 <Link
-                  to="/signup"
+                  href="/signup"
                   className="text-primary hover:text-primary/80 font-medium transition-colors hover:underline"
                 >
                   Create one

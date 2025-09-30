@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -452,7 +454,7 @@ const SearchInterface = () => {
     if (!selectedThread) return [];
     const thread = conversations.find(t => t.id === selectedThread);
     if (!thread) return [];
-    return [...new Set(thread.results.map(result => result[key as keyof typeof result]))];
+    return Array.from(new Set(thread.results.map(result => result[key as keyof typeof result])));
   };
 
   // Dropdown management

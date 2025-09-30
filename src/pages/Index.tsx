@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import SearchInterface from '@/components/SearchInterface';
 import UserProfile from '@/components/UserProfile';

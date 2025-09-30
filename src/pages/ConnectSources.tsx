@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +75,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 );
 
 const ConnectSources = () => {
+  const router = useRouter();
   const { user } = useAuth();
   const [connections, setConnections] = useState({
     slack: false,
@@ -129,7 +133,7 @@ const ConnectSources = () => {
 
   const handleContinue = () => {
     // Navigate to main app dashboard
-    window.location.href = '/dashboard';
+    router.push('/dashboard');
   };
 
   const hasAnyConnection = Object.values(connections).some(Boolean);
