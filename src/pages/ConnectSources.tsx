@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -244,6 +244,70 @@ const ConnectSources = () => {
   const [isIndexing, setIsIndexing] = useState(false);
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch connections from API
+  const fetchConnections = async () => {
+    console.log('🔄 Fetching connections...');
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch('/api/connections/get');
+      const data = await response.json();
+      
+      console.log('✅ Connections response:', data);
+      
+      if (response.ok && data.connections) {
+        const connectionStatus = {
+          slack: data.connections.some((conn: any) => conn.source_type === 'slack' && conn.is_active),
+          googleDrive: data.connections.some((conn: any) => conn.source_type === 'google_drive' && conn.is_active),
+          notion: data.connections.some((conn: any) => conn.source_type === 'notion' && conn.is_active)
+        };
+        
+        console.log('📊 Connection status:', connectionStatus);
+        setConnections(connectionStatus);
+      } else {
+        console.error('❌ Failed to fetch connections:', data);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching connections:', error);
+    } finally {
+      setIsLoading(false);
+      setConnectingSource(null); // Clear connecting state
+    }
+  };
+
+  // Detect OAuth completion and refetch connections
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+    
+    console.log('🔍 URL params on load:', { success, error });
+    
+    if (success) {
+      console.log('✅ OAuth success detected for:', success);
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refetch connections after successful OAuth
+      fetchConnections();
+    } else if (error) {
+      console.log('❌ OAuth error detected:', error);
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setConnectingSource(null);
+    } else {
+      // Initial load - fetch connections
+      fetchConnections();
+    }
+  }, []);
+
+  // Also refetch when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      fetchConnections();
+    }
+  }, [user]);
 
   const availableSources = [
     {
@@ -304,13 +368,44 @@ const ConnectSources = () => {
     // Redirect to OAuth endpoint
     const oauthEndpoints = {
       slack: '/api/auth/slack/connect',
-      googleDrive: '/api/auth/google/connect',
+      googleDrive: '/api/auth/drive/connect',
       notion: '/api/auth/notion/connect'
     };
     
     const endpoint = oauthEndpoints[sourceId as keyof typeof oauthEndpoints];
     if (endpoint) {
+      console.log('🔗 Redirecting to OAuth:', endpoint);
       window.location.href = endpoint;
+    }
+  };
+
+  const handleDisconnect = async (sourceId: string) => {
+    console.log('🔌 Disconnecting source:', sourceId);
+    setConnectingSource(sourceId); // Show loading state
+    
+    try {
+      const response = await fetch('/api/connections/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sourceType: sourceId === 'googleDrive' ? 'google_drive' : sourceId }),
+      });
+      
+      const data = await response.json();
+      console.log('Disconnect response:', data);
+      
+      if (response.ok) {
+        console.log('✅ Successfully disconnected:', sourceId);
+        // Refetch connections to update UI
+        await fetchConnections();
+      } else {
+        console.error('❌ Failed to disconnect:', data);
+      }
+    } catch (error) {
+      console.error('❌ Error disconnecting:', error);
+    } finally {
+      setConnectingSource(null);
     }
   };
 
@@ -427,18 +522,18 @@ const ConnectSources = () => {
                       <Button 
                         variant="outline" 
                         className="w-full group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors h-10"
-                        disabled={connectingSource === source.id || source.connected}
-                        onClick={() => handleConnectClick(source)}
+                        disabled={connectingSource === source.id}
+                        onClick={() => source.connected ? handleDisconnect(source.id) : handleConnectClick(source)}
                       >
                         {connectingSource === source.id ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Connecting...
+                            {source.connected ? 'Disconnecting...' : 'Connecting...'}
                           </>
                         ) : source.connected ? (
                           <>
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Connected
+                            <X className="w-4 h-4 mr-2" />
+                            Disconnect
                           </>
                         ) : (
                           <>
