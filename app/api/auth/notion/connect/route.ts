@@ -1,38 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    // Notion OAuth configuration
-    const clientId = process.env.NOTION_CLIENT_ID
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/notion/callback`
+    console.log('🔗 NOTION CONNECT - Starting OAuth flow...');
     
-    if (!clientId) {
-      return NextResponse.json(
-        { success: false, message: 'Notion OAuth not configured' },
-        { status: 500 }
-      )
+    // Get environment variables
+    const clientId = process.env.NOTION_CLIENT_ID;
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/notion/callback`;
+    
+    console.log('Environment check:');
+    console.log('- NOTION_CLIENT_ID exists:', !!clientId);
+    console.log('- NOTION_REDIRECT_URI exists:', !!redirectUri);
+    
+    if (!clientId || !redirectUri) {
+      console.error('❌ Missing Notion OAuth environment variables');
+      return NextResponse.json({ error: 'Notion OAuth not configured' }, { status: 500 });
     }
 
-    // Notion OAuth scopes
-    const scopes = [
-      'read',
-      'user:read'
-    ].join(' ')
+    // Notion OAuth parameters
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      owner: 'user',
+      state: 'notion_connect' // State to prevent CSRF
+    });
 
-    // Build Notion OAuth URL
-    const notionAuthUrl = new URL('https://api.notion.com/v1/oauth/authorize')
-    notionAuthUrl.searchParams.set('client_id', clientId)
-    notionAuthUrl.searchParams.set('redirect_uri', redirectUri)
-    notionAuthUrl.searchParams.set('response_type', 'code')
-    notionAuthUrl.searchParams.set('owner', 'user')
-    notionAuthUrl.searchParams.set('state', 'notion_connect') // Add CSRF protection
+    const notionAuthUrl = `https://api.notion.com/v1/oauth/authorize?${params.toString()}`;
+    
+    console.log('✅ Redirecting to Notion OAuth:', notionAuthUrl);
+    return NextResponse.redirect(notionAuthUrl);
 
-    // Redirect to Notion OAuth
-    return NextResponse.redirect(notionAuthUrl.toString())
   } catch (error) {
-    return NextResponse.json(
-      { success: false, message: 'Failed to initiate Notion OAuth' },
-      { status: 500 }
-    )
+    console.error('❌ Notion connect error:', error);
+    return NextResponse.json({ error: 'Failed to initiate Notion OAuth' }, { status: 500 });
   }
 }
