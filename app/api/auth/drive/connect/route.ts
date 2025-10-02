@@ -6,9 +6,8 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🔗 GOOGLE DRIVE CONNECT - Starting OAuth flow...');
     
-    // Get environment variables
+    // Get environment variables (works for dev, staging, and production)
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    // Use the current app URL instead of hardcoded redirect URI
     const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/drive/callback`;
     
     console.log('Environment check:');
