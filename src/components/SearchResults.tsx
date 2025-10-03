@@ -153,7 +153,6 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         summary={data.aiSummary} 
         query={data.query}
         totalResults={data.totalResults}
-        searchTime={data.searchTime}
       />
 
       {/* Controls Section */}

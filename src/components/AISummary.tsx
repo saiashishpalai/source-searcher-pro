@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Sparkles, Clock, BarChart3, ExternalLink } from 'lucide-react';
+import { Sparkles, BarChart3, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -8,19 +8,13 @@ interface AISummaryProps {
   summary: string;
   query: string;
   totalResults: number;
-  searchTime: number;
 }
 
 const AISummary: React.FC<AISummaryProps> = ({
   summary,
   query,
-  totalResults,
-  searchTime
+  totalResults
 }) => {
-  const formatSearchTime = (ms: number) => {
-    if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(1)}s`;
-  };
 
   return (
     <div className="relative">
@@ -57,10 +51,6 @@ const AISummary: React.FC<AISummaryProps> = ({
             <div className="flex items-center gap-1">
               <BarChart3 className="w-4 h-4" />
               <span>{totalResults} results</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              <span>{formatSearchTime(searchTime)}</span>
             </div>
           </div>
         </div>
