@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 import { createBrowserClient } from '@supabase/ssr'
 
-// Get environment variables - NO FALLBACKS for security
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Get environment variables - support both Vite and Next.js
+const supabaseUrl = typeof window !== 'undefined' 
+  ? import.meta.env.VITE_SUPABASE_URL 
+  : process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = typeof window !== 'undefined' 
+  ? import.meta.env.VITE_SUPABASE_ANON_KEY 
+  : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = typeof window !== 'undefined' 
+  ? import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY 
+  : process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing required Supabase environment variables. Please check your .env file.')

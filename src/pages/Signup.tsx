@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,7 +77,7 @@ const Signup = () => {
         {/* Back to Landing Link */}
         <div className="mb-6">
             <Link 
-              href="/" 
+              to="/" 
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group animate-fade-in"
             >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -227,7 +225,7 @@ const Signup = () => {
               <p className="text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <Link
-                  href="/login"
+                  to="/login"
                   className="text-primary hover:text-primary/80 font-medium transition-colors hover:underline"
                 >
                   Sign in

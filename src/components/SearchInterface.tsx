@@ -1,7 +1,6 @@
-'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut } from 'lucide-react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +10,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
+import SearchResults from './SearchResults';
+import { SearchResultsData } from './SearchResults';
+import { simulateSearch } from '@/data/mockSearchResults';
 
 // SVG Icon Components
 const Haven7Icon = ({ className = "" }: { className?: string }) => (
@@ -279,6 +281,16 @@ const SearchInterface = () => {
     'Profile feedback analysis',
   ]);
   
+  // Search results state
+  const [searchResults, setSearchResults] = useState<SearchResultsData | null>(null);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  // Follow-up conversation state
+  const [followUpQuery, setFollowUpQuery] = useState('');
+  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
+  
   // Filter states
   const [filters, setFilters] = useState({
     applications: [] as string[],
@@ -329,10 +341,56 @@ const SearchInterface = () => {
     },
   ];
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle search logic here
-    console.log('Searching for:', searchValue);
+    if (!searchValue.trim()) return;
+    
+    setIsSearchLoading(true);
+    setSearchError(null);
+    setShowSearchResults(true);
+    setSelectedThread(null); // Clear any selected thread
+    
+    try {
+      // Create search query with filters
+      const searchQuery = {
+        query: searchValue,
+        filters: {
+          applications: filters.applications,
+          authors: filters.authors,
+          documentTypes: filters.documentTypes,
+          timeRange: filters.timeRange,
+          dateRange: filters.dateRange
+        }
+      };
+      
+      const results = await simulateSearch(searchValue);
+      
+      // Apply filters to results if any are selected
+      if (filters.applications.length > 0 || filters.authors.length > 0 || filters.documentTypes.length > 0) {
+        const filteredResults = results.results.filter(result => {
+          const matchesApplication = filters.applications.length === 0 || filters.applications.includes(result.source);
+          const matchesAuthor = filters.authors.length === 0 || filters.authors.includes(result.author);
+          const matchesType = filters.documentTypes.length === 0 || filters.documentTypes.includes(result.type);
+          return matchesApplication && matchesAuthor && matchesType;
+        });
+        
+        results.results = filteredResults;
+        results.totalResults = filteredResults.length;
+      }
+      
+      setSearchResults(results);
+      
+      // Add to recent searches if not already there
+      setRecentSearches(prev => {
+        const newSearches = [searchValue, ...prev.filter(s => s !== searchValue)];
+        return newSearches.slice(0, 10); // Keep only last 10 searches
+      });
+    } catch (error) {
+      setSearchError('Failed to load search results. Please try again.');
+      console.error('Search error:', error);
+    } finally {
+      setIsSearchLoading(false);
+    }
   };
 
   const handleThreadClick = (threadId: string) => {
@@ -342,16 +400,89 @@ const SearchInterface = () => {
 
   const handleBackToSearch = () => {
     setSelectedThread(null);
+    setShowSearchResults(false);
+    setSearchResults(null);
+    setSearchError(null);
   };
 
   const handleNewConversation = () => {
     setSelectedThread(null);
+    setShowSearchResults(false);
+    setSearchResults(null);
+    setSearchError(null);
     setSearchValue(''); // Clear any existing search
   };
 
   const handleResultClick = (result: unknown) => {
     // Handle result card click - could open a detailed view or continue conversation
     console.log('Result clicked:', result);
+  };
+
+  // Search results handlers
+  const handleSearchResultClick = (result: any) => {
+    console.log('Search result clicked:', result);
+    // In a real app, this would:
+    // 1. Open the source document in a new tab
+    // 2. Show a preview modal
+    // 3. Navigate to a detailed view
+    // 4. Or continue the conversation with context
+    alert(`Opening ${result.title} from ${result.source}`);
+  };
+
+  const handleSearchRetry = async () => {
+    if (searchResults?.query) {
+      await handleSearch({ preventDefault: () => {} } as React.FormEvent);
+    }
+  };
+
+  const handleFollowUpQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!followUpQuery.trim()) return;
+    
+    setIsFollowUpLoading(true);
+    
+    try {
+      // Simulate follow-up question processing
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      if (selectedThread) {
+        // Handle follow-up in conversation thread
+        const thread = conversations.find(t => t.id === selectedThread);
+        if (thread) {
+          console.log('Follow-up question in conversation:', followUpQuery);
+          // In a real app, this would make an API call to process the follow-up
+          // For now, we'll just show a success message
+        }
+      } else if (searchResults) {
+        // Handle follow-up in search results - perform new search with follow-up query
+        const combinedQuery = `${searchResults.query} ${followUpQuery}`;
+        
+        setIsSearchLoading(true);
+        setSearchError(null);
+        
+        try {
+          const results = await simulateSearch(combinedQuery);
+          setSearchResults(results);
+          
+          // Add to recent searches
+          setRecentSearches(prev => {
+            const newSearches = [combinedQuery, ...prev.filter(s => s !== combinedQuery)];
+            return newSearches.slice(0, 10);
+          });
+        } catch (error) {
+          setSearchError('Failed to process follow-up question. Please try again.');
+          console.error('Follow-up search error:', error);
+        } finally {
+          setIsSearchLoading(false);
+        }
+      }
+      
+      setFollowUpQuery('');
+    } catch (error) {
+      console.error('Follow-up error:', error);
+    } finally {
+      setIsFollowUpLoading(false);
+    }
   };
 
   const handleRenameThread = (threadId: string, newTitle: string) => {
@@ -749,7 +880,7 @@ const SearchInterface = () => {
         </div>
 
         {/* Secondary Header - Navigation elements */}
-        {selectedThread && (
+        {(selectedThread || showSearchResults) && (
           <div className="flex items-center justify-between p-4 lg:p-6 border-b border-border/20 bg-background/60 backdrop-blur-sm">
             <div className="flex items-center gap-4">
               <Button
@@ -769,7 +900,7 @@ const SearchInterface = () => {
                 <Home className="w-4 h-4" />
                 <span>/</span>
                 <span className="text-foreground font-medium">
-                  {conversations.find(t => t.id === selectedThread)?.title}
+                  {showSearchResults ? `Search Results for "${searchValue}"` : conversations.find(t => t.id === selectedThread)?.title}
                 </span>
               </div>
             </div>
@@ -780,15 +911,298 @@ const SearchInterface = () => {
         )}
 
         {/* Content Area */}
-        <div className="flex-1 flex items-center justify-center p-4 lg:p-6 relative">
+        <div className={`flex-1 relative ${showSearchResults ? 'overflow-y-auto' : 'flex items-center justify-center'} p-4 lg:p-6`}>
           {/* Subtle background elements */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
             <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
           </div>
 
-        {/* Main search interface or conversation view */}
-        {selectedThread ? (
+        {/* Main search interface, search results, or conversation view */}
+        {showSearchResults ? (
+          <div className="w-full relative z-10 pb-8">
+            {/* Advanced Filters for Search Results */}
+            <div className="mb-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Filter Results</span>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Clear all
+                </Button>
+              </div>
+
+              {/* Compact Filter Row */}
+              <div className="flex flex-wrap gap-2">
+                {/* Applications Filter */}
+                <div className="relative" ref={dropdownRefs.applications}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('applications')}
+                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.applications ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Apps</span>
+                      {getFilterCounts().applications > 0 && (
+                        <Badge variant="secondary" className="h-4 px-1 text-xs">
+                          {getFilterCounts().applications}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                      openDropdowns.applications ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.applications && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {['Slack', 'Google Drive', 'Notion'].map((source) => (
+                            <button
+                              key={source}
+                              onClick={() => toggleFilter('applications', source)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {getApplicationIcon(source)}
+                                <span>{source}</span>
+                              </div>
+                              {filters.applications.includes(source) && (
+                                <Check className="w-3 h-3 text-primary ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Authors Filter */}
+                <div className="relative" ref={dropdownRefs.authors}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('authors')}
+                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.authors ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Authors</span>
+                      {getFilterCounts().authors > 0 && (
+                        <Badge variant="secondary" className="h-4 px-1 text-xs">
+                          {getFilterCounts().authors}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                      openDropdowns.authors ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.authors && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {['Sarah Chen', 'Mike Johnson', 'Alex Rivera', 'Emma Wilson', 'David Kim'].map((author) => (
+                            <button
+                              key={author}
+                              onClick={() => toggleFilter('authors', author)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
+                                  {author.charAt(0)}
+                                </div>
+                                <span>{author}</span>
+                              </div>
+                              {filters.authors.includes(author) && (
+                                <Check className="w-3 h-3 text-primary ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Document Types Filter */}
+                <div className="relative" ref={dropdownRefs.documentTypes}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('documentTypes')}
+                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.documentTypes ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Types</span>
+                      {getFilterCounts().documentTypes > 0 && (
+                        <Badge variant="secondary" className="h-4 px-1 text-xs">
+                          {getFilterCounts().documentTypes}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                      openDropdowns.documentTypes ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.documentTypes && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {['message', 'pdf', 'doc', 'excel', 'page'].map((type) => (
+                            <button
+                              key={type}
+                              onClick={() => toggleFilter('documentTypes', type)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-4 h-4 rounded-md bg-secondary/30 flex items-center justify-center text-xs font-medium">
+                                  {type.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="capitalize">{type}</span>
+                              </div>
+                              {filters.documentTypes.includes(type) && (
+                                <Check className="w-3 h-3 text-primary ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Time Range Filter */}
+                <div className="relative" ref={dropdownRefs.sort}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleDropdown('sort')}
+                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                      openDropdowns.sort ? 'bg-secondary/30 border-primary/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3 h-3" />
+                      <span>Time</span>
+                      {getFilterCounts().sort > 0 && (
+                        <Badge variant="secondary" className="h-4 px-1 text-xs">
+                          1
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                      openDropdowns.sort ? 'rotate-180' : ''
+                    }`} />
+                  </Button>
+
+                  {openDropdowns.sort && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {['latest', 'last-week', 'last-month', 'last-year'].map((timeRange) => (
+                            <button
+                              key={timeRange}
+                              onClick={() => {
+                                setFilters(prev => ({ ...prev, timeRange }));
+                                toggleDropdown('sort');
+                              }}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3 h-3" />
+                                <span className="capitalize">{timeRange.replace('-', ' ')}</span>
+                              </div>
+                              {filters.timeRange === timeRange && (
+                                <Check className="w-3 h-3 text-primary ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {searchResults ? (
+              <>
+                <SearchResults
+                  data={searchResults}
+                  isLoading={isSearchLoading}
+                  onResultClick={handleSearchResultClick}
+                  onRetry={handleSearchRetry}
+                  hasMore={false}
+                />
+                
+                {/* Follow-up Input for Search Results */}
+                <div className="mt-8">
+                  <form onSubmit={handleFollowUpQuestion} className="relative">
+                    <div className="relative bg-card/90 backdrop-blur-md border border-border/50 rounded-xl p-4 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <Input
+                          value={followUpQuery}
+                          onChange={(e) => setFollowUpQuery(e.target.value)}
+                          placeholder="Ask a follow-up question about these results..."
+                          className="flex-1 border-0 bg-transparent text-sm placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0"
+                          disabled={isFollowUpLoading}
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="outline"
+                          disabled={!followUpQuery.trim() || isFollowUpLoading}
+                          className="px-4 py-2 text-xs font-medium rounded-lg border-border/50 hover:bg-accent/10"
+                        >
+                          {isFollowUpLoading ? (
+                            <div className="w-3 h-3 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                          ) : (
+                            <Send className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </>
+            ) : isSearchLoading ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  <p className="text-muted-foreground">Searching across your sources...</p>
+                </div>
+              </div>
+            ) : searchError ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center space-y-4">
+                  <p className="text-destructive">{searchError}</p>
+                  <Button onClick={handleSearchRetry} variant="outline">
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : selectedThread ? (
           <div className="w-full max-w-4xl space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 relative z-10">
             {/* Conversation Header */}
             <div className="text-center space-y-2">
@@ -1072,6 +1486,39 @@ const SearchInterface = () => {
               ))}
             </div>
 
+            {/* Conversation Input */}
+            <div className="mt-8">
+              <form onSubmit={handleFollowUpQuestion} className="relative">
+                <div className="relative bg-card/90 backdrop-blur-md border border-border/50 rounded-xl p-4 shadow-lg">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <Input
+                      value={followUpQuery}
+                      onChange={(e) => setFollowUpQuery(e.target.value)}
+                      placeholder="Ask a follow-up question about these results..."
+                      className="flex-1 border-0 bg-transparent text-sm placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    />
+                    <Button 
+                      type="submit" 
+                      variant="search"
+                      size="sm"
+                      className="px-4 py-2 font-medium text-sm rounded-lg"
+                      disabled={!followUpQuery.trim() || isFollowUpLoading}
+                    >
+                      {isFollowUpLoading ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                          Asking...
+                        </>
+                      ) : (
+                        'Ask'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
           </div>
         ) : (
       <div className="w-full max-w-3xl space-y-10 animate-in fade-in-0 slide-in-from-top-4 duration-700 relative z-10">
@@ -1110,8 +1557,16 @@ const SearchInterface = () => {
                   variant="search"
                   size="lg"
                   className="px-6 lg:px-10 py-2 lg:py-3 font-medium text-sm lg:text-base rounded-xl"
+                  disabled={isSearchLoading}
                 >
-                  Search
+                  {isSearchLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                      Searching...
+                    </>
+                  ) : (
+                    'Search'
+                  )}
                 </Button>
               </div>
             </div>

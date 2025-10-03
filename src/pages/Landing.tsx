@@ -1,6 +1,4 @@
-'use client';
-
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 const Landing = () => {
@@ -36,7 +34,7 @@ const Landing = () => {
           {/* CTA Button with Enhanced Animations */}
           <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <Link 
-            href="/signup"
+            to="/signup"
               className="group relative inline-flex items-center gap-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-8 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-primary/25 active:scale-95 overflow-hidden"
             >
               {/* Animated background shimmer */}

@@ -1,4 +1,3 @@
-'use client';
 
 import React from 'react';
 import { Settings, User, LogOut } from 'lucide-react';
