@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     console.log('🧪 MOCK SLACK - Simulating OAuth success...');
     
     // Simulate successful OAuth callback
-    const mockCallbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/slack/callback?code=mock_slack_code&state=slack_connect`;
+    const mockCallbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/auth/slack/callback?code=mock_slack_code&state=slack_connect`;
     
     console.log('✅ Redirecting to mock Slack callback:', mockCallbackUrl);
     

@@ -74,7 +74,6 @@ const UserProfile = () => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
     </div>
   );
 };

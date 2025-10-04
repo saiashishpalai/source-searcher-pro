@@ -366,7 +366,7 @@ const ConnectSources = () => {
     // Redirect to OAuth endpoint
     const oauthEndpoints = {
       slack: '/api/auth/slack/connect',
-      googleDrive: '/api/auth/drive/connect',
+      googleDrive: '/api/auth/google/connect',
       notion: '/api/auth/notion/connect'
     };
     
