@@ -1,7 +1,5 @@
-'use client';
-
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
@@ -15,7 +13,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireVerification = false 
 }) => {
   const { user, loading } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -30,13 +28,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (!user) {
     // Redirect to login
-    router.push('/login');
+    navigate('/login');
     return null;
   }
 
-  if (requireVerification && !user.email_verified) {
+  if (requireVerification && !user.email_confirmed_at) {
     // Redirect to email verification
-    router.push('/verify-email');
+    navigate('/verify-email');
     return null;
   }
 

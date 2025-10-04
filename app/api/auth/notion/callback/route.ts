@@ -27,12 +27,12 @@ export async function GET(request: NextRequest) {
     // Check for OAuth errors
     if (error) {
       console.error('❌ OAuth error from Notion:', error);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=oauth_denied`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=oauth_denied`);
     }
     
     if (!code) {
       console.error('❌ No authorization code received');
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=no_code`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=no_code`);
     }
     
     // Handle mock authentication for development
@@ -73,13 +73,13 @@ export async function GET(request: NextRequest) {
         console.log('✅ Mock Notion connection saved successfully');
       }
       
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?success=notion`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?success=notion`);
     }
     
     // Get environment variables
     const clientId = process.env.NOTION_CLIENT_ID;
     const clientSecret = process.env.NOTION_CLIENT_SECRET;
-    const redirectUri = process.env.NOTION_REDIRECT_URI;
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/auth/notion/callback`;
     
     console.log('Environment check:');
     console.log('- NOTION_CLIENT_ID exists:', !!clientId);
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     
     if (!clientId || !clientSecret || !redirectUri) {
       console.error('❌ Missing Notion OAuth environment variables');
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=config_missing`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=config_missing`);
     }
     
     // Exchange code for tokens
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     
     if (!tokenResponse.ok || tokenData.error) {
       console.error('❌ Token exchange failed:', tokenData);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=token_exchange_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=token_exchange_failed`);
     }
     
     // Get user info from Notion
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
     
     if (!userResponse.ok || userInfo.object === 'error') {
       console.error('❌ Failed to get user info:', userInfo);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=user_info_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=user_info_failed`);
     }
     
     // Save Notion connection to database
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
     
     if (saveError) {
       console.error('❌ Error saving Notion connection:', saveError);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=save_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=save_failed`);
     }
     
     const duration = Date.now() - startTime;
@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
       workspaceName: tokenData.workspace_name
     });
     
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?success=notion`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?success=notion`);
     
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -195,6 +195,6 @@ export async function GET(request: NextRequest) {
       duration: `${duration}ms`,
       stack: error instanceof Error ? error.stack : undefined
     });
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=callback_failed`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=callback_failed`);
   }
 }

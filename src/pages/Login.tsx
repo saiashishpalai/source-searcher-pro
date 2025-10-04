@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +62,7 @@ const Login = () => {
         {/* Back to Landing Link */}
         <div className="mb-6">
             <Link 
-              href="/" 
+              to="/" 
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group animate-fade-in"
             >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -162,7 +160,7 @@ const Login = () => {
                   </Label>
                 </div>
                 <Link
-                  href="/forgot-password"
+                  to="/forgot-password"
                   className="text-sm text-primary hover:text-primary/80 font-medium transition-colors hover:underline"
                 >
                   Forgot password?
@@ -200,7 +198,7 @@ const Login = () => {
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{' '}
                 <Link
-                  href="/signup"
+                  to="/signup"
                   className="text-primary hover:text-primary/80 font-medium transition-colors hover:underline"
                 >
                   Create one
@@ -217,56 +215,6 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Custom CSS for animations */}
-      <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes fade-in-up {
-          from { 
-            opacity: 0; 
-            transform: translateY(30px); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0); 
-          }
-        }
-        
-        @keyframes background-drift {
-          0%, 100% { 
-            transform: translate(0, 0) scale(1); 
-            opacity: 0.3; 
-          }
-          25% { 
-            transform: translate(20px, -20px) scale(1.05); 
-            opacity: 0.4; 
-          }
-          50% { 
-            transform: translate(-10px, 10px) scale(0.95); 
-            opacity: 0.2; 
-          }
-          75% { 
-            transform: translate(15px, 5px) scale(1.02); 
-            opacity: 0.35; 
-          }
-        }
-        
-        .animate-fade-in {
-          animation: fade-in 0.8s ease-out forwards;
-        }
-        
-        .animate-fade-in-up {
-          animation: fade-in-up 0.8s ease-out forwards;
-          opacity: 0;
-        }
-        
-        .animate-background-drift {
-          animation: background-drift 20s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 };

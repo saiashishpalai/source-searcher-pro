@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -159,7 +157,7 @@ const ForgotPassword = () => {
 
             <div className="text-center">
               <Link
-                href="/login"
+                to="/login"
                 className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />

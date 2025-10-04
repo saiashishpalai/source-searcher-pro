@@ -27,12 +27,12 @@ export async function GET(request: NextRequest) {
     // Check for OAuth errors
     if (error) {
       console.error('❌ OAuth error from Slack:', error);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=oauth_denied`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=oauth_denied`);
     }
     
     if (!code) {
       console.error('❌ No authorization code received');
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=no_code`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=no_code`);
     }
     
     // Handle mock authentication for development
@@ -73,13 +73,13 @@ export async function GET(request: NextRequest) {
         console.log('✅ Mock Slack connection saved successfully');
       }
       
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?success=slack`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?success=slack`);
     }
     
     // Get environment variables
     const clientId = process.env.SLACK_CLIENT_ID;
     const clientSecret = process.env.SLACK_CLIENT_SECRET;
-    const redirectUri = process.env.SLACK_REDIRECT_URI;
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/auth/slack/callback`;
     
     console.log('Environment check:');
     console.log('- SLACK_CLIENT_ID exists:', !!clientId);
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     
     if (!clientId || !clientSecret || !redirectUri) {
       console.error('❌ Missing Slack OAuth environment variables');
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=config_missing`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=config_missing`);
     }
     
     // Exchange code for tokens
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     
     if (!tokenResponse.ok || !tokenData.ok) {
       console.error('❌ Token exchange failed:', tokenData);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=token_exchange_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=token_exchange_failed`);
     }
     
     const accessToken = tokenData.access_token;
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
     
     if (!teamResponse.ok || !teamInfo.ok || !userResponse.ok || !userInfo.ok) {
       console.error('❌ Failed to get Slack info:', { teamInfo, userInfo });
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=slack_info_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=slack_info_failed`);
     }
     
     // Save Slack connection to database
@@ -193,7 +193,7 @@ export async function GET(request: NextRequest) {
     
     if (saveError) {
       console.error('❌ Error saving Slack connection:', saveError);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=save_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=save_failed`);
     }
     
     const duration = Date.now() - startTime;
@@ -205,7 +205,7 @@ export async function GET(request: NextRequest) {
       teamName: teamInfo.team.name
     });
     
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?success=slack`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?success=slack`);
     
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -214,6 +214,6 @@ export async function GET(request: NextRequest) {
       duration: `${duration}ms`,
       stack: error instanceof Error ? error.stack : undefined
     });
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connect-sources?error=callback_failed`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=callback_failed`);
   }
 }

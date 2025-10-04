@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     
     // Get environment variables
     const clientId = process.env.NOTION_CLIENT_ID;
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/notion/callback`;
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/auth/notion/callback`;
     
     console.log('Environment check:');
     console.log('- NOTION_CLIENT_ID exists:', !!clientId);

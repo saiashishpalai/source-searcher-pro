@@ -1,8 +1,5 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,7 +96,7 @@ const VerifyEmail = () => {
               </div>
 
               <div className="text-center">
-                <Link href="/connect-sources">
+                <Link to="/connect-sources">
                   <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
                     Continue to Haven7
                   </Button>
@@ -187,7 +184,7 @@ const VerifyEmail = () => {
               </Button>
 
               <Link
-                href="/login"
+                to="/login"
                 className="inline-flex items-center justify-center gap-2 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />

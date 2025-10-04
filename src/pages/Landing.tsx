@@ -1,6 +1,4 @@
-'use client';
-
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 const Landing = () => {
@@ -36,7 +34,7 @@ const Landing = () => {
           {/* CTA Button with Enhanced Animations */}
           <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <Link 
-            href="/signup"
+            to="/signup"
               className="group relative inline-flex items-center gap-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-8 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-primary/25 active:scale-95 overflow-hidden"
             >
               {/* Animated background shimmer */}
@@ -68,56 +66,6 @@ const Landing = () => {
         </div>
       </footer>
 
-      {/* Custom CSS for animations */}
-      <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes fade-in-up {
-          from { 
-            opacity: 0; 
-            transform: translateY(30px); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0); 
-          }
-        }
-        
-        @keyframes background-drift {
-          0%, 100% { 
-            transform: translate(0, 0) scale(1); 
-            opacity: 0.3; 
-          }
-          25% { 
-            transform: translate(20px, -20px) scale(1.05); 
-            opacity: 0.4; 
-          }
-          50% { 
-            transform: translate(-10px, 10px) scale(0.95); 
-            opacity: 0.2; 
-          }
-          75% { 
-            transform: translate(15px, 5px) scale(1.02); 
-            opacity: 0.35; 
-          }
-        }
-        
-        .animate-fade-in {
-          animation: fade-in 0.8s ease-out forwards;
-        }
-        
-        .animate-fade-in-up {
-          animation: fade-in-up 0.8s ease-out forwards;
-          opacity: 0;
-        }
-        
-        .animate-background-drift {
-          animation: background-drift 20s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 };

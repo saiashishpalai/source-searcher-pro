@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -233,7 +231,7 @@ const PermissionModal = ({
 };
 
 const ConnectSources = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [connections, setConnections] = useState({
     slack: false,
@@ -368,7 +366,7 @@ const ConnectSources = () => {
     // Redirect to OAuth endpoint
     const oauthEndpoints = {
       slack: '/api/auth/slack/connect',
-      googleDrive: '/api/auth/drive/connect',
+      googleDrive: '/api/auth/google/connect',
       notion: '/api/auth/notion/connect'
     };
     
@@ -416,7 +414,7 @@ const ConnectSources = () => {
 
   const handleContinue = () => {
     // Navigate to main app dashboard
-    router.push('/dashboard');
+    navigate('/dashboard');
   };
 
   const hasAnyConnection = Object.values(connections).some(Boolean);

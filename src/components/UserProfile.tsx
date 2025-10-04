@@ -1,4 +1,3 @@
-'use client';
 
 import React from 'react';
 import { Settings, User, LogOut } from 'lucide-react';
@@ -75,7 +74,6 @@ const UserProfile = () => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
     </div>
   );
 };

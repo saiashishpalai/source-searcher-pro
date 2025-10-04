@@ -4,7 +4,7 @@ export async function GET(request: NextRequest) {
   try {
     // Google OAuth configuration
     const clientId = process.env.GOOGLE_CLIENT_ID
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/auth/drive/callback`
     
     if (!clientId) {
       return NextResponse.json(
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     googleAuthUrl.searchParams.set('response_type', 'code')
     googleAuthUrl.searchParams.set('access_type', 'offline')
     googleAuthUrl.searchParams.set('prompt', 'consent')
-    googleAuthUrl.searchParams.set('state', 'google_connect') // Add CSRF protection
+    googleAuthUrl.searchParams.set('state', 'google_drive_connect') // Add CSRF protection
 
     // Redirect to Google OAuth
     return NextResponse.redirect(googleAuthUrl.toString())
