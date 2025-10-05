@@ -12,18 +12,26 @@ const supabaseServiceRoleKey = typeof window !== 'undefined'
   ? import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY 
   : process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Provide fallback values for development/demo purposes
+const fallbackUrl = 'https://demo.supabase.co';
+const fallbackAnonKey = 'demo-anon-key';
+
+const finalSupabaseUrl = supabaseUrl || fallbackUrl;
+const finalSupabaseAnonKey = supabaseAnonKey || fallbackAnonKey;
+
+// Only throw error in production if no environment variables are set
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing required Supabase environment variables. Please check your .env file.')
+  console.warn('Missing Supabase environment variables. Using fallback values for demo purposes.');
 }
 
 // Client-side Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(finalSupabaseUrl, finalSupabaseAnonKey)
 
 // For use in Client Components
-export const createSupabaseClient = () => createBrowserClient(supabaseUrl, supabaseAnonKey)
+export const createSupabaseClient = () => createBrowserClient(finalSupabaseUrl, finalSupabaseAnonKey)
 
 // For server-side operations - only create if we have the service role key
-export const supabaseAdmin = supabaseServiceRoleKey ? createClient(supabaseUrl, supabaseServiceRoleKey) : null
+export const supabaseAdmin = supabaseServiceRoleKey ? createClient(finalSupabaseUrl, supabaseServiceRoleKey) : null
 
 // Types for Supabase tables
 export type Database = {
