@@ -36,17 +36,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if we're using demo Supabase values
-  const isDemoMode = supabase.supabaseUrl.includes('demo.supabase.co') || 
-                     supabase.supabaseKey === 'demo-anon-key';
-
   useEffect(() => {
-    if (isDemoMode) {
-      // In demo mode, skip Supabase auth and set loading to false
-      setLoading(false);
-      return;
-    }
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -64,18 +54,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, [isDemoMode]);
+  }, []);
 
   const signup = async (email: string, password: string) => {
     try {
-      if (isDemoMode) {
-        // Demo mode - simulate successful signup
-        return {
-          success: true,
-          message: 'Demo account created! You can now login with any credentials.',
-        };
-      }
-
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -100,56 +82,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      if (isDemoMode) {
-        // Demo mode - accept any email/password combination
-        const mockUser: User = {
-          id: '7bac32d5-50d6-4c7b-b595-be20f589233f',
-          email: email,
-          email_confirmed_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          app_metadata: {},
-          user_metadata: {},
-          aud: 'authenticated',
-          confirmation_sent_at: null,
-          recovery_sent_at: null,
-          email_change_sent_at: null,
-          new_email: null,
-          new_phone: null,
-          invited_at: null,
-          action_link: null,
-          email_change: null,
-          phone_change: null,
-          last_sign_in_at: new Date().toISOString(),
-          phone: null,
-          phone_confirmed_at: null,
-          confirmed_at: new Date().toISOString(),
-          email_change_confirm_status: 0,
-          banned_until: null,
-          is_anonymous: false,
-          role: 'authenticated',
-          factors: null,
-          identities: []
-        };
-
-        const mockSession: Session = {
-          access_token: 'demo-access-token',
-          refresh_token: 'demo-refresh-token',
-          expires_in: 3600,
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
-          token_type: 'bearer',
-          user: mockUser
-        };
-
-        setUser(mockUser);
-        setSession(mockSession);
-
-        return {
-          success: true,
-          message: 'Demo login successful! (Using fallback authentication)',
-        };
-      }
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -170,26 +102,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
-    if (isDemoMode) {
-      // Demo mode - just clear local state
-      setUser(null);
-      setSession(null);
-    } else {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
     // Redirect to login page after logout
     window.location.href = '/login';
   };
 
   const resetPassword = async (email: string) => {
     try {
-      if (isDemoMode) {
-        return {
-          success: true,
-          message: 'Demo mode: Password reset email would be sent!',
-        };
-      }
-
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -210,13 +129,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updatePassword = async (password: string) => {
     try {
-      if (isDemoMode) {
-        return {
-          success: true,
-          message: 'Demo mode: Password would be updated!',
-        };
-      }
-
       const { error } = await supabase.auth.updateUser({
         password,
       });
@@ -241,13 +153,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return {
           success: false,
           message: 'No email found',
-        };
-      }
-
-      if (isDemoMode) {
-        return {
-          success: true,
-          message: 'Demo mode: Verification email would be sent!',
         };
       }
 
