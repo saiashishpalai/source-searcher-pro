@@ -88,7 +88,7 @@ const EnhancedInput: React.FC<EnhancedInputProps> = ({
             <Button 
               type="submit" 
               variant="search"
-              size={size}
+              size={size === 'md' ? 'default' : size}
               className={`${currentSize.button} font-medium rounded-xl ${buttonClassName}`}
               disabled={!value.trim() || isLoading || disabled}
             >

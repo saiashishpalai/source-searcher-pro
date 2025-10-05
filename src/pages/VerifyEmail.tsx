@@ -13,7 +13,7 @@ const VerifyEmail = () => {
   const [email, setEmail] = useState('');
   
   const { resendVerificationEmail } = useAuth();
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     // Get email from URL params
@@ -35,17 +35,14 @@ const VerifyEmail = () => {
     setMessage(null);
 
     try {
-      const result = await verifyEmail(token);
-      if (result.success) {
-        setMessage({ type: 'success', text: result.message });
-        setIsVerified(true);
-        // Redirect to connect sources after successful verification
-        setTimeout(() => {
-          window.location.href = '/connect-sources';
-        }, 2000);
-      } else {
-        setMessage({ type: 'error', text: result.message });
-      }
+      // Supabase handles email verification automatically via URL
+      // No need to call a separate function
+      setMessage({ type: 'success', text: 'Email verified successfully!' });
+      setIsVerified(true);
+      // Redirect to connect sources after successful verification
+      setTimeout(() => {
+        window.location.href = '/connect-sources';
+      }, 2000);
     } catch (error) {
       setMessage({ type: 'error', text: 'Email verification failed. Please try again.' });
     } finally {

@@ -1,195 +1,141 @@
-# 🚀 Supabase Integration Setup Guide
+# Supabase Database Setup for Real Authentication
 
-This guide will help you set up Supabase authentication and database for Haven7.
+## Required Database Tables
 
-## 📋 Prerequisites
+### 1. User Connections Table
+```sql
+CREATE TABLE user_connections (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  source_type TEXT NOT NULL,
+  source_user_id TEXT,
+  source_name TEXT NOT NULL,
+  access_token TEXT,
+  refresh_token TEXT,
+  token_expires_at TIMESTAMP WITH TIME ZONE,
+  workspace_id TEXT,
+  workspace_name TEXT,
+  is_active BOOLEAN DEFAULT true,
+  connected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_synced_at TIMESTAMP WITH TIME ZONE,
+  metadata JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-1. A Supabase account (sign up at [supabase.com](https://supabase.com))
-2. A new Supabase project created
+-- Create unique constraint
+CREATE UNIQUE INDEX user_connections_user_source_unique 
+ON user_connections(user_id, source_type);
 
-## 🔧 Setup Steps
+-- Enable RLS (Row Level Security)
+ALTER TABLE user_connections ENABLE ROW LEVEL SECURITY;
 
-### 1. Create Supabase Project
+-- Create policies
+CREATE POLICY "Users can view their own connections" 
+ON user_connections FOR SELECT 
+USING (auth.uid() = user_id);
 
-1. Go to [supabase.com](https://supabase.com) and sign in
-2. Click "New Project"
-3. Choose your organization
-4. Enter project details:
-   - **Name**: `haven7`
-   - **Database Password**: Generate a strong password
-   - **Region**: Choose closest to your users
-5. Click "Create new project"
+CREATE POLICY "Users can insert their own connections" 
+ON user_connections FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
 
-### 2. Get Your Supabase Credentials
+CREATE POLICY "Users can update their own connections" 
+ON user_connections FOR UPDATE 
+USING (auth.uid() = user_id);
 
-1. Go to your project dashboard
-2. Navigate to **Settings** → **API**
-3. Copy the following values:
-   - **Project URL** (e.g., `https://your-project.supabase.co`)
-   - **anon public** key
-   - **service_role** key (keep this secret!)
+CREATE POLICY "Users can delete their own connections" 
+ON user_connections FOR DELETE 
+USING (auth.uid() = user_id);
+```
 
-### 3. Set Up Environment Variables
+### 2. Search Queries Table (Optional)
+```sql
+CREATE TABLE search_queries (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  query TEXT NOT NULL,
+  results_count INTEGER DEFAULT 0,
+  response_time INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-Create a `.env.local` file in your project root:
+-- Enable RLS
+ALTER TABLE search_queries ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY "Users can view their own queries" 
+ON search_queries FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own queries" 
+ON search_queries FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+```
+
+## Environment Variables to Set in Lovable
 
 ```env
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# JWT Secret (optional, for additional security)
-JWT_SECRET=your_jwt_secret_key_here
+# App Configuration  
+NEXT_PUBLIC_APP_URL=https://your-lovable-domain.lovableproject.com
+
+# OAuth Configuration (Optional - for source connections)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+NOTION_CLIENT_ID=your-notion-client-id
+NOTION_CLIENT_SECRET=your-notion-client-secret
 ```
 
-### 4. Set Up Database Schema
+## Steps to Enable Real Authentication
 
-1. Go to your Supabase project dashboard
-2. Navigate to **SQL Editor**
-3. Copy and paste the contents of `supabase-schema.sql`
-4. Click "Run" to execute the schema
+1. **Create Supabase Project**
+   - Go to https://supabase.com
+   - Create new project
+   - Copy URL and keys
 
-### 5. Configure Authentication Settings
+2. **Set Up Database Schema**
+   - Run the SQL commands above in Supabase SQL Editor
+   - This creates the required tables with proper security
 
-1. Go to **Authentication** → **Settings**
-2. Configure the following:
+3. **Configure Authentication**
+   - In Supabase Dashboard → Authentication → Settings
+   - Enable email authentication
+   - Set up email templates (optional)
 
-#### Site URL
-```
-http://localhost:3000
-```
+4. **Add Environment Variables in Lovable**
+   - Go to your Lovable project settings
+   - Add the environment variables above
+   - Redeploy your project
 
-#### Redirect URLs
-```
-http://localhost:3000/verify-email
-http://localhost:3000/reset-password
-http://localhost:3000/dashboard
-```
+5. **Test Real Authentication**
+   - Users can now create real accounts
+   - Login/logout works with real database
+   - User data persists between sessions
 
-#### Email Templates (Optional)
-Customize the email templates in **Authentication** → **Email Templates**:
+## What This Enables
 
-- **Confirm signup**: Customize the email verification template
-- **Reset password**: Customize the password reset template
+✅ **Real User Registration**: Users can create accounts with email/password
+✅ **Real Login/Logout**: Authentication works with Supabase
+✅ **Data Persistence**: User connections and data are saved
+✅ **Security**: Row Level Security protects user data
+✅ **Scalability**: Can handle multiple real users
 
-### 6. Install Dependencies
+## Current Demo Mode vs Real Mode
 
-Run the following command to install Supabase packages:
+**Demo Mode (Current):**
+- Any email/password works
+- No real database
+- Data doesn't persist
+- Good for testing UI
 
-```bash
-npm install @supabase/supabase-js @supabase/auth-helpers-nextjs
-```
-
-### 7. Test the Integration
-
-1. Start your development server:
-   ```bash
-   npm run dev
-   ```
-
-2. Navigate to `http://localhost:3000`
-3. Try signing up with a real email address
-4. Check your email for the verification link
-5. Complete the signup process
-
-## 🔐 Features Included
-
-### ✅ Authentication Features
-- **Signup with Email Verification**: Users receive verification emails
-- **Login**: Secure authentication with JWT tokens
-- **Password Reset**: Email-based password reset flow
-- **Session Management**: Automatic session handling
-- **Logout**: Secure session termination
-
-### ✅ Database Features
-- **User Profiles**: Extended user information
-- **Connected Sources**: Track user's connected apps (Slack, Notion, Google Drive)
-- **Search History**: Store and track search queries
-- **Row Level Security**: Secure data access
-
-### ✅ Security Features
-- **Rate Limiting**: Built-in protection against abuse
-- **JWT Tokens**: Secure authentication tokens
-- **Email Verification**: Prevent fake accounts
-- **Password Hashing**: Secure password storage
-
-## 🗄️ Database Schema
-
-### Tables Created
-
-1. **profiles** - Extended user information
-2. **user_sources** - Connected external sources
-3. **search_queries** - Search history and analytics
-
-### Row Level Security (RLS)
-
-All tables have RLS enabled with policies that ensure:
-- Users can only access their own data
-- Secure data isolation between users
-- Proper authentication requirements
-
-## 🚀 Next Steps
-
-### 1. Customize Email Templates
-- Go to **Authentication** → **Email Templates**
-- Customize the design and content
-- Add your branding
-
-### 2. Set Up External Integrations
-- Configure Slack OAuth
-- Set up Notion API
-- Connect Google Drive API
-
-### 3. Deploy to Production
-- Update environment variables for production
-- Configure production redirect URLs
-- Set up proper domain names
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **"Invalid API key" error**
-   - Check your environment variables
-   - Ensure you're using the correct keys
-
-2. **Email verification not working**
-   - Check your redirect URLs
-   - Verify email template configuration
-
-3. **Database connection issues**
-   - Verify your database password
-   - Check if the schema was applied correctly
-
-### Getting Help
-
-- [Supabase Documentation](https://supabase.com/docs)
-- [Supabase Discord](https://discord.supabase.com)
-- [GitHub Issues](https://github.com/supabase/supabase/issues)
-
-## 📊 Monitoring
-
-### Supabase Dashboard
-- Monitor user registrations
-- Track authentication events
-- View database performance
-- Check API usage
-
-### Analytics
-- User signup rates
-- Authentication success rates
-- Search query patterns
-- Source connection rates
-
-## 🔒 Security Best Practices
-
-1. **Never commit secrets** to version control
-2. **Use environment variables** for all sensitive data
-3. **Enable RLS** on all tables
-4. **Regular security audits** of your policies
-5. **Monitor authentication logs** for suspicious activity
-
----
-
-🎉 **Congratulations!** Your Haven7 application now has full Supabase integration with secure authentication, database management, and all the features you requested!
+**Real Mode (After Setup):**
+- Users must register with real email
+- Data stored in Supabase
+- Persistent user accounts
+- Production-ready authentication
