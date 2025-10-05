@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { disconnectSource } from '@/lib/connections/get-connections';
 
 export const dynamic = 'force-dynamic';
@@ -33,16 +34,21 @@ export async function POST(request: NextRequest) {
     
     console.log('Request body:', { sourceType });
     
-    const supabase = createServiceClient();
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    // Get user from session or use a test user ID
-    const testUserId = '7bac32d5-50d6-4c7b-b595-be20f589233f';
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
     
-    console.log('Using user ID:', testUserId);
+    console.log('Using user ID:', user.id);
     
     // Add overall timeout for the entire operation
     const result = await Promise.race([
-      disconnectSource(supabase, testUserId, sourceType),
+      disconnectSource(supabase, user.id, sourceType),
       new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('Disconnect timeout after 10 seconds')), 10000)
       )

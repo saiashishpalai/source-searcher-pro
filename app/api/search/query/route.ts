@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/integrations/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     
     // Get user's connected sources from Supabase
     const { data: sources, error: sourcesError } = await supabaseAdmin
-      .from('user_sources')
+      .from('user_connections')
       .select('*')
       .eq('user_id', userId)
       .eq('is_connected', true)
@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
     // For now, return mock results based on connected sources
     const mockResults = sources?.map((source, index) => ({
       id: `${source.id}-${index}`,
-      source: source.source_name,
-      title: `Search result from ${source.source_name}`,
-      content: `Found "${query}" in ${source.source_name}`,
+      source: source.workspace_name || source.source_type,
+      title: `Search result from ${source.workspace_name || source.source_type}`,
+      content: `Found "${query}" in ${source.workspace_name || source.source_type}`,
       author: 'System',
       timestamp: new Date().toISOString(),
       url: `/${source.source_type.toLowerCase()}`

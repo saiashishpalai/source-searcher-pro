@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/integrations/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     // Store connection in database
     if (supabaseAdmin) {
       const { error: dbError } = await supabaseAdmin
-        .from('user_sources')
+        .from('user_connections')
         .upsert({
           user_id: userData.id, // This should be the Haven7 user ID
           source_type: 'google_drive',

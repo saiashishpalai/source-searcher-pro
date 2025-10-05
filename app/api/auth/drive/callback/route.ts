@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,13 +55,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Store connection in database
-    const supabase = createServiceClient()
-    const testUserId = '7bac32d5-50d6-4c7b-b595-be20f589233f' // TODO: Get actual user ID from session
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=unauthorized`)
+    }
     
     const { error: dbError } = await supabase
       .from('user_connections')
       .upsert({
-        user_id: testUserId,
+        user_id: user.id,
         source_type: 'google_drive',
         source_user_id: userData.id,
         workspace_id: userData.id,

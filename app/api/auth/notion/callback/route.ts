@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,16 +42,18 @@ export async function GET(request: NextRequest) {
       console.log('🧪 MOCK AUTHENTICATION - Simulating successful Notion connection');
       
       // Save mock connection to database
-      const { createServiceClient } = await import('@/lib/supabase/server');
-      const supabase = createServiceClient();
+      const supabase = createRouteHandlerClient({ cookies });
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      const testUserId = '7bac32d5-50d6-4c7b-b595-be20f589233f';
+      if (userError || !user) {
+        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=unauthorized`);
+      }
       
       // Use proper upsert for mock connection
       const { data: mockData, error: mockError } = await supabase
         .from('user_connections')
         .upsert({
-          user_id: testUserId,
+          user_id: user.id,
           source_type: 'notion',
           source_user_id: 'mock_notion_user_123',
           workspace_id: 'mock_workspace_123',
@@ -142,16 +146,18 @@ export async function GET(request: NextRequest) {
     
     // Save Notion connection to database
     console.log('💾 Saving Notion connection to database...');
-    const { createServiceClient } = await import('@/lib/supabase/server');
-    const supabase = createServiceClient();
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    const testUserId = '7bac32d5-50d6-4c7b-b595-be20f589233f';
+    if (userError || !user) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/connect-sources?error=unauthorized`);
+    }
     
     // Use proper upsert with the correct schema
     const { data, error: saveError } = await supabase
       .from('user_connections')
       .upsert({
-        user_id: testUserId,
+        user_id: user.id,
         source_type: 'notion',
         source_user_id: userInfo.id,
         workspace_id: tokenData.workspace_id || userInfo.id,
@@ -180,7 +186,7 @@ export async function GET(request: NextRequest) {
     const duration = Date.now() - startTime;
     console.log('✅ Notion OAuth completed and saved successfully', {
       duration: `${duration}ms`,
-      userId: testUserId,
+      userId: user.id,
       sourceType: 'notion',
       workspaceId: tokenData.workspace_id,
       workspaceName: tokenData.workspace_name
