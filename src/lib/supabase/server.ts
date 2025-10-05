@@ -11,19 +11,10 @@ const supabaseServiceRoleKey = typeof window !== 'undefined'
   ? import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY 
   : process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Provide fallback values for development/demo purposes
-const fallbackUrl = 'https://demo.supabase.co';
-const fallbackAnonKey = 'demo-anon-key';
-const fallbackServiceKey = 'demo-service-key';
-
-const finalSupabaseUrl = supabaseUrl || fallbackUrl;
-const finalSupabaseAnonKey = supabaseAnonKey || fallbackAnonKey;
-const finalSupabaseServiceKey = supabaseServiceRoleKey || fallbackServiceKey;
-
-// Only warn in development if no environment variables are set
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Missing Supabase environment variables. Using fallback values for demo purposes.');
-}
+// Use real Supabase credentials
+const finalSupabaseUrl = supabaseUrl || 'https://wjqlqmepnpvaywfbfpxb.supabase.co';
+const finalSupabaseAnonKey = supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqcWxxbWVwbnB2YXl3ZmJmcHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzMzNTcsImV4cCI6MjA3NDgwOTM1N30.pwRxkIQvPKVQxKEtjBLzS1TfyPZfo0g7lXwKZGAVIOM';
+const finalSupabaseServiceKey = supabaseServiceRoleKey || 'your-service-role-key';
 
 export function createServiceClient() {
   if (!supabaseServiceRoleKey) {
