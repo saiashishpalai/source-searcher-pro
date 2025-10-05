@@ -58,7 +58,7 @@ const ResetPassword = () => {
     }
 
     try {
-      const result = await updatePassword(token, formData.password);
+      const result = await updatePassword(formData.password);
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
         // Redirect to login after successful password reset
