@@ -1,9 +1,11 @@
+import { getEnvVar } from './env';
+
 export function validateOAuthEnvironment() {
   const providers = ['GOOGLE', 'SLACK', 'NOTION'];
   const issues: string[] = [];
 
   providers.forEach(provider => {
-    const clientId = import.meta.env[`VITE_${provider}_CLIENT_ID`];
+    const clientId = getEnvVar(`VITE_${provider}_CLIENT_ID`);
     if (!clientId || clientId.includes('your-') || clientId.includes('placeholder')) {
       issues.push(`${provider} client ID not configured`);
     }

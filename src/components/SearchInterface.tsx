@@ -1,6 +1,8 @@
 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -265,6 +267,7 @@ const dummyConversations = [
 const SearchInterface = () => {
   // Auth context
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   
   const [searchValue, setSearchValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -849,17 +852,8 @@ const SearchInterface = () => {
             <span className="text-xl font-semibold text-white leading-none">Haven7</span>
           </div>
           
-          {/* Right section: Settings + Profile */}
+          {/* Right section: Profile */}
           <div className="flex items-center gap-4 pr-6">
-            {/* Settings button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 rounded-full bg-card/50 backdrop-blur-sm border border-border/50 hover:bg-card/80 transition-all duration-200 flex items-center justify-center"
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
-
             {/* User avatar with dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -888,15 +882,29 @@ const SearchInterface = () => {
                   </p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="hover:bg-accent/50">
+                <DropdownMenuItem 
+                  className="hover:bg-accent/50 cursor-pointer"
+                  onClick={() => {
+                    console.log('🔗 Navigating to connected-sources from Profile Settings');
+                    navigate('/connected-sources');
+                  }}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
                   Profile Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem className="hover:bg-accent/50">
+                <DropdownMenuItem 
+                  className="hover:bg-accent/50 cursor-pointer"
+                  onClick={() => {
+                    console.log('🔗 Navigating to connected-sources');
+                    navigate('/connected-sources');
+                  }}
+                >
+                  <Link className="w-4 h-4 mr-2" />
                   Connected Sources
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
-                  className="hover:bg-destructive/10 text-destructive hover:text-destructive"
+                  className="hover:bg-destructive/10 text-destructive hover:text-destructive cursor-pointer"
                   onClick={() => logout()}
                 >
                   <LogOut className="w-4 h-4 mr-2" />

@@ -14,7 +14,7 @@ export const supabaseAdmin = createClient<Database>(SUPABASE_URL, SUPABASE_SERVI
 
 // Client for server-side operations that need user context
 export const createServerClient = (accessToken?: string) => {
-  return createClient<Database>(SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "", {
+  return createClient<Database>(SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "", {
     global: {
       headers: accessToken ? {
         Authorization: `Bearer ${accessToken}`

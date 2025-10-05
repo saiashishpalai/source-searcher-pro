@@ -6,12 +6,38 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink, Shield, Eye, Lock, X } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { 
+  CheckCircle, 
+  Plus, 
+  ArrowLeft, 
+  Loader2, 
+  ExternalLink, 
+  Shield, 
+  Eye, 
+  Lock, 
+  X, 
+  RefreshCw,
+  Settings,
+  Activity,
+  Clock,
+  Database,
+  AlertTriangle,
+  CheckCircle2,
+  Zap,
+  Users,
+  FileText,
+  MessageSquare,
+  BarChart3,
+  Info
+} from 'lucide-react';
 import { getEnvVar } from '@/lib/env';
 import { Buffer } from 'buffer';
 import { ApiClient } from '@/lib/api-client';
 
-// SVG Icon Components (reusing from SearchInterface)
+// SVG Icon Components (reusing from existing components)
 const SlackIcon = ({ className = "" }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -77,7 +103,122 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
-// Permission Modal Component
+// Connection Status Component
+const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing }: {
+  connection: any;
+  onRefresh: () => void;
+  onDisconnect: () => void;
+  isRefreshing: boolean;
+}) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'healthy': return 'text-green-400';
+      case 'warning': return 'text-yellow-400';
+      case 'error': return 'text-red-400';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'healthy': return <CheckCircle2 className="w-4 h-4" />;
+      case 'warning': return <AlertTriangle className="w-4 h-4" />;
+      case 'error': return <X className="w-4 h-4" />;
+      default: return <Activity className="w-4 h-4" />;
+    }
+  };
+
+  const formatLastSync = (lastSync: string) => {
+    if (!lastSync) return 'Never synced';
+    const date = new Date(lastSync);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Status Overview */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${connection.status === 'healthy' ? 'bg-green-400' : connection.status === 'warning' ? 'bg-yellow-400' : 'bg-red-400'} animate-pulse`} />
+          <span className="text-sm font-medium text-foreground">
+            {connection.status === 'healthy' ? 'Connected' : connection.status === 'warning' ? 'Limited Access' : 'Connection Issue'}
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="h-8 px-3"
+        >
+          {isRefreshing ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <RefreshCw className="w-3 h-3" />
+          )}
+        </Button>
+      </div>
+
+      {/* Connection Details */}
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span className="text-muted-foreground">Last Sync:</span>
+          <p className="font-medium">{formatLastSync(connection.last_synced)}</p>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Items Indexed:</span>
+          <p className="font-medium">{connection.indexed_items || 'Unknown'}</p>
+        </div>
+      </div>
+
+      {/* Sync Progress */}
+      {connection.sync_in_progress && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Syncing...</span>
+            <span className="font-medium">{connection.sync_progress || 0}%</span>
+          </div>
+          <Progress value={connection.sync_progress || 0} className="h-2" />
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="flex-1"
+        >
+          {isRefreshing ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Refresh
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDisconnect}
+          className="flex-1 text-destructive hover:text-destructive"
+        >
+          <X className="w-4 h-4 mr-2" />
+          Disconnect
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// Permission Modal Component (enhanced)
 const PermissionModal = ({ 
   isOpen, 
   onClose, 
@@ -234,89 +375,23 @@ const PermissionModal = ({
   );
 };
 
-const ConnectSources = () => {
+const ConnectedSources = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [connections, setConnections] = useState({
-    slack: false,
-    googleDrive: false,
-    notion: false
-  });
+  const [connections, setConnections] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshingConnection, setRefreshingConnection] = useState<string | null>(null);
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
-  const [isIndexing, setIsIndexing] = useState(false);
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch connections from API
-  const fetchConnections = async () => {
-    console.log('🔄 Fetching connections...');
-    setIsLoading(true);
-    
-    try {
-      const data = await ApiClient.get<{ connections: any[] }>('/api/connections/get');
-      
-      console.log('✅ Connections response:', data);
-      
-      if (data.connections) {
-        const connectionStatus = {
-          slack: data.connections.some((conn: any) => conn.source_type === 'slack' && conn.is_active),
-          googleDrive: data.connections.some((conn: any) => conn.source_type === 'google_drive' && conn.is_active),
-          notion: data.connections.some((conn: any) => conn.source_type === 'notion' && conn.is_active)
-        };
-        
-        console.log('📊 Connection status:', connectionStatus);
-        setConnections(connectionStatus);
-      } else {
-        console.error('❌ No connections data received');
-      }
-    } catch (error) {
-      console.error('❌ Error fetching connections:', error);
-    } finally {
-      setIsLoading(false);
-      setConnectingSource(null); // Clear connecting state
-    }
-  };
-
-  // Detect OAuth completion and refetch connections
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const error = urlParams.get('error');
-    
-    console.log('🔍 URL params on load:', { success, error });
-    
-    if (success) {
-      console.log('✅ OAuth success detected for:', success);
-      // Clear URL params
-      window.history.replaceState({}, document.title, window.location.pathname);
-      // Refetch connections after successful OAuth
-      fetchConnections();
-    } else if (error) {
-      console.log('❌ OAuth error detected:', error);
-      // Clear URL params
-      window.history.replaceState({}, document.title, window.location.pathname);
-      setConnectingSource(null);
-    } else {
-      // Initial load - fetch connections
-      fetchConnections();
-    }
-  }, []);
-
-  // Also refetch when component mounts or user changes
-  useEffect(() => {
-    if (user) {
-      fetchConnections();
-    }
-  }, [user]);
-
+  // Mock data for demonstration - in real app this would come from API
   const availableSources = [
     {
       id: 'slack',
       name: 'Slack',
       description: 'Connect your Slack workspace to search messages, files, and conversations',
       icon: SlackIcon,
-      connected: connections.slack,
       color: 'bg-[#4A154B]',
       available: true,
       permissions: [
@@ -330,7 +405,6 @@ const ConnectSources = () => {
       name: 'Google Drive',
       description: 'Access and search your Google Drive files, documents, and folders',
       icon: GoogleDriveIcon,
-      connected: connections.googleDrive,
       color: 'bg-[#4285F4]',
       available: true,
       permissions: [
@@ -344,7 +418,6 @@ const ConnectSources = () => {
       name: 'Notion',
       description: 'Search through your Notion pages, databases, and knowledge base',
       icon: NotionIcon,
-      connected: connections.notion,
       color: 'bg-[#000000]',
       available: true,
       permissions: [
@@ -355,9 +428,42 @@ const ConnectSources = () => {
     }
   ];
 
-  const handleConnectClick = (source: any) => {
-    if (source.connected) return;
+  // Fetch connections from API
+  const fetchConnections = async () => {
+    console.log('🔄 Fetching connections...');
+    setIsLoading(true);
     
+    try {
+      const data = await ApiClient.get<{ connections: any[] }>('/api/connections/get');
+      
+      console.log('✅ Connections response:', data);
+      
+      if (data.connections) {
+        // Enhance connection data with mock status info
+        const enhancedConnections = data.connections.map((conn: any) => ({
+          ...conn,
+          status: Math.random() > 0.8 ? 'warning' : 'healthy', // Mock status
+          indexed_items: Math.floor(Math.random() * 1000) + 100, // Mock indexed items
+          sync_in_progress: Math.random() > 0.9, // Mock sync status
+          sync_progress: Math.floor(Math.random() * 100), // Mock sync progress
+        }));
+        
+        setConnections(enhancedConnections);
+      } else {
+        console.error('❌ No connections data received');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching connections:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConnections();
+  }, []);
+
+  const handleConnectClick = (source: any) => {
     setSelectedSource(source);
     setPermissionModalOpen(true);
   };
@@ -450,9 +556,9 @@ const ConnectSources = () => {
     }
   };
 
-  const handleDisconnect = async (sourceId: string) => {
-    console.log('🔌 Disconnecting source:', sourceId);
-    setConnectingSource(sourceId); // Show loading state
+  const handleDisconnect = async (sourceType: string) => {
+    console.log('🔌 Disconnecting source:', sourceType);
+    setRefreshingConnection(sourceType);
     
     try {
       const response = await fetch('/api/connections/disconnect', {
@@ -460,15 +566,14 @@ const ConnectSources = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ sourceType: sourceId === 'googleDrive' ? 'google_drive' : sourceId }),
+        body: JSON.stringify({ sourceType }),
       });
       
       const data = await response.json();
       console.log('Disconnect response:', data);
       
       if (response.ok) {
-        console.log('✅ Successfully disconnected:', sourceId);
-        // Refetch connections to update UI
+        console.log('✅ Successfully disconnected:', sourceType);
         await fetchConnections();
       } else {
         console.error('❌ Failed to disconnect:', data);
@@ -476,21 +581,37 @@ const ConnectSources = () => {
     } catch (error) {
       console.error('❌ Error disconnecting:', error);
     } finally {
-      setConnectingSource(null);
+      setRefreshingConnection(null);
     }
   };
 
-  const handleViewPermissions = (source: any) => {
-    setSelectedSource(source);
-    setPermissionModalOpen(true);
+  const handleRefreshConnection = async (sourceType: string) => {
+    console.log('🔄 Refreshing connection:', sourceType);
+    setRefreshingConnection(sourceType);
+    
+    // Simulate refresh delay
+    setTimeout(() => {
+      setRefreshingConnection(null);
+      fetchConnections();
+    }, 2000);
   };
 
-  const handleContinue = () => {
-    // Navigate to main app dashboard
-    navigate('/dashboard');
+  const getConnectedSources = () => {
+    return availableSources.map(source => {
+      const connection = connections.find(conn => 
+        conn.source_type === (source.id === 'googleDrive' ? 'google_drive' : source.id)
+      );
+      return {
+        ...source,
+        connected: !!connection,
+        connection
+      };
+    });
   };
 
-  const hasAnyConnection = Object.values(connections).some(Boolean);
+  const connectedSources = getConnectedSources();
+  const connectedCount = connectedSources.filter(s => s.connected).length;
+  const totalItems = connections.reduce((sum, conn) => sum + (conn.indexed_items || 0), 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -503,13 +624,28 @@ const ConnectSources = () => {
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
         <div className="border-b border-border/30 bg-background/80 backdrop-blur-sm">
-          <div className="max-w-4xl mx-auto px-6 py-8">
+          <div className="max-w-6xl mx-auto px-6 py-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">H7</span>
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/dashboard')}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Dashboard
+                </Button>
+                <Separator orientation="vertical" className="h-6" />
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                    <Settings className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-semibold text-foreground">Connected Sources</h1>
+                    <p className="text-sm text-muted-foreground">Manage your integrations</p>
+                  </div>
                 </div>
-                <span className="text-2xl font-semibold text-foreground">Haven7</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
@@ -524,25 +660,58 @@ const ConnectSources = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="w-full max-w-4xl space-y-8">
-            {/* Welcome Section */}
-            <div className="text-center space-y-4">
-              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
-                <CheckCircle className="w-4 h-4" />
-                Email Verified
-              </div>
-              <h1 className="text-3xl lg:text-4xl font-light text-foreground tracking-tight">
-                Connect Your Knowledge
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Haven7 searches your work tools to answer questions with your actual context
-              </p>
+        <div className="flex-1 p-6">
+          <div className="max-w-6xl mx-auto space-y-8">
+            {/* Overview Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <Database className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-semibold text-foreground">{connectedCount}</p>
+                      <p className="text-sm text-muted-foreground">Connected Sources</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-semibold text-foreground">{totalItems.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">Items Indexed</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                      <Activity className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-semibold text-foreground">
+                        {connections.filter(c => c.status === 'healthy').length}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Healthy Connections</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Sources Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {availableSources.map((source) => (
+              {connectedSources.map((source) => (
                 <Card 
                   key={source.id}
                   className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-lg group h-full flex flex-col"
@@ -576,98 +745,110 @@ const ConnectSources = () => {
                       {source.description}
                     </CardDescription>
                     
-                    {/* Permission Preview */}
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium text-muted-foreground mb-2">What we'll access</h4>
-                      <ul className="space-y-1">
-                        {source.permissions.map((permission, index) => (
-                          <li key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
-                            <span>{permission}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    
-                    <div className="mt-auto space-y-3">
-                      <Button 
-                        variant="outline" 
-                        className="w-full group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors h-10"
-                        disabled={connectingSource === source.id}
-                        onClick={() => source.connected ? handleDisconnect(source.id) : handleConnectClick(source)}
-                      >
-                        {connectingSource === source.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            {source.connected ? 'Disconnecting...' : 'Connecting...'}
-                          </>
-                        ) : source.connected ? (
-                          <>
-                            <X className="w-4 h-4 mr-2" />
-                            Disconnect
-                          </>
-                        ) : (
-                          <>
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Connect
-                          </>
-                        )}
-                      </Button>
-                      
-                      {/* Footer link */}
-                      <button
-                        onClick={() => handleViewPermissions(source)}
-                        className="w-full text-xs text-primary hover:text-primary/80 hover:underline transition-colors"
-                      >
-                        View all permissions
-                      </button>
-                    </div>
+                    {source.connected ? (
+                      <ConnectionStatus
+                        connection={source.connection}
+                        onRefresh={() => handleRefreshConnection(source.id === 'googleDrive' ? 'google_drive' : source.id)}
+                        onDisconnect={() => handleDisconnect(source.id === 'googleDrive' ? 'google_drive' : source.id)}
+                        isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
+                      />
+                    ) : (
+                      <div className="mt-auto space-y-3">
+                        <Button 
+                          variant="outline" 
+                          className="w-full group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors h-10"
+                          disabled={connectingSource === source.id}
+                          onClick={() => handleConnectClick(source)}
+                        >
+                          {connectingSource === source.id ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              Connect
+                            </>
+                          )}
+                        </Button>
+                        
+                        {/* Footer link */}
+                        <button
+                          onClick={() => handleConnectClick(source)}
+                          className="w-full text-xs text-primary hover:text-primary/80 hover:underline transition-colors"
+                        >
+                          View permissions
+                        </button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            {/* Indexing State */}
-            {isIndexing && (
-              <div className="text-center space-y-4">
-                <div className="flex items-center justify-center gap-3">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="text-lg font-medium text-foreground">
-                    Indexing your connected sources...
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  This may take a few minutes depending on your data size
-                </p>
-              </div>
-            )}
+            {/* Additional Features */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Bulk Actions */}
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-primary" />
+                    Quick Actions
+                  </CardTitle>
+                  <CardDescription>
+                    Manage all your connections at once
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => {
+                      connectedSources.filter(s => !s.connected).forEach(source => {
+                        handleConnectClick(source);
+                      });
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Connect All Available Sources
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={fetchConnections}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh All Connections
+                  </Button>
+                </CardContent>
+              </Card>
 
-            {/* Continue Button */}
-            <div className="text-center space-y-4">
-              <Button 
-                onClick={handleContinue}
-                size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3"
-                disabled={!hasAnyConnection || isIndexing}
-              >
-                {isIndexing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Indexing...
-                  </>
-                ) : (
-                  <>
-                    Continue to Haven7
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                )}
-              </Button>
-              <p className="text-sm text-muted-foreground">
-                {!hasAnyConnection 
-                  ? 'Connect at least one source to continue' 
-                  : 'You can always connect more sources later from your settings'
-                }
-              </p>
+              {/* Help & Support */}
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Info className="w-5 h-5 text-primary" />
+                    Need Help?
+                  </CardTitle>
+                  <CardDescription>
+                    Get support with your connections
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Having trouble connecting? Check our troubleshooting guide or contact support.
+                    </AlertDescription>
+                  </Alert>
+                  <Button variant="outline" className="w-full justify-start">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Documentation
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
@@ -684,4 +865,4 @@ const ConnectSources = () => {
   );
 };
 
-export default ConnectSources;
+export default ConnectedSources;

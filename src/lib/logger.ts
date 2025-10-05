@@ -1,4 +1,4 @@
-const isDev = import.meta.env.DEV;
+import { isDev } from './env';
 
 export const logger = {
   oauth(message: string, data?: any) {

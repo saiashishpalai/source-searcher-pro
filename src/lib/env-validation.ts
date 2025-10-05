@@ -1,10 +1,12 @@
+import { getEnvVar } from './env';
+
 export function validateEnvVariables() {
   const required = [
     'VITE_SUPABASE_URL',
     'VITE_SUPABASE_ANON_KEY',
   ];
 
-  const missing = required.filter(key => !import.meta.env[key]);
+  const missing = required.filter(key => !getEnvVar(key));
 
   if (missing.length > 0) {
     throw new Error(

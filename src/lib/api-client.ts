@@ -1,6 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getEnvVar } from './env';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Use relative URL in development to go through Vite proxy
+// In production, use the full API URL
+const API_BASE_URL = import.meta.env.DEV ? '' : (getEnvVar('VITE_API_URL') || 'http://localhost:3000');
 
 export class ApiClient {
   private static async getAuthHeaders(): Promise<HeadersInit> {
