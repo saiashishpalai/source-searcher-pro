@@ -14,7 +14,7 @@ const supabaseServiceRoleKey = typeof window !== 'undefined'
 
 // Use real Supabase credentials - no fallbacks
 const finalSupabaseUrl = supabaseUrl || 'https://wjqlqmepnpvaywfbfpxb.supabase.co';
-const finalSupabaseAnonKey = supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqcWxxbWVwbnB2YXl3ZmJmcHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4MDA3NjEsImV4cCI6MjA1MTM3Njc2MX0.4l6WZ3YVYqXzVXjQKzVXjQKzVXjQKzVXjQKzVXjQKzVXjQ';
+const finalSupabaseAnonKey = supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqcWxxbWVwbnB2YXl3ZmJmcHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzMzNTcsImV4cCI6MjA3NDgwOTM1N30.pwRxkIQvPKVQxKEtjBLzS1TfyPZfo0g7lXwKZGAVIOM';
 
 // Client-side Supabase client
 export const supabase = createClient(finalSupabaseUrl, finalSupabaseAnonKey)
