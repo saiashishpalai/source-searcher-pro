@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
 import SearchResults from './SearchResults';
 import { SearchResultsData } from './SearchResults';
@@ -268,6 +269,7 @@ const SearchInterface = () => {
   // Auth context
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [profileData, setProfileData] = useState<{ name?: string; avatar_url?: string } | null>(null);
   
   const [searchValue, setSearchValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -283,6 +285,43 @@ const SearchInterface = () => {
     'Product roadmap draft',
     'Profile feedback analysis',
   ]);
+
+  // Fetch profile data for avatar
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name, avatar_url')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) {
+          setProfileData({
+            name: data.name || undefined,
+            avatar_url: data.avatar_url || undefined,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    fetchProfile();
+
+    // Listen for profile updates
+    const handleProfileUpdate = () => {
+      fetchProfile();
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
+  }, [user]);
   
   // Search results state
   const [searchResults, setSearchResults] = useState<SearchResultsData | null>(null);
@@ -862,9 +901,14 @@ const SearchInterface = () => {
                   className="h-10 w-10 rounded-full p-0 bg-card/50 backdrop-blur-sm border border-border/50 hover:bg-card/80 transition-all duration-200 flex items-center justify-center"
                 >
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src="/api/placeholder/32/32" alt="User" />
+                    <AvatarImage 
+                      key={profileData?.avatar_url || 'no-avatar'}
+                      src={profileData?.avatar_url || ''} 
+                      alt={profileData?.name || 'User'} 
+                      className="object-cover"
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                      {user?.email?.charAt(0).toUpperCase() || 'U'}
+                      {profileData?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -885,8 +929,8 @@ const SearchInterface = () => {
                 <DropdownMenuItem 
                   className="hover:bg-accent/50 cursor-pointer"
                   onClick={() => {
-                    console.log('🔗 Navigating to connected-sources from Profile Settings');
-                    navigate('/connected-sources');
+                    console.log('🔗 Navigating to profile-settings from dropdown');
+                    navigate('/profile-settings');
                   }}
                 >
                   <Settings className="w-4 h-4 mr-2" />
