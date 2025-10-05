@@ -1,7 +1,32 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
 
 const Landing = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // If user is authenticated, redirect to dashboard
+    if (!loading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // Don't render landing page if user is authenticated
+  if (user) {
+    return null;
+  }
   return (
     <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col relative overflow-hidden">
       {/* Animated Background Elements - Consistent with ConnectSources */}

@@ -30,7 +30,7 @@ const Login = () => {
         setMessage({ type: 'success', text: result.message });
         // Redirect to main app
         setTimeout(() => {
-          window.location.href = '/connect-sources';
+          window.location.href = '/dashboard';
         }, 1000);
       } else {
         setMessage({ type: 'error', text: result.message });
