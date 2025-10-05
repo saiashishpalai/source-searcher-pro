@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
   try {
+    // Get authenticated user
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      return NextResponse.json(
+        { success: false, message: 'User not authenticated' },
+        { status: 401 }
+      )
+    }
+
     // Google OAuth configuration
     const clientId = process.env.GOOGLE_CLIENT_ID
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/auth/drive/callback`
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/auth/google/callback`
     
     if (!clientId) {
       return NextResponse.json(
@@ -12,6 +25,14 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Generate secure state parameter
+    const state = btoa(JSON.stringify({
+      provider: 'google_drive',
+      userId: user.id,
+      timestamp: Date.now(),
+      nonce: crypto.randomUUID(),
+    }))
 
     // Google OAuth scopes for Drive API
     const scopes = [
@@ -28,7 +49,7 @@ export async function GET(request: NextRequest) {
     googleAuthUrl.searchParams.set('response_type', 'code')
     googleAuthUrl.searchParams.set('access_type', 'offline')
     googleAuthUrl.searchParams.set('prompt', 'consent')
-    googleAuthUrl.searchParams.set('state', 'google_drive_connect') // Add CSRF protection
+    googleAuthUrl.searchParams.set('state', state)
 
     // Redirect to Google OAuth
     return NextResponse.redirect(googleAuthUrl.toString())

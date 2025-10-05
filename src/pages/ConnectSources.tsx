@@ -363,17 +363,65 @@ const ConnectSources = () => {
     setPermissionModalOpen(false);
     setConnectingSource(sourceId);
     
-    // Redirect to OAuth endpoint
-    const oauthEndpoints = {
-      slack: '/api/auth/slack/connect',
-      googleDrive: '/api/auth/google/connect',
-      notion: '/api/auth/notion/connect'
-    };
-    
-    const endpoint = oauthEndpoints[sourceId as keyof typeof oauthEndpoints];
-    if (endpoint) {
-      console.log('🔗 Redirecting to OAuth:', endpoint);
-      window.location.href = endpoint;
+    try {
+      // Build OAuth URLs using frontend environment variables
+      const redirectUri = `${window.location.origin}/api/auth/${sourceId === 'googleDrive' ? 'google' : sourceId}/callback`;
+      
+      if (sourceId === 'googleDrive') {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!clientId) {
+          console.error('Google Client ID not configured');
+          return;
+        }
+        
+        const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        googleAuthUrl.searchParams.set('client_id', clientId);
+        googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
+        googleAuthUrl.searchParams.set('response_type', 'code');
+        googleAuthUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile');
+        googleAuthUrl.searchParams.set('access_type', 'offline');
+        googleAuthUrl.searchParams.set('prompt', 'consent');
+        googleAuthUrl.searchParams.set('state', 'google_connect');
+        
+        console.log('🔗 Redirecting to Google OAuth:', googleAuthUrl.toString());
+        window.location.href = googleAuthUrl.toString();
+        
+      } else if (sourceId === 'slack') {
+        const clientId = import.meta.env.VITE_SLACK_CLIENT_ID;
+        if (!clientId) {
+          console.error('Slack Client ID not configured');
+          return;
+        }
+        
+        const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
+        slackAuthUrl.searchParams.set('client_id', clientId);
+        slackAuthUrl.searchParams.set('redirect_uri', redirectUri);
+        slackAuthUrl.searchParams.set('scope', 'channels:read,channels:history,groups:read,groups:history,im:read,im:history,mpim:read,mpim:history,files:read,users:read,users:read.email,team:read');
+        slackAuthUrl.searchParams.set('state', 'slack_connect');
+        
+        console.log('🔗 Redirecting to Slack OAuth:', slackAuthUrl.toString());
+        window.location.href = slackAuthUrl.toString();
+        
+      } else if (sourceId === 'notion') {
+        const clientId = import.meta.env.VITE_NOTION_CLIENT_ID;
+        if (!clientId) {
+          console.error('Notion Client ID not configured');
+          return;
+        }
+        
+        const notionAuthUrl = new URL('https://api.notion.com/v1/oauth/authorize');
+        notionAuthUrl.searchParams.set('client_id', clientId);
+        notionAuthUrl.searchParams.set('redirect_uri', redirectUri);
+        notionAuthUrl.searchParams.set('response_type', 'code');
+        notionAuthUrl.searchParams.set('owner', 'user');
+        notionAuthUrl.searchParams.set('state', 'notion_connect');
+        
+        console.log('🔗 Redirecting to Notion OAuth:', notionAuthUrl.toString());
+        window.location.href = notionAuthUrl.toString();
+      }
+    } catch (error) {
+      console.error('OAuth connection error:', error);
+      setConnectingSource(null);
     }
   };
 
