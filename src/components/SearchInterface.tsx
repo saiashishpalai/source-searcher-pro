@@ -425,6 +425,12 @@ const SearchInterface = () => {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        if (response.status === 429 && errorData.code === 'QUOTA_EXCEEDED') {
+          throw new Error('Search temporarily unavailable due to API quota limits. Please try again later.');
+        }
+        
         throw new Error(`Search failed: ${response.statusText}`);
       }
 
@@ -432,7 +438,7 @@ const SearchInterface = () => {
       
       // Apply filters to results if any are selected
       if (filters.applications.length > 0 || filters.authors.length > 0 || filters.documentTypes.length > 0) {
-        const filteredResults = results.results.filter(result => {
+        const filteredResults = results.results.filter((result: any) => {
           const matchesApplication = filters.applications.length === 0 || filters.applications.includes(result.source);
           const matchesAuthor = filters.authors.length === 0 || filters.authors.includes(result.author);
           const matchesType = filters.documentTypes.length === 0 || filters.documentTypes.includes(result.type);

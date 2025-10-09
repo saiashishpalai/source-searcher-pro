@@ -504,7 +504,19 @@ app.post('/api/search', async (req, res) => {
 
   } catch (error) {
     console.error('Search endpoint error:', error);
-    res.status(500).json({ error: 'Search failed' });
+    
+    // Handle specific error types
+    if (error.message.includes('OpenAI quota exceeded')) {
+      return res.status(429).json({ 
+        error: 'Search temporarily unavailable due to API quota limits. Please try again later.',
+        code: 'QUOTA_EXCEEDED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Search failed: Internal Server Error',
+      code: 'SEARCH_ERROR'
+    });
   }
 });
 

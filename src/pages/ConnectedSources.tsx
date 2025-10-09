@@ -178,10 +178,6 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
           <span className="text-muted-foreground">Last Sync:</span>
           <p className="font-medium">{formatLastSync(connection.last_synced)}</p>
         </div>
-        <div>
-          <span className="text-muted-foreground">Items Indexed:</span>
-          <p className="font-medium">{connection.indexed_items || 'Unknown'}</p>
-        </div>
       </div>
 
       {/* Sync Progress */}
@@ -226,7 +222,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                     variant="outline"
                     size="sm"
                     onClick={onClearData}
-                    className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="w-full text-xs text-red-600 hover:text-white hover:bg-red-600"
                   >
                     Clear All Data
                   </Button>
@@ -338,7 +334,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
             variant="outline"
             size="sm"
             onClick={onDisconnect}
-            className="flex-1 text-destructive hover:text-destructive"
+            className="flex-1 text-destructive hover:text-white hover:bg-destructive"
           >
             <X className="w-4 h-4 mr-2" />
             Disconnect
@@ -867,8 +863,6 @@ const ConnectedSources = () => {
   };
 
   const connectedSources = getConnectedSources();
-  const connectedCount = connectedSources.filter(s => s.connected).length;
-  const totalItems = connections.reduce((sum, conn) => sum + (conn.indexed_items || 0), 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -919,52 +913,6 @@ const ConnectedSources = () => {
         {/* Main Content */}
         <div className="flex-1 p-6">
           <div className="max-w-6xl mx-auto space-y-8">
-            {/* Overview Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                      <Database className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-semibold text-foreground">{connectedCount}</p>
-                      <p className="text-sm text-muted-foreground">Connected Sources</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-green-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-semibold text-foreground">{totalItems.toLocaleString()}</p>
-                      <p className="text-sm text-muted-foreground">Items Indexed</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                      <Activity className="w-6 h-6 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-semibold text-foreground">
-                        {connections.filter(c => c.status === 'healthy').length}
-                      </p>
-                      <p className="text-sm text-muted-foreground">Healthy Connections</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
 
             {/* Sources Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

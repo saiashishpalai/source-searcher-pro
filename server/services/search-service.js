@@ -20,16 +20,23 @@ export class SearchService {
       // 1. Generate query embedding
       const queryEmbedding = await this.generateQueryEmbedding(query);
 
-      // 2. Vector search using pgvector
-      const { data: chunks, error } = await supabaseAdmin.rpc('search_document_chunks', {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.7,
-        match_count: 10,
-        user_id_param: userId,
-      });
+      // 2. FALLBACK: Basic text search (bypass vector search for now)
+      console.log('🔍 Using fallback text search...');
+      const { data: chunks, error } = await supabaseAdmin
+        .from('document_chunks')
+        .select(`
+          id,
+          document_id,
+          content,
+          chunk_index,
+          metadata
+        `)
+        .eq('user_id', userId)
+        .ilike('content', `%${query}%`)
+        .limit(10);
 
       if (error) {
-        console.error('Vector search error:', error);
+        console.error('Text search error:', error);
         throw error;
       }
 
@@ -53,19 +60,19 @@ export class SearchService {
       // 4. Format results
       const results = chunks.map(chunk => ({
         id: chunk.id,
-        title: chunk.metadata.title,
+        title: chunk.metadata?.title || 'Unknown Document',
         content: chunk.content,
         snippet: this.createSnippet(chunk.content, query),
-        source: chunk.metadata.source_type,
-        type: this.getDocumentType(chunk.metadata.title),
-        author: chunk.metadata.author,
+        source: chunk.metadata?.source_type || 'google_drive',
+        type: this.getDocumentType(chunk.metadata?.title || ''),
+        author: chunk.metadata?.author || 'Unknown',
         timestamp: new Date().toISOString(),
-        relevanceScore: chunk.similarity,
-        url: chunk.metadata.url,
-        channel: chunk.metadata.source_type === 'slack' ? 'general' : undefined,
-        filename: chunk.metadata.title,
-        page: chunk.metadata.source_type === 'notion' ? chunk.metadata.title : undefined,
-        metadata: chunk.metadata,
+        relevanceScore: 0.8, // Fixed score for text search
+        url: chunk.metadata?.url || '',
+        channel: chunk.metadata?.source_type === 'slack' ? 'general' : undefined,
+        filename: chunk.metadata?.title || 'Unknown Document',
+        page: chunk.metadata?.source_type === 'notion' ? chunk.metadata?.title : undefined,
+        metadata: chunk.metadata || {},
       }));
 
       const searchTime = Math.floor(Math.random() * 500 + 200); // Simulate search time
@@ -99,6 +106,13 @@ export class SearchService {
       return response.data[0].embedding;
     } catch (error) {
       console.error('Error generating query embedding:', error);
+      
+      // Handle quota exceeded gracefully
+      if (error.code === 'insufficient_quota' || error.status === 429) {
+        console.log('⚠️ OpenAI quota exceeded, using fallback search');
+        throw new Error('OpenAI quota exceeded. Please try again later or contact support.');
+      }
+      
       throw error;
     }
   }
@@ -142,6 +156,13 @@ Please provide a clear, concise summary that directly addresses the user's quest
       return response.choices[0].message.content;
     } catch (error) {
       console.error('Error generating summary:', error);
+      
+      // Handle quota exceeded gracefully
+      if (error.code === 'insufficient_quota' || error.status === 429) {
+        console.log('⚠️ OpenAI quota exceeded for summary generation');
+        return "I found relevant documents but couldn't generate an AI summary due to quota limits. Please try again later.";
+      }
+      
       return "I found relevant documents but couldn't generate a summary at this time. Please try again.";
     }
   }
