@@ -172,14 +172,6 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
         </Button>
       </div>
 
-      {/* Connection Details */}
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <span className="text-muted-foreground">Last Sync:</span>
-          <p className="font-medium">{formatLastSync(connection.last_synced)}</p>
-        </div>
-      </div>
-
       {/* Sync Progress */}
       {connection.sync_in_progress && (
         <div className="space-y-2">
@@ -193,8 +185,8 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 
       {/* Action Buttons */}
       <div className="space-y-2">
-          {/* Sync Documents Button for Google Drive */}
-          {connection.source_type === 'google_drive' && onSyncDocuments && (
+          {/* Sync Documents Button for Google Drive and Notion */}
+          {(connection.source_type === 'google_drive' || connection.source_type === 'notion') && onSyncDocuments && (
             <div className="space-y-2">
               <div className="space-y-2">
                 <Button
@@ -207,17 +199,17 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                   {isSyncing ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing... (0/5 docs)
+                      Syncing...
                     </>
                   ) : (
                     <>
                       <Database className="w-4 h-4 mr-2" />
-                      {(syncStatus?.totalDocuments || 0) > 0 ? 'Re-sync Documents' : 'Sync Documents'}
+                      {(syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 ? 'Re-sync Documents' : 'Sync Documents'}
                     </>
                   )}
                 </Button>
                 
-                {(syncStatus?.totalDocuments || 0) > 0 && (
+                {(syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -229,21 +221,9 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                 )}
               </div>
               
-              {/* Sync Status Info - Fixed */}
+              {/* Sync Status Info */}
               <div className="text-xs text-muted-foreground space-y-1">
-                {isSyncing ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-center py-2">
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      <span>Processing... ({syncStatus?.syncProgress?.processedDocuments || 0}/{syncStatus?.syncProgress?.totalDocuments || 5} docs)</span>
-                    </div>
-                    {syncStatus?.syncProgress?.currentDocument && (
-                      <div className="text-center text-xs text-muted-foreground">
-                        Current: {syncStatus.syncProgress.currentDocument}
-                      </div>
-                    )}
-                  </div>
-                ) : (
+                {!isSyncing && (
                   <>
                     {syncError ? (
                       <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -292,17 +272,17 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                       <>
                         <div className="flex justify-between">
                           <span>Documents:</span>
-                          <span className="font-medium">{syncStatus?.totalDocuments ?? 0}</span>
+                          <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Chunks:</span>
-                          <span className="font-medium">{syncStatus?.totalChunks ?? 0}</span>
+                          <span className="font-medium">{syncStatus?.[connection.source_type]?.totalChunks ?? 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Last Sync:</span>
                           <span className="font-medium">
-                            {syncStatus?.lastSyncTime 
-                              ? new Date(syncStatus.lastSyncTime).toLocaleString()
+                            {syncStatus?.[connection.source_type]?.lastSyncTime 
+                              ? new Date(syncStatus[connection.source_type].lastSyncTime).toLocaleString()
                               : 'Never'
                             }
                           </span>
@@ -511,7 +491,7 @@ const ConnectedSources = () => {
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
-  const [syncingDocuments, setSyncingDocuments] = useState(false);
+  const [syncingDocuments, setSyncingDocuments] = useState<Record<string, boolean>>({});
   const [syncStatus, setSyncStatus] = useState({
     totalDocuments: 0,
     totalChunks: 0,
@@ -733,8 +713,8 @@ const ConnectedSources = () => {
     }
   };
 
-  const handleClearData = async () => {
-    console.log('🗑️ Clearing all data...');
+  const handleClearData = async (sourceType: string) => {
+    console.log(`🗑️ Clearing data for ${sourceType}...`);
     
     try {
       const response = await fetch('http://localhost:3000/api/clear-data', {
@@ -743,6 +723,7 @@ const ConnectedSources = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
+        body: JSON.stringify({ sourceType }),
       });
       
       const data = await response.json();
@@ -751,7 +732,8 @@ const ConnectedSources = () => {
         throw new Error(data.error || 'Clear data failed');
       }
       
-      console.log('✅ Data cleared successfully');
+      const sourceName = sourceType === 'google_drive' ? 'Google Drive' : sourceType === 'notion' ? 'Notion' : sourceType;
+      console.log(`✅ ${sourceName} data cleared successfully`);
       await fetchSyncStatus();
       await fetchConnections();
       
@@ -800,21 +782,37 @@ const ConnectedSources = () => {
     }
   };
 
-  const handleSyncDocuments = async () => {
-    console.log('📄 Starting document sync...');
+  const handleSyncDocuments = async (sourceType: string) => {
+    console.log(`📄 Starting ${sourceType} document sync...`);
     console.log('🔑 Session token:', session?.access_token ? 'Present' : 'Missing');
     console.log('👤 User:', user?.id);
-    setSyncingDocuments(true);
+    
+    // Set syncing state for this specific source
+    setSyncingDocuments(prev => ({ ...prev, [sourceType]: true }));
     setSyncError(null);
     
     if (!session?.access_token) {
       setSyncError('Your session has expired. Please refresh the page to log in again.');
-      setSyncingDocuments(false);
+      setSyncingDocuments(prev => ({ ...prev, [sourceType]: false }));
       return;
     }
     
     try {
-      const response = await fetch('http://localhost:3000/api/sync/google-drive', {
+      // Determine API endpoint based on source type
+      const endpoint = sourceType === 'google_drive' 
+        ? '/api/sync/google-drive'
+        : sourceType === 'notion'
+        ? '/api/sync/notion'
+        : null;
+      
+      if (!endpoint) {
+        throw new Error(`Sync not implemented for ${sourceType}`);
+      }
+      
+      const sourceName = sourceType === 'google_drive' ? 'Google Drive' : 'Notion';
+      console.log(`🔄 Calling endpoint: ${endpoint}`);
+      
+      const response = await fetch(`http://localhost:3000${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -826,16 +824,20 @@ const ConnectedSources = () => {
       
       if (!response.ok) {
         if (data.code === 'TOKEN_EXPIRED') {
-          setSyncError('Your Google Drive connection has expired. Please reconnect Google Drive.');
+          setSyncError(`Your ${sourceName} connection has expired. Please reconnect ${sourceName}.`);
           return;
         } else if (data.code === 'NOT_CONNECTED') {
-          setSyncError('Google Drive is not connected. Please connect first.');
+          setSyncError(`${sourceName} is not connected. Please connect first.`);
           return;
         }
         throw new Error(data.error || 'Sync failed');
       }
       
       console.log('✅ Sync complete:', data);
+      
+      if (data.synced === 0) {
+        setSyncError(`No documents were synced from ${sourceName}. Make sure you have accessible content.`);
+      }
       
       // Refresh to show updated counts
       await fetchSyncStatus();
@@ -845,18 +847,34 @@ const ConnectedSources = () => {
       console.error('❌ Sync error:', error);
       setSyncError(error instanceof Error ? error.message : 'Sync failed');
     } finally {
-      setSyncingDocuments(false);
+      setSyncingDocuments(prev => ({ ...prev, [sourceType]: false }));
     }
   };
 
   const getConnectedSources = () => {
     return availableSources.map(source => {
+      // Map frontend source IDs to database source_types
+      const sourceTypeMap = {
+        'googleDrive': 'google_drive',
+        'notion': 'notion',
+        'slack': 'slack'
+      };
+      const dbSourceType = sourceTypeMap[source.id] || source.id;
+      
       const connection = connections.find(conn => 
-        conn.source_type === (source.id === 'googleDrive' ? 'google_drive' : source.id)
+        conn.source_type === dbSourceType
       );
+      
+      console.log(`🔍 Checking ${source.name}:`, {
+        frontendId: source.id,
+        dbSourceType,
+        hasConnection: !!connection,
+        connection: connection ? { id: connection.id, source_type: connection.source_type, is_active: connection.is_active } : null
+      });
+      
       return {
         ...source,
-        connected: !!connection,
+        connected: !!connection && connection.is_active,
         connection
       };
     });
@@ -951,18 +969,34 @@ const ConnectedSources = () => {
                     </CardDescription>
                     
                     {source.connected ? (
-        <ConnectionStatus
+          <ConnectionStatus
           connection={source.connection}
-          onRefresh={() => handleRefreshConnection(source.id === 'googleDrive' ? 'google_drive' : source.id)}
-          onDisconnect={() => handleDisconnect(source.id === 'googleDrive' ? 'google_drive' : source.id)}
+          onRefresh={() => {
+            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const dbSourceType = sourceTypeMap[source.id] || source.id;
+            handleRefreshConnection(dbSourceType);
+          }}
+          onDisconnect={() => {
+            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const dbSourceType = sourceTypeMap[source.id] || source.id;
+            handleDisconnect(dbSourceType);
+          }}
           isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
-          onSyncDocuments={source.id === 'googleDrive' ? handleSyncDocuments : undefined}
-          isSyncing={syncingDocuments}
+          onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion') ? () => {
+            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion' };
+            const dbSourceType = sourceTypeMap[source.id] || source.id;
+            handleSyncDocuments(dbSourceType);
+          } : undefined}
+          isSyncing={syncingDocuments[source.id === 'googleDrive' ? 'google_drive' : source.id] || false}
           syncStatus={syncStatus}
           syncStatusLoading={syncStatusLoading}
           syncError={syncError}
           setSyncError={setSyncError}
-          onClearData={handleClearData}
+          onClearData={() => {
+            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const dbSourceType = sourceTypeMap[source.id] || source.id;
+            handleClearData(dbSourceType);
+          }}
         />
                     ) : (
                       <div className="mt-auto space-y-3">

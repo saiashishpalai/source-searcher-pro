@@ -11,6 +11,7 @@ import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import { DocumentSync } from './services/document-sync.js';
 import { SearchService } from './services/search-service.js';
+import { NotionSync } from './services/notion-sync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,9 +33,48 @@ const supabaseAdmin = createClient(
 // Initialize services
 const documentSync = new DocumentSync(process.env.OPENAI_API_KEY);
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
+const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Test endpoint to check Notion connection
+app.get('/api/test/notion-connection', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId required' });
+    }
+    
+    const { data: connection, error } = await supabaseAdmin
+      .from('user_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('source_type', 'notion')
+      .single();
+    
+    if (error || !connection) {
+      return res.json({ 
+        hasConnection: false, 
+        error: error?.message || 'No connection found' 
+      });
+    }
+    
+    res.json({ 
+      hasConnection: true, 
+      connection: {
+        id: connection.id,
+        source_type: connection.source_type,
+        is_active: connection.is_active,
+        hasAccessToken: !!connection.access_token,
+        created_at: connection.created_at
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // GET USER CONNECTIONS
@@ -108,27 +148,51 @@ app.get('/api/auth/google/callback', async (req, res) => {
     }
 
     const tokens = await tokenResponse.json();
+    
+    // Fetch Google user info to get source_user_id
+    let googleUserId = 'google_user';
+    let userEmail = '';
+    try {
+      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` }
+      });
+      if (userInfoResponse.ok) {
+        const userInfo = await userInfoResponse.json();
+        googleUserId = userInfo.id || 'google_user';
+        userEmail = userInfo.email || '';
+        console.log('✓ Google user info retrieved:', { id: googleUserId, email: userEmail });
+      }
+    } catch (error) {
+      console.error('Error fetching Google user info:', error.message);
+    }
 
     const { error: dbError } = await supabaseAdmin
       .from('user_connections')
       .upsert({
         user_id: stateData.userId,
         source_type: 'google_drive',
+        source_user_id: googleUserId, // Required by schema
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         token_expires_at: tokens.expires_in 
           ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
           : null,
         is_active: true,
+        metadata: {
+          email: userEmail,
+          scope: tokens.scope,
+        },
         updated_at: new Date().toISOString(),
       }, { 
         onConflict: 'user_id,source_type' 
       });
 
     if (dbError) {
-      console.error('Database error:', dbError);
+      console.error('❌ Database error:', dbError);
       return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
     }
+    
+    console.log('✓ Google Drive connection saved to database');
 
     return res.redirect(`${APP_URL}/connect-sources?connected=google`);
   } catch (error) {
@@ -169,25 +233,46 @@ app.get('/api/auth/slack/callback', async (req, res) => {
       console.error('Slack token exchange failed:', tokens);
       return res.redirect(`${APP_URL}/connect-sources?error=token_failed`);
     }
+    
+    // Extract Slack team and user info
+    const slackUserId = tokens.authed_user?.id || tokens.user_id || 'slack_user';
+    const teamId = tokens.team?.id || 'unknown';
+    const teamName = tokens.team?.name || 'Slack Workspace';
+    
+    console.log('✓ Slack tokens received:', { 
+      teamId, 
+      teamName, 
+      userId: slackUserId,
+      hasAccessToken: !!tokens.access_token 
+    });
 
     const { error: dbError } = await supabaseAdmin
       .from('user_connections')
       .upsert({
         user_id: stateData.userId,
         source_type: 'slack',
+        source_user_id: slackUserId, // Required by schema
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token || null,
         token_expires_at: null, // Slack tokens don't expire
         is_active: true,
+        metadata: {
+          team_id: teamId,
+          team_name: teamName,
+          scope: tokens.scope,
+          authed_user: tokens.authed_user,
+        },
         updated_at: new Date().toISOString(),
       }, { 
         onConflict: 'user_id,source_type' 
       });
 
     if (dbError) {
-      console.error('Database error:', dbError);
+      console.error('❌ Database error:', dbError);
       return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
     }
+    
+    console.log('✓ Slack connection saved to database');
 
     return res.redirect(`${APP_URL}/connect-sources?connected=slack`);
   } catch (error) {
@@ -234,25 +319,47 @@ app.get('/api/auth/notion/callback', async (req, res) => {
     }
 
     const tokens = await tokenResponse.json();
+    
+    // Extract workspace and user info from Notion response
+    const workspaceId = tokens.workspace_id || 'unknown';
+    const workspaceName = tokens.workspace_name || 'Notion Workspace';
+    const botId = tokens.bot_id || null;
+    const ownerId = tokens.owner?.user?.id || tokens.owner?.workspace || 'notion_user';
+    
+    console.log('✓ Notion tokens received:', { 
+      workspaceId, 
+      workspaceName, 
+      botId,
+      hasAccessToken: !!tokens.access_token 
+    });
 
     const { error: dbError } = await supabaseAdmin
       .from('user_connections')
       .upsert({
         user_id: stateData.userId,
         source_type: 'notion',
+        source_user_id: ownerId, // Required by schema
         access_token: tokens.access_token,
         refresh_token: null, // Notion doesn't provide refresh tokens
         token_expires_at: null, // Notion tokens don't expire
         is_active: true,
+        metadata: {
+          workspace_id: workspaceId,
+          workspace_name: workspaceName,
+          bot_id: botId,
+          owner: tokens.owner,
+        },
         updated_at: new Date().toISOString(),
       }, { 
         onConflict: 'user_id,source_type' 
       });
 
     if (dbError) {
-      console.error('Database error:', dbError);
+      console.error('❌ Database error:', dbError);
       return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
     }
+    
+    console.log('✓ Notion connection saved to database');
 
     return res.redirect(`${APP_URL}/connect-sources?connected=notion`);
   } catch (error) {
@@ -339,6 +446,62 @@ app.post('/api/sync/google-drive', async (req, res) => {
   }
 });
 
+// SYNC NOTION ENDPOINT
+app.post('/api/sync/notion', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Get Notion connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('source_type', 'notion')
+      .single();
+    
+    if (connError || !connection) {
+      return res.status(400).json({ 
+        error: 'Notion not connected',
+        code: 'NOT_CONNECTED'
+      });
+    }
+    
+    console.log('✓ Starting Notion sync for user:', user.id);
+    
+    // Call sync service
+    const result = await notionSync.syncNotion(user.id, connection.access_token);
+    
+    console.log(`✓ Notion sync complete: ${result.synced} documents`);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('✗ Notion sync error:', error.message);
+    
+    if (error.code === 'notion_api_error' || error.message.includes('Notion')) {
+      return res.status(401).json({ 
+        error: 'Notion API error. Token may have expired.',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message,
+      code: 'SYNC_FAILED'
+    });
+  }
+});
+
 // SYNC STATUS ENDPOINT
 app.get('/api/sync/status', async (req, res) => {
   try {
@@ -354,37 +517,46 @@ app.get('/api/sync/status', async (req, res) => {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    // Get document count and last sync time
-    const { data: documents, error: docError } = await supabaseAdmin
-      .from('documents')
-      .select('id, synced_at, created_at')
-      .eq('user_id', user.id)
-      .eq('source_type', 'google_drive')
-      .order('synced_at', { ascending: false });
+    // Get stats for all sources
+    const sources = ['google_drive', 'notion', 'slack'];
+    const statsBySource = {};
 
-    if (docError) {
-      console.error('Error fetching documents:', docError);
-      return res.status(500).json({ error: 'Failed to fetch sync status' });
+    for (const sourceType of sources) {
+      const { data: documents, error: docError } = await supabaseAdmin
+        .from('documents')
+        .select('id, synced_at, created_at')
+        .eq('user_id', user.id)
+        .eq('source_type', sourceType)
+        .order('synced_at', { ascending: false });
+
+      if (!docError && documents) {
+        const totalDocuments = documents.length;
+        const lastSyncTime = documents[0]?.synced_at || null;
+
+        // Get chunk count for this source
+        const { data: chunks } = await supabaseAdmin
+          .from('document_chunks')
+          .select('id')
+          .eq('user_id', user.id)
+          .in('document_id', documents.map(d => d.id));
+
+        statsBySource[sourceType] = {
+          totalDocuments,
+          totalChunks: chunks?.length || 0,
+          lastSyncTime,
+          isSyncing: false
+        };
+      } else {
+        statsBySource[sourceType] = {
+          totalDocuments: 0,
+          totalChunks: 0,
+          lastSyncTime: null,
+          isSyncing: false
+        };
+      }
     }
 
-    const totalDocuments = documents?.length || 0;
-    const lastSyncTime = documents?.[0]?.synced_at || null;
-
-    // Get chunk count for Google Drive documents only
-    const { data: chunks, error: chunkError } = await supabaseAdmin
-      .from('document_chunks')
-      .select('id')
-      .eq('user_id', user.id)
-      .in('document_id', documents?.map(d => d.id) || []);
-
-    const totalChunks = chunks?.length || 0;
-
-    res.json({
-      totalDocuments,
-      totalChunks,
-      lastSyncTime,
-      isSyncing: false
-    });
+    res.json(statsBySource);
 
   } catch (error) {
     console.error('Sync status endpoint error:', error);
@@ -395,9 +567,15 @@ app.get('/api/sync/status', async (req, res) => {
 // CLEAR DATA ENDPOINT (for testing)
 app.post('/api/clear-data', async (req, res) => {
   try {
+    const { sourceType } = req.body;
     const authHeader = req.headers.authorization;
+    
     if (!authHeader) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    if (!sourceType) {
+      return res.status(400).json({ error: 'sourceType is required' });
     }
     
     const token = authHeader.replace('Bearer ', '');
@@ -407,19 +585,36 @@ app.post('/api/clear-data', async (req, res) => {
       return res.status(401).json({ error: 'Invalid token' });
     }
     
-    // Delete all documents and chunks for this user
-    await supabaseAdmin
-      .from('document_chunks')
-      .delete()
-      .eq('user_id', user.id);
-    
-    await supabaseAdmin
+    // Get documents for this source
+    const { data: documents } = await supabaseAdmin
       .from('documents')
-      .delete()
-      .eq('user_id', user.id);
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('source_type', sourceType);
     
-    console.log(`✓ Cleared all data for user ${user.id}`);
-    res.json({ success: true, message: 'All data cleared' });
+    if (documents && documents.length > 0) {
+      const docIds = documents.map(d => d.id);
+      
+      // Delete chunks for these documents
+      await supabaseAdmin
+        .from('document_chunks')
+        .delete()
+        .in('document_id', docIds);
+      
+      // Delete documents for this source
+      await supabaseAdmin
+        .from('documents')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('source_type', sourceType);
+    }
+    
+    console.log(`✓ Cleared ${sourceType} data for user ${user.id} (${documents?.length || 0} documents)`);
+    res.json({ 
+      success: true, 
+      message: `${sourceType} data cleared`,
+      documentsDeleted: documents?.length || 0
+    });
     
   } catch (error) {
     console.error('Clear data error:', error);
@@ -456,6 +651,24 @@ app.post('/api/connections/disconnect', async (req, res) => {
       return res.status(500).json({ error: 'Failed to disconnect' });
     }
     
+    // Get documents for this source first
+    const { data: documents } = await supabaseAdmin
+      .from('documents')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('source_type', sourceType);
+    
+    // Delete chunks for these documents
+    if (documents && documents.length > 0) {
+      const docIds = documents.map(d => d.id);
+      await supabaseAdmin
+        .from('document_chunks')
+        .delete()
+        .in('document_id', docIds);
+      
+      console.log(`✓ Deleted ${documents.length} documents and their chunks for ${sourceType}`);
+    }
+    
     // Delete synced documents
     await supabaseAdmin
       .from('documents')
@@ -464,7 +677,7 @@ app.post('/api/connections/disconnect', async (req, res) => {
       .eq('source_type', sourceType);
     
     console.log(`✓ Disconnected ${sourceType} for user ${user.id}`);
-    res.json({ success: true });
+    res.json({ success: true, documentsDeleted: documents?.length || 0 });
     
   } catch (error) {
     console.error('Disconnect error:', error);

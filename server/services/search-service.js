@@ -20,39 +20,115 @@ export class SearchService {
       // 1. Generate query embedding
       const queryEmbedding = await this.generateQueryEmbedding(query);
 
-      // 2. FALLBACK: Basic text search (bypass vector search for now)
-      console.log('🔍 Using fallback text search...');
-      const { data: chunks, error } = await supabaseAdmin
+      // 2. First, check if there are any chunks with embeddings
+      const { data: allChunks, error: checkError } = await supabaseAdmin
         .from('document_chunks')
-        .select(`
-          id,
-          document_id,
-          content,
-          chunk_index,
-          metadata
-        `)
+        .select('id, metadata, embedding')
         .eq('user_id', userId)
-        .ilike('content', `%${query}%`)
-        .limit(10);
+        .not('embedding', 'is', null)
+        .limit(50);  // Higher limit to see all sources
+      
+      const sourceCounts = {};
+      allChunks?.forEach(c => {
+        const src = c.metadata?.source_type || 'unknown';
+        sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+      });
+      
+      console.log('📊 Embedding check:', {
+        totalChunksWithEmbeddings: allChunks?.length || 0,
+        bySource: sourceCounts
+      });
+
+      // 3. Vector similarity search using Supabase RPC function
+      console.log('🔍 Using vector similarity search across all sources...');
+      let { data: chunks, error } = await supabaseAdmin
+        .rpc('search_document_chunks', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.3,  // Much lower threshold for better recall
+          match_count: 20,        // More results
+          user_id_param: userId
+        });
+
+      console.log('🔍 Vector search response:', { 
+        hasError: !!error, 
+        hasData: !!chunks, 
+        chunkCount: chunks?.length || 0,
+        errorDetails: error || 'none'
+      });
 
       if (error) {
-        console.error('Text search error:', error);
-        throw error;
+        console.error('❌ Vector search RPC error:', error);
+        console.log('⚠️ Falling back to text search...');
+        
+        // Fallback to text search if vector search fails
+        const { data: textChunks, error: textError } = await supabaseAdmin
+          .from('document_chunks')
+          .select(`
+            id,
+            document_id,
+            content,
+            chunk_index,
+            metadata
+          `)
+          .eq('user_id', userId)
+          .ilike('content', `%${query}%`)
+          .limit(10);
+        
+        if (textError || !textChunks || textChunks.length === 0) {
+          console.log('❌ No relevant documents found (text search also failed)');
+          return {
+            query,
+            results: [],
+            aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
+            totalResults: 0,
+            searchTime: 0,
+            timestamp: new Date().toISOString(),
+          };
+        }
+        
+        // Use text search results
+        chunks = textChunks;
+        console.log(`📊 Found ${chunks.length} relevant chunks (text search fallback)`);
       }
 
+      // If vector search returns no results, fall back to text search
       if (!chunks || chunks.length === 0) {
-        console.log('❌ No relevant documents found');
-        return {
-          query,
-          results: [],
-          aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
-          totalResults: 0,
-          searchTime: 0,
-          timestamp: new Date().toISOString(),
-        };
+        console.log('⚠️ Vector search returned 0 results, falling back to text search...');
+        
+        const { data: textChunks, error: textError } = await supabaseAdmin
+          .from('document_chunks')
+          .select(`
+            id,
+            document_id,
+            content,
+            chunk_index,
+            metadata
+          `)
+          .eq('user_id', userId)
+          .ilike('content', `%${query}%`)
+          .limit(10);
+        
+        if (!textChunks || textChunks.length === 0) {
+          console.log('❌ No relevant documents found (both vector and text search failed)');
+          return {
+            query,
+            results: [],
+            aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
+            totalResults: 0,
+            searchTime: 0,
+            timestamp: new Date().toISOString(),
+          };
+        }
+        
+        chunks = textChunks;
+        console.log(`📊 Found ${chunks.length} relevant chunks (text search fallback)`);
       }
 
-      console.log(`📊 Found ${chunks.length} relevant chunks`);
+      console.log(`📊 Found ${chunks.length} relevant chunks (vector similarity search)`);
+
+      // Log sources of results
+      const sources = [...new Set(chunks.map(c => c.metadata?.source_type))];
+      console.log(`📁 Results from sources: ${sources.join(', ')}`);
 
       // 3. Generate AI summary using RAG
       const aiSummary = await this.generateSummary(query, chunks);
@@ -67,7 +143,7 @@ export class SearchService {
         type: this.getDocumentType(chunk.metadata?.title || ''),
         author: chunk.metadata?.author || 'Unknown',
         timestamp: new Date().toISOString(),
-        relevanceScore: 0.8, // Fixed score for text search
+        relevanceScore: chunk.similarity || 0.8, // Use actual similarity score from vector search
         url: chunk.metadata?.url || '',
         channel: chunk.metadata?.source_type === 'slack' ? 'general' : undefined,
         filename: chunk.metadata?.title || 'Unknown Document',

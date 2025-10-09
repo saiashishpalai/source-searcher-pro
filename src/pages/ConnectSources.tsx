@@ -280,13 +280,15 @@ const ConnectSources = () => {
   // Detect OAuth completion and refetch connections
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
+    const connected = urlParams.get('connected'); // Server sends ?connected=notion
+    const success = urlParams.get('success');     // Legacy support
     const error = urlParams.get('error');
     
-    console.log('🔍 URL params on load:', { success, error });
+    console.log('🔍 URL params on load:', { connected, success, error });
     
-    if (success) {
-      console.log('✅ OAuth success detected for:', success);
+    if (connected || success) {
+      const source = connected || success;
+      console.log('✅ OAuth success detected for:', source);
       // Clear URL params
       window.history.replaceState({}, document.title, window.location.pathname);
       // Refetch connections after successful OAuth
