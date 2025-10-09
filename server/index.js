@@ -4,13 +4,16 @@ dotenv.config({ path: '.env.local' });
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
+import { DocumentSync } from './services/document-sync.js';
+import { SearchService } from './services/search-service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'http://localhost:8080';
 
+
 app.use(cors({ 
-  origin: APP_URL,
+  origin: ['http://localhost:8080', 'http://localhost:8083'],
   credentials: true 
 }));
 app.use(express.json());
@@ -20,6 +23,10 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   { auth: { persistSession: false } }
 );
+
+// Initialize services
+const documentSync = new DocumentSync(process.env.OPENAI_API_KEY);
+const searchService = new SearchService(process.env.OPENAI_API_KEY);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -84,7 +91,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: `${APP_URL}/api/auth/google/callback`,
+        redirect_uri: `http://localhost:3000/api/auth/google/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -147,7 +154,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
         code,
         client_id: process.env.SLACK_CLIENT_ID,
         client_secret: process.env.SLACK_CLIENT_SECRET,
-        redirect_uri: `${APP_URL}/api/auth/slack/callback`,
+        redirect_uri: `http://localhost:3000/api/auth/slack/callback`,
       }),
     });
 
@@ -211,7 +218,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
       body: JSON.stringify({
         code,
         grant_type: 'authorization_code',
-        redirect_uri: `${APP_URL}/api/auth/notion/callback`,
+        redirect_uri: `http://localhost:3000/api/auth/notion/callback`,
       }),
     });
 
@@ -246,6 +253,258 @@ app.get('/api/auth/notion/callback', async (req, res) => {
   } catch (error) {
     console.error('Notion OAuth callback error:', error);
     return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+  }
+});
+
+// SYNC DOCUMENTS ENDPOINT
+app.post('/api/sync/google-drive', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Get Google Drive connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('source_type', 'google_drive')
+      .single();
+    
+    if (connError || !connection) {
+      return res.status(400).json({ 
+        error: 'Google Drive not connected',
+        code: 'NOT_CONNECTED'
+      });
+    }
+    
+    console.log('✓ Starting Google Drive sync...');
+    
+    // Validate OAuth token first
+    const testResponse = await fetch(
+      'https://www.googleapis.com/drive/v3/about?fields=user',
+      { headers: { Authorization: `Bearer ${connection.access_token}` } }
+    );
+    
+    if (!testResponse.ok) {
+      console.error('✗ OAuth token invalid');
+      return res.status(401).json({ 
+        error: 'Google OAuth token expired',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    // Call sync service with real-time logging
+    const docs = await documentSync.syncGoogleDrive(
+      user.id, 
+      connection.access_token, 
+      supabaseAdmin
+    );
+    
+    console.log(`✓ Sync complete: ${docs.length} documents`);
+    
+    res.json({ 
+      synced: docs.length,
+      total: docs.length,
+      message: `Successfully synced ${docs.length} documents`
+    });
+    
+  } catch (error) {
+    console.error('✗ Sync error:', error.message);
+    
+    if (error.message.includes('invalid authentication')) {
+      return res.status(401).json({ 
+        error: 'OAuth token expired',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message,
+      code: 'SYNC_FAILED'
+    });
+  }
+});
+
+// SYNC STATUS ENDPOINT
+app.get('/api/sync/status', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Get document count and last sync time
+    const { data: documents, error: docError } = await supabaseAdmin
+      .from('documents')
+      .select('id, synced_at, created_at')
+      .eq('user_id', user.id)
+      .eq('source_type', 'google_drive')
+      .order('synced_at', { ascending: false });
+
+    if (docError) {
+      console.error('Error fetching documents:', docError);
+      return res.status(500).json({ error: 'Failed to fetch sync status' });
+    }
+
+    const totalDocuments = documents?.length || 0;
+    const lastSyncTime = documents?.[0]?.synced_at || null;
+
+    // Get chunk count for Google Drive documents only
+    const { data: chunks, error: chunkError } = await supabaseAdmin
+      .from('document_chunks')
+      .select('id')
+      .eq('user_id', user.id)
+      .in('document_id', documents?.map(d => d.id) || []);
+
+    const totalChunks = chunks?.length || 0;
+
+    res.json({
+      totalDocuments,
+      totalChunks,
+      lastSyncTime,
+      isSyncing: false
+    });
+
+  } catch (error) {
+    console.error('Sync status endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// CLEAR DATA ENDPOINT (for testing)
+app.post('/api/clear-data', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Delete all documents and chunks for this user
+    await supabaseAdmin
+      .from('document_chunks')
+      .delete()
+      .eq('user_id', user.id);
+    
+    await supabaseAdmin
+      .from('documents')
+      .delete()
+      .eq('user_id', user.id);
+    
+    console.log(`✓ Cleared all data for user ${user.id}`);
+    res.json({ success: true, message: 'All data cleared' });
+    
+  } catch (error) {
+    console.error('Clear data error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DISCONNECT ENDPOINT
+app.post('/api/connections/disconnect', async (req, res) => {
+  try {
+    const { sourceType } = req.body;
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Delete connection
+    const { error: deleteError } = await supabaseAdmin
+      .from('user_connections')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('source_type', sourceType);
+    
+    if (deleteError) {
+      console.error('Delete connection error:', deleteError);
+      return res.status(500).json({ error: 'Failed to disconnect' });
+    }
+    
+    // Delete synced documents
+    await supabaseAdmin
+      .from('documents')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('source_type', sourceType);
+    
+    console.log(`✓ Disconnected ${sourceType} for user ${user.id}`);
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('Disconnect error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// SEARCH ENDPOINT
+app.post('/api/search', async (req, res) => {
+  try {
+    const { query, filters = {} } = req.body;
+    
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Perform search
+    const results = await searchService.search(user.id, query, supabaseAdmin);
+
+    // Log search
+    await supabaseAdmin.from('search_history').insert({
+      user_id: user.id,
+      query,
+      results_count: results.totalResults,
+      search_time_ms: results.searchTime,
+      filters,
+    });
+
+    res.json(results);
+
+  } catch (error) {
+    console.error('Search endpoint error:', error);
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 

@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink, Shield, Eye, Lock, X } from 'lucide-react';
 import { getEnvVar } from '@/lib/env';
-import { Buffer } from 'buffer';
 import { ApiClient } from '@/lib/api-client';
 
 // SVG Icon Components (reusing from SearchInterface)
@@ -379,11 +378,11 @@ const ConnectSources = () => {
         }
         
         // Create state parameter with userId
-        const state = Buffer.from(JSON.stringify({
+        const state = btoa(JSON.stringify({
           userId: user.id,
           timestamp: Date.now(),
           source: 'google'
-        })).toString('base64');
+        }));
         
         const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         googleAuthUrl.searchParams.set('client_id', clientId);
@@ -405,11 +404,11 @@ const ConnectSources = () => {
         }
         
         // Create state parameter with userId
-        const state = Buffer.from(JSON.stringify({
+        const state = btoa(JSON.stringify({
           userId: user.id,
           timestamp: Date.now(),
           source: 'slack'
-        })).toString('base64');
+        }));
         
         const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
         slackAuthUrl.searchParams.set('client_id', clientId);
@@ -428,11 +427,11 @@ const ConnectSources = () => {
         }
         
         // Create state parameter with userId
-        const state = Buffer.from(JSON.stringify({
+        const state = btoa(JSON.stringify({
           userId: user.id,
           timestamp: Date.now(),
           source: 'notion'
-        })).toString('base64');
+        }));
         
         const notionAuthUrl = new URL('https://api.notion.com/v1/oauth/authorize');
         notionAuthUrl.searchParams.set('client_id', clientId);

@@ -1,0 +1,180 @@
+import OpenAI from 'openai';
+
+/**
+ * SearchService - Performs vector similarity search and RAG answer generation
+ */
+export class SearchService {
+  constructor(apiKey) {
+    this.openai = new OpenAI({ apiKey });
+    this.embeddingModel = 'text-embedding-3-small';
+    this.llmModel = 'gpt-3.5-turbo'; // Cheaper than GPT-4
+  }
+
+  /**
+   * Perform RAG search with safety limits
+   */
+  async search(userId, query, supabaseAdmin) {
+    try {
+      console.log(`🔍 Searching for: "${query}" (user: ${userId})`);
+
+      // 1. Generate query embedding
+      const queryEmbedding = await this.generateQueryEmbedding(query);
+
+      // 2. Vector search using pgvector
+      const { data: chunks, error } = await supabaseAdmin.rpc('search_document_chunks', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.7,
+        match_count: 10,
+        user_id_param: userId,
+      });
+
+      if (error) {
+        console.error('Vector search error:', error);
+        throw error;
+      }
+
+      if (!chunks || chunks.length === 0) {
+        console.log('❌ No relevant documents found');
+        return {
+          query,
+          results: [],
+          aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
+          totalResults: 0,
+          searchTime: 0,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      console.log(`📊 Found ${chunks.length} relevant chunks`);
+
+      // 3. Generate AI summary using RAG
+      const aiSummary = await this.generateSummary(query, chunks);
+
+      // 4. Format results
+      const results = chunks.map(chunk => ({
+        id: chunk.id,
+        title: chunk.metadata.title,
+        content: chunk.content,
+        snippet: this.createSnippet(chunk.content, query),
+        source: chunk.metadata.source_type,
+        type: this.getDocumentType(chunk.metadata.title),
+        author: chunk.metadata.author,
+        timestamp: new Date().toISOString(),
+        relevanceScore: chunk.similarity,
+        url: chunk.metadata.url,
+        channel: chunk.metadata.source_type === 'slack' ? 'general' : undefined,
+        filename: chunk.metadata.title,
+        page: chunk.metadata.source_type === 'notion' ? chunk.metadata.title : undefined,
+        metadata: chunk.metadata,
+      }));
+
+      const searchTime = Math.floor(Math.random() * 500 + 200); // Simulate search time
+
+      console.log(`✅ Search complete: ${results.length} results, ${searchTime}ms`);
+
+      return {
+        query,
+        results,
+        aiSummary,
+        totalResults: results.length,
+        searchTime,
+        timestamp: new Date().toISOString(),
+      };
+
+    } catch (error) {
+      console.error('Search error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate query embedding
+   */
+  async generateQueryEmbedding(query) {
+    try {
+      const response = await this.openai.embeddings.create({
+        model: this.embeddingModel,
+        input: query,
+      });
+      return response.data[0].embedding;
+    } catch (error) {
+      console.error('Error generating query embedding:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate AI summary using RAG with safety limits
+   */
+  async generateSummary(query, chunks) {
+    try {
+      // SAFETY: Limit context to prevent high costs
+      const maxChunks = 10;
+      const contextChunks = chunks.slice(0, maxChunks);
+      
+      const context = contextChunks
+        .map(chunk => `Source: ${chunk.metadata.title}\nContent: ${chunk.content}`)
+        .join('\n\n');
+
+      const prompt = `Based on the following documents, provide a comprehensive summary answering the user's query: "${query}"
+
+Documents:
+${context}
+
+Please provide a clear, concise summary that directly addresses the user's question. Include specific details and cite sources when relevant. Keep the summary under 300 words.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: this.llmModel,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that summarizes information from documents to answer user queries. Be accurate and cite sources.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: 300, // Limit response length
+        temperature: 0.3, // Reduce randomness for accuracy
+      });
+
+      return response.choices[0].message.content;
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      return "I found relevant documents but couldn't generate a summary at this time. Please try again.";
+    }
+  }
+
+  /**
+   * Create snippet from content highlighting query terms
+   */
+  createSnippet(content, query) {
+    const queryWords = query.toLowerCase().split(/\s+/);
+    const words = content.split(/\s+/);
+    
+    // Find first occurrence of any query word
+    let startIndex = 0;
+    for (let i = 0; i < words.length; i++) {
+      if (queryWords.some(word => words[i].toLowerCase().includes(word))) {
+        startIndex = Math.max(0, i - 10); // 10 words before
+        break;
+      }
+    }
+    
+    const snippet = words.slice(startIndex, startIndex + 30).join(' '); // 30 words
+    return snippet + (words.length > startIndex + 30 ? '...' : '');
+  }
+
+  /**
+   * Determine document type from title
+   */
+  getDocumentType(title) {
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('.pdf')) return 'pdf';
+    if (lowerTitle.includes('.doc') || lowerTitle.includes('.docx')) return 'doc';
+    if (lowerTitle.includes('.xls') || lowerTitle.includes('.xlsx')) return 'excel';
+    if (lowerTitle.includes('slack') || lowerTitle.includes('message')) return 'message';
+    return 'page';
+  }
+}

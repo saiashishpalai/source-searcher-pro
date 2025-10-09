@@ -267,7 +267,7 @@ const dummyConversations = [
 
 const SearchInterface = () => {
   // Auth context
-  const { user, logout } = useAuth();
+  const { user, session, logout } = useAuth();
   const navigate = useNavigate();
   const [profileData, setProfileData] = useState<{ name?: string; avatar_url?: string } | null>(null);
   
@@ -405,7 +405,30 @@ const SearchInterface = () => {
         }
       };
       
-      const results = await simulateSearch(searchValue);
+      // Call real search API
+      const response = await fetch('http://localhost:3000/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          query: searchValue,
+          filters: {
+            applications: filters.applications,
+            authors: filters.authors,
+            documentTypes: filters.documentTypes,
+            timeRange: filters.timeRange,
+            dateRange: filters.dateRange
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`);
+      }
+
+      const results = await response.json();
       
       // Apply filters to results if any are selected
       if (filters.applications.length > 0 || filters.authors.length > 0 || filters.documentTypes.length > 0) {

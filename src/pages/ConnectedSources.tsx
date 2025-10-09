@@ -31,10 +31,10 @@ import {
   FileText,
   MessageSquare,
   BarChart3,
-  Info
+  Info,
+  AlertCircle
 } from 'lucide-react';
 import { getEnvVar } from '@/lib/env';
-import { Buffer } from 'buffer';
 import { ApiClient } from '@/lib/api-client';
 
 // SVG Icon Components (reusing from existing components)
@@ -104,12 +104,19 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 );
 
 // Connection Status Component
-const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing }: {
-  connection: any;
-  onRefresh: () => void;
-  onDisconnect: () => void;
-  isRefreshing: boolean;
-}) => {
+    const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing, onSyncDocuments, isSyncing, syncStatus, syncStatusLoading = false, syncError = null, setSyncError, onClearData }: {
+      connection: any;
+      onRefresh: () => void;
+      onDisconnect: () => void;
+      isRefreshing: boolean;
+      onSyncDocuments?: () => void;
+      isSyncing?: boolean;
+      syncStatus?: any;
+      syncStatusLoading?: boolean;
+      syncError?: string | null;
+      setSyncError?: (error: string | null) => void;
+      onClearData?: () => void;
+    }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy': return 'text-green-400';
@@ -189,30 +196,154 @@ const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing }:
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className="flex-1"
-        >
-          {isRefreshing ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      <div className="space-y-2">
+          {/* Sync Documents Button for Google Drive */}
+          {connection.source_type === 'google_drive' && onSyncDocuments && (
+            <div className="space-y-2">
+              <div className="space-y-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={onSyncDocuments}
+                  disabled={isSyncing}
+                  className="w-full bg-primary hover:bg-primary/90"
+                >
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing... (0/5 docs)
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 mr-2" />
+                      {(syncStatus?.totalDocuments || 0) > 0 ? 'Re-sync Documents' : 'Sync Documents'}
+                    </>
+                  )}
+                </Button>
+                
+                {(syncStatus?.totalDocuments || 0) > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onClearData}
+                    className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    Clear All Data
+                  </Button>
+                )}
+              </div>
+              
+              {/* Sync Status Info - Fixed */}
+              <div className="text-xs text-muted-foreground space-y-1">
+                {isSyncing ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center py-2">
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      <span>Processing... ({syncStatus?.syncProgress?.processedDocuments || 0}/{syncStatus?.syncProgress?.totalDocuments || 5} docs)</span>
+                    </div>
+                    {syncStatus?.syncProgress?.currentDocument && (
+                      <div className="text-center text-xs text-muted-foreground">
+                        Current: {syncStatus.syncProgress.currentDocument}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {syncError ? (
+                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                        <div className="flex items-start">
+                          <AlertCircle className="w-4 h-4 text-red-600 mr-2 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm text-red-800 font-medium">Sync Error</p>
+                            <p className="text-sm text-red-700 mt-1">{syncError}</p>
+        <div className="flex gap-2 mt-3">
+          {syncError.includes('expired') && syncError.includes('session') ? (
+            <button
+              onClick={() => window.location.reload()}
+              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Refresh Page
+            </button>
+          ) : syncError.includes('expired') || syncError.includes('reconnect') ? (
+            <button
+              onClick={() => {
+                setSyncError?.(null);
+                window.location.href = '/connect-sources';
+              }}
+              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Reconnect Google Drive
+            </button>
           ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <button
+              onClick={() => handleSyncDocuments?.()}
+              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Try Again
+            </button>
           )}
-          Refresh
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onDisconnect}
-          className="flex-1 text-destructive hover:text-destructive"
-        >
-          <X className="w-4 h-4 mr-2" />
-          Disconnect
-        </Button>
+          <button
+            onClick={() => setSyncError?.(null)}
+            className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Dismiss
+          </button>
+        </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Documents:</span>
+                          <span className="font-medium">{syncStatus?.totalDocuments ?? 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Chunks:</span>
+                          <span className="font-medium">{syncStatus?.totalChunks ?? 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Last Sync:</span>
+                          <span className="font-medium">
+                            {syncStatus?.lastSyncTime 
+                              ? new Date(syncStatus.lastSyncTime).toLocaleString()
+                              : 'Never'
+                            }
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="flex-1"
+          >
+            {isRefreshing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDisconnect}
+            className="flex-1 text-destructive hover:text-destructive"
+          >
+            <X className="w-4 h-4 mr-2" />
+            Disconnect
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -377,13 +508,22 @@ const PermissionModal = ({
 
 const ConnectedSources = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [connections, setConnections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshingConnection, setRefreshingConnection] = useState<string | null>(null);
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
+  const [syncingDocuments, setSyncingDocuments] = useState(false);
+  const [syncStatus, setSyncStatus] = useState({
+    totalDocuments: 0,
+    totalChunks: 0,
+    lastSyncTime: null,
+    isSyncing: false
+  });
+  const [syncStatusLoading, setSyncStatusLoading] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Mock data for demonstration - in real app this would come from API
   const availableSources = [
@@ -461,7 +601,18 @@ const ConnectedSources = () => {
 
   useEffect(() => {
     fetchConnections();
+    // Only fetch sync status if user is authenticated
+    if (session?.access_token) {
+      fetchSyncStatus();
+    }
   }, []);
+
+  // Fetch sync status when user changes
+  useEffect(() => {
+    if (user && session?.access_token) {
+      fetchSyncStatus();
+    }
+  }, [user, session]);
 
   const handleConnectClick = (source: any) => {
     setSelectedSource(source);
@@ -485,11 +636,11 @@ const ConnectedSources = () => {
         }
         
         // Create state parameter with userId
-        const state = Buffer.from(JSON.stringify({
+        const state = btoa(JSON.stringify({
           userId: user.id,
           timestamp: Date.now(),
           source: 'google'
-        })).toString('base64');
+        }));
         
         const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         googleAuthUrl.searchParams.set('client_id', clientId);
@@ -511,11 +662,11 @@ const ConnectedSources = () => {
         }
         
         // Create state parameter with userId
-        const state = Buffer.from(JSON.stringify({
+        const state = btoa(JSON.stringify({
           userId: user.id,
           timestamp: Date.now(),
           source: 'slack'
-        })).toString('base64');
+        }));
         
         const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
         slackAuthUrl.searchParams.set('client_id', clientId);
@@ -534,11 +685,11 @@ const ConnectedSources = () => {
         }
         
         // Create state parameter with userId
-        const state = Buffer.from(JSON.stringify({
+        const state = btoa(JSON.stringify({
           userId: user.id,
           timestamp: Date.now(),
           source: 'notion'
-        })).toString('base64');
+        }));
         
         const notionAuthUrl = new URL('https://api.notion.com/v1/oauth/authorize');
         notionAuthUrl.searchParams.set('client_id', clientId);
@@ -557,31 +708,59 @@ const ConnectedSources = () => {
   };
 
   const handleDisconnect = async (sourceType: string) => {
-    console.log('🔌 Disconnecting source:', sourceType);
+    console.log(`🔌 Disconnecting ${sourceType}...`);
     setRefreshingConnection(sourceType);
     
     try {
-      const response = await fetch('/api/connections/disconnect', {
+      const response = await fetch('http://localhost:3000/api/connections/disconnect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({ sourceType }),
       });
       
       const data = await response.json();
-      console.log('Disconnect response:', data);
       
-      if (response.ok) {
-        console.log('✅ Successfully disconnected:', sourceType);
-        await fetchConnections();
-      } else {
-        console.error('❌ Failed to disconnect:', data);
+      if (!response.ok) {
+        throw new Error(data.error || 'Disconnect failed');
       }
+      
+      console.log('✅ Disconnected successfully');
+      await fetchConnections();
+      
     } catch (error) {
-      console.error('❌ Error disconnecting:', error);
+      console.error('❌ Disconnect error:', error);
     } finally {
       setRefreshingConnection(null);
+    }
+  };
+
+  const handleClearData = async () => {
+    console.log('🗑️ Clearing all data...');
+    
+    try {
+      const response = await fetch('http://localhost:3000/api/clear-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Clear data failed');
+      }
+      
+      console.log('✅ Data cleared successfully');
+      await fetchSyncStatus();
+      await fetchConnections();
+      
+    } catch (error) {
+      console.error('❌ Clear data error:', error);
     }
   };
 
@@ -594,6 +773,84 @@ const ConnectedSources = () => {
       setRefreshingConnection(null);
       fetchConnections();
     }, 2000);
+  };
+
+  const fetchSyncStatus = async () => {
+    // Only fetch if user is authenticated
+    if (!session?.access_token) {
+      console.log('No session token available for sync status');
+      return;
+    }
+
+    setSyncStatusLoading(true);
+    try {
+      const response = await fetch('http://localhost:3000/api/sync/status', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const status = await response.json();
+        setSyncStatus(status);
+      } else {
+        console.log('Sync status response not ok:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching sync status:', error);
+      // Don't show error to user, just log it
+    } finally {
+      setSyncStatusLoading(false);
+    }
+  };
+
+  const handleSyncDocuments = async () => {
+    console.log('📄 Starting document sync...');
+    console.log('🔑 Session token:', session?.access_token ? 'Present' : 'Missing');
+    console.log('👤 User:', user?.id);
+    setSyncingDocuments(true);
+    setSyncError(null);
+    
+    if (!session?.access_token) {
+      setSyncError('Your session has expired. Please refresh the page to log in again.');
+      setSyncingDocuments(false);
+      return;
+    }
+    
+    try {
+      const response = await fetch('http://localhost:3000/api/sync/google-drive', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (data.code === 'TOKEN_EXPIRED') {
+          setSyncError('Your Google Drive connection has expired. Please reconnect Google Drive.');
+          return;
+        } else if (data.code === 'NOT_CONNECTED') {
+          setSyncError('Google Drive is not connected. Please connect first.');
+          return;
+        }
+        throw new Error(data.error || 'Sync failed');
+      }
+      
+      console.log('✅ Sync complete:', data);
+      
+      // Refresh to show updated counts
+      await fetchSyncStatus();
+      await fetchConnections();
+      
+    } catch (error) {
+      console.error('❌ Sync error:', error);
+      setSyncError(error instanceof Error ? error.message : 'Sync failed');
+    } finally {
+      setSyncingDocuments(false);
+    }
   };
 
   const getConnectedSources = () => {
@@ -746,12 +1003,19 @@ const ConnectedSources = () => {
                     </CardDescription>
                     
                     {source.connected ? (
-                      <ConnectionStatus
-                        connection={source.connection}
-                        onRefresh={() => handleRefreshConnection(source.id === 'googleDrive' ? 'google_drive' : source.id)}
-                        onDisconnect={() => handleDisconnect(source.id === 'googleDrive' ? 'google_drive' : source.id)}
-                        isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
-                      />
+        <ConnectionStatus
+          connection={source.connection}
+          onRefresh={() => handleRefreshConnection(source.id === 'googleDrive' ? 'google_drive' : source.id)}
+          onDisconnect={() => handleDisconnect(source.id === 'googleDrive' ? 'google_drive' : source.id)}
+          isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
+          onSyncDocuments={source.id === 'googleDrive' ? handleSyncDocuments : undefined}
+          isSyncing={syncingDocuments}
+          syncStatus={syncStatus}
+          syncStatusLoading={syncStatusLoading}
+          syncError={syncError}
+          setSyncError={setSyncError}
+          onClearData={handleClearData}
+        />
                     ) : (
                       <div className="mt-auto space-y-3">
                         <Button 
