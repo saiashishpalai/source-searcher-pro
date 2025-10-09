@@ -1,5 +1,10 @@
 import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '..', '.env.local') });
 
 import express from 'express';
 import cors from 'cors';
@@ -515,6 +520,59 @@ app.post('/api/search', async (req, res) => {
     
     res.status(500).json({ 
       error: 'Search failed: Internal Server Error',
+      code: 'SEARCH_ERROR'
+    });
+  }
+});
+
+// FOLLOW-UP SEARCH ENDPOINT - Search within specific documents only
+app.post('/api/search/followup', async (req, res) => {
+  try {
+    const { query, documentIds = [] } = req.body;
+    
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    if (!documentIds || documentIds.length === 0) {
+      return res.status(400).json({ error: 'Document IDs are required for follow-up search' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Perform follow-up search within specific documents
+    const results = await searchService.searchWithinDocuments(
+      user.id, 
+      query, 
+      documentIds, 
+      supabaseAdmin
+    );
+
+    res.json(results);
+
+  } catch (error) {
+    console.error('Follow-up search endpoint error:', error);
+    
+    // Handle specific error types
+    if (error.message.includes('OpenAI quota exceeded')) {
+      return res.status(429).json({ 
+        error: 'Search temporarily unavailable due to API quota limits. Please try again later.',
+        code: 'QUOTA_EXCEEDED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Follow-up search failed: Internal Server Error',
       code: 'SEARCH_ERROR'
     });
   }

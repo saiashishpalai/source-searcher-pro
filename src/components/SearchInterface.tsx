@@ -273,7 +273,7 @@ const SearchInterface = () => {
   
   const [searchValue, setSearchValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const [conversations, setConversations] = useState(dummyConversations);
+  const [conversations, setConversations] = useState<typeof dummyConversations>([]);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [editingThread, setEditingThread] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -322,16 +322,72 @@ const SearchInterface = () => {
       window.removeEventListener('profileUpdated', handleProfileUpdate);
     };
   }, [user]);
+
+  // Load threads from database on mount
+  useEffect(() => {
+    const loadThreads = async () => {
+      if (!user) {
+        setIsLoadingThreads(false);
+        return;
+      }
+      
+      try {
+        const { data: threads, error } = await (supabase as any)
+          .from('search_threads')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (!error && threads) {
+          // Fetch results for each thread
+          const threadsWithResults = await Promise.all(
+            threads.map(async (thread: any) => {
+              const { data: resultsData, error: resultsError } = await (supabase as any)
+                .from('search_thread_results')
+                .select('result_data')
+                .eq('thread_id', thread.id)
+                .order('created_at', { ascending: true });
+
+              const results = !resultsError && resultsData
+                ? resultsData.map((r: any) => r.result_data)
+                : [];
+
+              return {
+                id: thread.id,
+                title: thread.title,
+                timestamp: thread.created_at,
+                query: thread.query,
+                results: results,
+              };
+            })
+          );
+
+          setConversations(threadsWithResults as any);
+        }
+      } catch (error) {
+        console.error('Error loading threads:', error);
+      } finally {
+        setIsLoadingThreads(false);
+      }
+    };
+
+    loadThreads();
+  }, [user]);
   
   // Search results state
   const [searchResults, setSearchResults] = useState<SearchResultsData | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [currentSearchDocumentIds, setCurrentSearchDocumentIds] = useState<string[]>([]);
 
   // Follow-up conversation state
   const [followUpQuery, setFollowUpQuery] = useState('');
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
+  
+  // Thread management state
+  const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -451,10 +507,14 @@ const SearchInterface = () => {
       
       setSearchResults(results);
       
-      // Add to recent searches if not already there
+      // Track document IDs for follow-up questions (RAG within these documents)
+      const documentIds = results.results.map((result: any) => result.id);
+      setCurrentSearchDocumentIds(documentIds);
+      
+      // Add to recent searches if not already there (FIFO - limit to 6)
       setRecentSearches(prev => {
         const newSearches = [searchValue, ...prev.filter(s => s !== searchValue)];
-        return newSearches.slice(0, 10); // Keep only last 10 searches
+        return newSearches.slice(0, 6); // Keep only last 6 searches
       });
     } catch (error) {
       setSearchError('Failed to load search results. Please try again.');
@@ -469,11 +529,58 @@ const SearchInterface = () => {
     setShowMobileSidebar(false); // Close mobile sidebar when selecting a thread
   };
 
-  const handleBackToSearch = () => {
+  const handleBackToSearch = async () => {
+    // Save current search results as a thread if they exist AND it's a new search (not viewing an existing thread)
+    if (searchResults && !selectedThread && user) {
+      try {
+        // Create a new thread in the database
+        const { data: newThread, error: threadError } = await (supabase as any)
+          .from('search_threads')
+          .insert({
+            user_id: user.id,
+            title: searchResults.query.substring(0, 100), // Limit title length
+            query: searchResults.query,
+          })
+          .select()
+          .single();
+
+        if (!threadError && newThread) {
+          // Save all results for this thread
+          const resultsToInsert = searchResults.results.map((result) => ({
+            thread_id: newThread.id,
+            result_data: result,
+          }));
+
+          await (supabase as any).from('search_thread_results').insert(resultsToInsert);
+
+          // Add to local state at the beginning (most recent first)
+          const newConversation = {
+            id: newThread.id,
+            title: newThread.title,
+            timestamp: newThread.created_at,
+            query: newThread.query,
+            results: searchResults.results,
+          };
+
+          setConversations((prev) => {
+            const updated = [newConversation as any, ...prev];
+            // Keep only the 10 most recent threads
+            return updated.slice(0, 10);
+          });
+          console.log('✅ Thread saved to database');
+        }
+      } catch (error) {
+        console.error('Error saving thread:', error);
+      }
+    }
+
+    // Clear all states to go back to main search
     setSelectedThread(null);
     setShowSearchResults(false);
     setSearchResults(null);
     setSearchError(null);
+    setCurrentSearchDocumentIds([]);
+    setSearchValue(''); // Also clear the search input
   };
 
   const handleNewConversation = () => {
@@ -481,6 +588,7 @@ const SearchInterface = () => {
     setShowSearchResults(false);
     setSearchResults(null);
     setSearchError(null);
+    setCurrentSearchDocumentIds([]);
     setSearchValue(''); // Clear any existing search
   };
 
@@ -513,9 +621,6 @@ const SearchInterface = () => {
     setIsFollowUpLoading(true);
     
     try {
-      // Simulate follow-up question processing
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
       if (selectedThread) {
         // Handle follow-up in conversation thread
         const thread = conversations.find(t => t.id === selectedThread);
@@ -524,27 +629,38 @@ const SearchInterface = () => {
           // In a real app, this would make an API call to process the follow-up
           // For now, we'll just show a success message
         }
-      } else if (searchResults) {
-        // Handle follow-up in search results - perform new search with follow-up query
-        const combinedQuery = `${searchResults.query} ${followUpQuery}`;
-        
-        setIsSearchLoading(true);
+      } else if (searchResults && currentSearchDocumentIds.length > 0) {
+        // Handle follow-up in search results - search WITHIN already found documents (RAG)
         setSearchError(null);
         
         try {
-          const results = await simulateSearch(combinedQuery);
+          console.log('🔍 Follow-up search within', currentSearchDocumentIds.length, 'documents');
+          
+          const response = await fetch('http://localhost:3000/api/search/followup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({
+              query: followUpQuery,
+              documentIds: currentSearchDocumentIds,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Follow-up search failed: ${response.statusText}`);
+          }
+
+          const results = await response.json();
           setSearchResults(results);
           
-          // Add to recent searches
-          setRecentSearches(prev => {
-            const newSearches = [combinedQuery, ...prev.filter(s => s !== combinedQuery)];
-            return newSearches.slice(0, 10);
-          });
+          // Update document IDs to the new results for further follow-ups
+          const documentIds = results.results.map((result: any) => result.id);
+          setCurrentSearchDocumentIds(documentIds);
         } catch (error) {
           setSearchError('Failed to process follow-up question. Please try again.');
           console.error('Follow-up search error:', error);
-        } finally {
-          setIsSearchLoading(false);
         }
       }
       
@@ -556,20 +672,49 @@ const SearchInterface = () => {
     }
   };
 
-  const handleRenameThread = (threadId: string, newTitle: string) => {
-    setConversations(prev => 
-      prev.map(thread => 
-        thread.id === threadId ? { ...thread, title: newTitle } : thread
-      )
-    );
+  const handleRenameThread = async (threadId: string, newTitle: string) => {
+    try {
+      // Update in database
+      const { error } = await (supabase as any)
+        .from('search_threads')
+        .update({ title: newTitle })
+        .eq('id', threadId);
+
+      if (!error) {
+        // Update local state
+        setConversations(prev => 
+          prev.map(thread => 
+            thread.id === threadId ? { ...thread, title: newTitle } : thread
+          )
+        );
+        console.log('✅ Thread renamed in database');
+      }
+    } catch (error) {
+      console.error('Error renaming thread:', error);
+    }
+    
     setEditingThread(null);
     setEditTitle('');
   };
 
-  const handleDeleteThread = (threadId: string) => {
-    setConversations(prev => prev.filter(thread => thread.id !== threadId));
-    if (selectedThread === threadId) {
-      setSelectedThread(null);
+  const handleDeleteThread = async (threadId: string) => {
+    try {
+      // Delete from database (CASCADE will delete associated results)
+      const { error } = await (supabase as any)
+        .from('search_threads')
+        .delete()
+        .eq('id', threadId);
+
+      if (!error) {
+        // Update local state
+        setConversations(prev => prev.filter(thread => thread.id !== threadId));
+        if (selectedThread === threadId) {
+          setSelectedThread(null);
+        }
+        console.log('✅ Thread deleted from database');
+      }
+    } catch (error) {
+      console.error('Error deleting thread:', error);
     }
   };
 
@@ -586,14 +731,44 @@ const SearchInterface = () => {
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
-    if (diffInHours < 24) {
-      return `${diffInHours}h ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays}d ago`;
+    // Format time as HH:MM AM/PM
+    const timeStr = date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    
+    // Check if it's today
+    if (dateOnly.getTime() === today.getTime()) {
+      return `Today at ${timeStr}`;
     }
+    
+    // Check if it's yesterday
+    if (dateOnly.getTime() === yesterday.getTime()) {
+      return `Yesterday at ${timeStr}`;
+    }
+    
+    // Check if it's this year
+    if (date.getFullYear() === now.getFullYear()) {
+      const monthDay = date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      return `${monthDay} at ${timeStr}`;
+    }
+    
+    // For older dates, include the year
+    const fullDate = date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+    return `${fullDate} at ${timeStr}`;
   };
 
   // Filter logic
@@ -1021,7 +1196,7 @@ const SearchInterface = () => {
 
 
         {/* Content Area */}
-        <div className={`flex-1 relative ${showSearchResults ? 'overflow-y-auto' : 'flex items-center justify-center'} p-4 lg:p-6`}>
+        <div className={`flex-1 relative ${showSearchResults || selectedThread ? 'overflow-y-auto' : 'flex items-center justify-center'} p-4 lg:p-6`}>
           {/* Subtle background elements */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
@@ -1326,7 +1501,7 @@ const SearchInterface = () => {
             ) : null}
           </div>
         ) : selectedThread ? (
-          <div className="w-full max-w-4xl space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 relative z-10">
+          <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 relative z-10">
             {/* Conversation Header */}
             <div className="text-center space-y-2">
               <h1 className="text-2xl font-semibold text-foreground">
