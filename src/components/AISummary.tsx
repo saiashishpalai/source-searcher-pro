@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Sparkles, BarChart3, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sparkles, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -142,14 +142,6 @@ const AISummary: React.FC<AISummaryProps> = ({
                   Max reached
                 </Badge>
               )}
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Export Summary
             </Button>
           </div>
         </div>
