@@ -738,6 +738,51 @@ app.post('/api/search', async (req, res) => {
   }
 });
 
+// REGENERATE SUMMARY ENDPOINT
+app.post('/api/regenerate-summary', async (req, res) => {
+  try {
+    const { query, results } = req.body;
+    
+    if (!query || !results) {
+      return res.status(400).json({ error: 'Query and results are required' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    console.log(`✨ Regenerating summary for query: "${query}"`);
+
+    // Generate new AI summary with different temperature for variation
+    const aiSummary = await searchService.regenerateSummary(query, results);
+
+    res.json({ aiSummary });
+
+  } catch (error) {
+    console.error('Summary regeneration endpoint error:', error);
+    
+    if (error.message.includes('OpenAI quota exceeded')) {
+      return res.status(429).json({ 
+        error: 'Summary regeneration temporarily unavailable. Please try again later.',
+        code: 'QUOTA_EXCEEDED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Summary regeneration failed',
+      code: 'REGENERATE_ERROR'
+    });
+  }
+});
+
 // FOLLOW-UP SEARCH ENDPOINT - Search within specific documents only
 app.post('/api/search/followup', async (req, res) => {
   try {

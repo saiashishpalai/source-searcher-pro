@@ -275,6 +275,63 @@ export class SearchService {
   }
 
   /**
+   * Regenerate summary with higher temperature for variation
+   */
+  async regenerateSummary(query, results) {
+    try {
+      // Convert results back to chunks format for summary generation
+      const chunks = results.map(result => ({
+        content: result.content || result.snippet,
+        metadata: {
+          title: result.title || result.filename,
+          source: result.source
+        }
+      }));
+
+      const maxChunks = 10;
+      const contextChunks = chunks.slice(0, maxChunks);
+      
+      const context = contextChunks
+        .map(chunk => `Source: ${chunk.metadata.title}\nContent: ${chunk.content}`)
+        .join('\n\n');
+
+      const prompt = `Based on the following documents, provide a comprehensive summary answering the user's query: "${query}"
+
+Documents:
+${context}
+
+Please provide a clear, concise summary that directly addresses the user's question. Include specific details and cite sources when relevant. Keep the summary under 300 words. Provide a fresh perspective with different wording than previous summaries.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: this.llmModel,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that summarizes information from documents to answer user queries. Be accurate and cite sources. Provide varied perspectives when asked to regenerate.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: 300,
+        temperature: 0.7, // Higher temperature for more variation in regeneration
+      });
+
+      return response.choices[0].message.content;
+    } catch (error) {
+      console.error('Error regenerating summary:', error);
+      
+      if (error.code === 'insufficient_quota' || error.status === 429) {
+        console.log('⚠️ OpenAI quota exceeded for summary regeneration');
+        throw new Error('OpenAI quota exceeded');
+      }
+      
+      return "I couldn't regenerate the summary at this time. Please try again.";
+    }
+  }
+
+  /**
    * Generate AI summary using RAG with safety limits
    */
   async generateSummary(query, chunks) {

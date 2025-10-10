@@ -363,7 +363,20 @@ const SearchInterface = () => {
               // Check format: if 1 row and it's an array, it's new conversation format
               if (resultsData.length === 1) {
                 const data = resultsData[0].result_data;
-                // New format: result_data is an array of conversation Q&A pairs
+                
+                // Newest format: object with conversation and summaryVersions
+                if (data && typeof data === 'object' && data.conversation && data.summaryVersions) {
+                  return {
+                    id: thread.id,
+                    title: thread.title,
+                    timestamp: thread.created_at,
+                    query: thread.query,
+                    results: data.conversation,
+                    summaryVersions: data.summaryVersions,
+                  };
+                }
+                
+                // New format (before summary versions): result_data is an array of conversation Q&A pairs
                 if (Array.isArray(data) && data.length > 0 && data[0]?.query) {
                   return {
                     id: thread.id,
@@ -410,6 +423,13 @@ const SearchInterface = () => {
   // Conversation thread state - stores history of Q&A
   const [conversationThread, setConversationThread] = useState<SearchResultsData[]>([]);
   const MAX_CONVERSATION_LENGTH = 5;
+
+  // Summary versions state - tracks original + regenerated summaries for each Q&A
+  interface SummaryVersions {
+    [qaIndex: number]: string[]; // Array of summary versions for each Q&A
+  }
+  const [summaryVersions, setSummaryVersions] = useState<SummaryVersions>({});
+  const [isRegenerating, setIsRegenerating] = useState<{ [qaIndex: number]: boolean }>({});
 
   // Follow-up conversation state
   const [followUpQuery, setFollowUpQuery] = useState('');
@@ -543,6 +563,9 @@ const SearchInterface = () => {
       // Initialize conversation thread with first Q&A
       setConversationThread([results]);
       
+      // Initialize summary versions for the first Q&A
+      setSummaryVersions({ 0: [results.aiSummary] });
+      
       // Add to recent searches if not already there (FIFO - limit to 6)
       setRecentSearches(prev => {
         const newSearches = [searchValue, ...prev.filter(s => s !== searchValue)];
@@ -561,7 +584,7 @@ const SearchInterface = () => {
     setShowMobileSidebar(false); // Close mobile sidebar when selecting a thread
     
     // Load the conversation thread from the saved thread
-    const thread = conversations.find(t => t.id === threadId);
+    const thread: any = conversations.find(t => t.id === threadId);
     if (thread && thread.results) {
       // Check if results is already an array of conversation items or old format
       if (Array.isArray(thread.results) && thread.results.length > 0) {
@@ -569,12 +592,20 @@ const SearchInterface = () => {
         const firstItem: any = thread.results[0];
         if (firstItem && typeof firstItem === 'object' && 'query' in firstItem && 'results' in firstItem) {
           setConversationThread(thread.results as any);
+          
+          // Restore summary versions if they exist
+          if (thread.summaryVersions) {
+            setSummaryVersions(thread.summaryVersions);
+            console.log(`📖 Loaded thread with ${thread.results.length} Q&A pairs and summary versions`);
+          } else {
+            console.log(`📖 Loaded thread with ${thread.results.length} Q&A pairs (no summary versions)`);
+          }
+          
           // Extract document IDs from first search for reference
           if (firstItem.results && Array.isArray(firstItem.results)) {
             const docIds = firstItem.results.map((r: any) => r.id);
             setCurrentSearchDocumentIds(docIds);
           }
-          console.log(`📖 Loaded thread with ${thread.results.length} Q&A pairs`);
         }
       }
     }
@@ -601,11 +632,16 @@ const SearchInterface = () => {
           .single();
 
         if (!threadError && newThread) {
-          // Save the ENTIRE conversation thread (all Q&A pairs)
+          // Save the ENTIRE conversation thread with summary versions
           // Store as a single JSONB object containing the full conversation
+          const threadData = {
+            conversation: conversationThread,
+            summaryVersions: summaryVersions
+          };
+          
           await (supabase as any).from('search_thread_results').insert({
             thread_id: newThread.id,
-            result_data: conversationThread, // Save entire conversation thread
+            result_data: threadData, // Save conversation + summary versions
           });
 
           // Add to local state at the beginning (most recent first)
@@ -622,7 +658,7 @@ const SearchInterface = () => {
             // Keep only the 10 most recent threads
             return updated.slice(0, 10);
           });
-          console.log(`✅ Thread saved to database with ${conversationThread.length} Q&A pairs`);
+          console.log(`✅ Thread saved to database with ${conversationThread.length} Q&A pairs and summary versions`);
         }
       } catch (error) {
         console.error('Error saving thread:', error);
@@ -636,6 +672,8 @@ const SearchInterface = () => {
     setSearchError(null);
     setCurrentSearchDocumentIds([]);
     setConversationThread([]); // Clear conversation thread
+    setSummaryVersions({}); // Clear summary versions
+    setIsRegenerating({}); // Clear regenerating state
     setSearchValue(''); // Also clear the search input
   };
 
@@ -646,6 +684,8 @@ const SearchInterface = () => {
     setSearchError(null);
     setCurrentSearchDocumentIds([]);
     setConversationThread([]); // Clear conversation thread
+    setSummaryVersions({}); // Clear summary versions
+    setIsRegenerating({}); // Clear regenerating state
     setSearchValue(''); // Clear any existing search
   };
 
@@ -668,6 +708,57 @@ const SearchInterface = () => {
   const handleSearchRetry = async () => {
     if (searchResults?.query) {
       await handleSearch({ preventDefault: () => {} } as React.FormEvent);
+    }
+  };
+
+  const handleRegenerateSummary = async (qaIndex: number) => {
+    // Check if we've already regenerated (max 1 regeneration)
+    const versions = summaryVersions[qaIndex] || [];
+    if (versions.length >= 2) {
+      console.log('⚠️ Maximum regenerations reached for this Q&A');
+      return;
+    }
+
+    setIsRegenerating(prev => ({ ...prev, [qaIndex]: true }));
+
+    try {
+      const qa = conversationThread[qaIndex];
+      const response = await fetch('http://localhost:3000/api/regenerate-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          query: qa.query,
+          results: qa.results,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Summary regeneration failed: ${response.statusText}`);
+      }
+
+      const { aiSummary } = await response.json();
+
+      // Add new summary version
+      setSummaryVersions(prev => ({
+        ...prev,
+        [qaIndex]: [...(prev[qaIndex] || []), aiSummary]
+      }));
+
+      // Update the conversation thread with new summary
+      setConversationThread(prev => 
+        prev.map((item, idx) => 
+          idx === qaIndex ? { ...item, aiSummary } : item
+        )
+      );
+
+      console.log(`✨ Summary regenerated for Q&A ${qaIndex + 1}`);
+    } catch (error) {
+      console.error('Error regenerating summary:', error);
+    } finally {
+      setIsRegenerating(prev => ({ ...prev, [qaIndex]: false }));
     }
   };
 
@@ -719,8 +810,15 @@ const SearchInterface = () => {
           const results = await response.json();
           
           // APPEND to conversation thread instead of replacing
+          const newIndex = conversationThread.length;
           setConversationThread(prev => [...prev, results]);
           setSearchResults(results); // Keep for compatibility
+          
+          // Initialize summary versions for this new Q&A
+          setSummaryVersions(prev => ({
+            ...prev,
+            [newIndex]: [results.aiSummary]
+          }));
           
           // Keep document IDs the SAME (search within same documents)
           // Don't update document IDs - we want to stay within the original set
@@ -1549,6 +1647,11 @@ const SearchInterface = () => {
                       onResultClick={handleSearchResultClick}
                       onRetry={handleSearchRetry}
                       hasMore={false}
+                      summaryVersions={summaryVersions[index]}
+                      onRegenerateSummary={() => handleRegenerateSummary(index)}
+                      isRegeneratingSummary={isRegenerating[index]}
+                      canRegenerateSummary={!summaryVersions[index] || summaryVersions[index].length < 2}
+                      isClosedThread={false}
                     />
                   </div>
                 ))}
@@ -1657,13 +1760,15 @@ const SearchInterface = () => {
                   )}
                 </div>
                 
-                {/* Results */}
+                {/* Results - For saved threads, disable regeneration */}
                 <SearchResults
                   data={qa}
                   isLoading={false}
                   onResultClick={handleSearchResultClick}
                   onRetry={handleSearchRetry}
                   hasMore={false}
+                  summaryVersions={summaryVersions[index]}
+                  isClosedThread={true}
                 />
               </div>
             ))}

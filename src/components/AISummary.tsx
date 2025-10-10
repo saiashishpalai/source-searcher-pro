@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Sparkles, BarChart3, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, BarChart3, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -8,13 +8,26 @@ interface AISummaryProps {
   summary: string;
   query: string;
   totalResults: number;
+  summaryVersions?: string[]; // All summary versions (original + regenerated)
+  onRegenerate?: () => void;
+  isRegenerating?: boolean;
+  canRegenerate?: boolean; // Whether regeneration is allowed
+  isClosedThread?: boolean; // Whether this is a saved/closed thread
 }
 
 const AISummary: React.FC<AISummaryProps> = ({
   summary,
   query,
-  totalResults
+  totalResults,
+  summaryVersions = [summary],
+  onRegenerate,
+  isRegenerating = false,
+  canRegenerate = true,
+  isClosedThread = false
 }) => {
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(summaryVersions.length - 1);
+  const currentSummary = summaryVersions[currentVersionIndex] || summary;
+  const hasMultipleVersions = summaryVersions.length > 1;
 
   return (
     <div className="relative">
@@ -65,9 +78,46 @@ const AISummary: React.FC<AISummaryProps> = ({
 
         {/* AI Summary content */}
         <div className="space-y-4">
+          {/* Version navigation (if multiple versions exist) */}
+          {hasMultipleVersions && (
+            <div className="flex items-center justify-between mb-4 p-3 bg-secondary/20 rounded-lg border border-border/30">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  Version {currentVersionIndex + 1} of {summaryVersions.length}
+                </Badge>
+                {currentVersionIndex === 0 && (
+                  <span className="text-xs text-muted-foreground">Original</span>
+                )}
+                {currentVersionIndex > 0 && (
+                  <span className="text-xs text-muted-foreground">Regenerated</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentVersionIndex(prev => Math.max(0, prev - 1))}
+                  disabled={currentVersionIndex === 0}
+                  className="h-7 px-2"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentVersionIndex(prev => Math.min(summaryVersions.length - 1, prev + 1))}
+                  disabled={currentVersionIndex === summaryVersions.length - 1}
+                  className="h-7 px-2"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+          
           <div className="prose prose-invert max-w-none">
             <p className="text-foreground/90 leading-relaxed text-base">
-              {summary}
+              {currentSummary}
             </p>
           </div>
           
@@ -76,10 +126,22 @@ const AISummary: React.FC<AISummaryProps> = ({
             <Button 
               variant="ghost" 
               size="sm"
-              className="text-primary hover:text-primary/80 hover:bg-primary/10"
+              onClick={onRegenerate}
+              disabled={!canRegenerate || isRegenerating || isClosedThread}
+              className={`${
+                isClosedThread 
+                  ? 'text-muted-foreground/50 cursor-not-allowed' 
+                  : 'text-primary hover:text-primary/80 hover:bg-primary/10'
+              }`}
+              title={isClosedThread ? 'Cannot regenerate summary for saved threads' : canRegenerate ? 'Regenerate summary (1 remaining)' : 'Maximum regenerations reached'}
             >
               <Sparkles className="w-4 h-4 mr-2" />
-              Regenerate Summary
+              {isRegenerating ? 'Regenerating...' : 'Regenerate Summary'}
+              {!canRegenerate && !isClosedThread && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  Max reached
+                </Badge>
+              )}
             </Button>
             <Button 
               variant="ghost" 

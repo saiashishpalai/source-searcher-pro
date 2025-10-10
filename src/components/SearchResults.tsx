@@ -45,6 +45,11 @@ interface SearchResultsProps {
   onRetry?: () => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
+  summaryVersions?: string[];
+  onRegenerateSummary?: () => void;
+  isRegeneratingSummary?: boolean;
+  canRegenerateSummary?: boolean;
+  isClosedThread?: boolean;
 }
 
 const SearchResults: React.FC<SearchResultsProps> = ({
@@ -53,7 +58,12 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   onResultClick,
   onRetry,
   onLoadMore,
-  hasMore = false
+  hasMore = false,
+  summaryVersions,
+  onRegenerateSummary,
+  isRegeneratingSummary = false,
+  canRegenerateSummary = true,
+  isClosedThread = false
 }) => {
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set(['Slack', 'Google Drive', 'Notion']));
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'source'>('relevance');
@@ -154,6 +164,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         summary={data.aiSummary} 
         query={data.query}
         totalResults={data.totalResults}
+        summaryVersions={summaryVersions}
+        onRegenerate={onRegenerateSummary}
+        isRegenerating={isRegeneratingSummary}
+        canRegenerate={canRegenerateSummary}
+        isClosedThread={isClosedThread}
       />
 
       {/* Controls Section */}
