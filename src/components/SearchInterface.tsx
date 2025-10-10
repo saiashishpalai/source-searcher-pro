@@ -343,22 +343,47 @@ const SearchInterface = () => {
           // Fetch results for each thread
           const threadsWithResults = await Promise.all(
             threads.map(async (thread: any) => {
+              // Fetch all rows without .single() to avoid 406 errors
               const { data: resultsData, error: resultsError } = await (supabase as any)
                 .from('search_thread_results')
                 .select('result_data')
                 .eq('thread_id', thread.id)
                 .order('created_at', { ascending: true });
 
-              const results = !resultsError && resultsData
-                ? resultsData.map((r: any) => r.result_data)
-                : [];
+              if (resultsError || !resultsData || resultsData.length === 0) {
+                return {
+                  id: thread.id,
+                  title: thread.title,
+                  timestamp: thread.created_at,
+                  query: thread.query,
+                  results: [],
+                };
+              }
+
+              // Check format: if 1 row and it's an array, it's new conversation format
+              if (resultsData.length === 1) {
+                const data = resultsData[0].result_data;
+                // New format: result_data is an array of conversation Q&A pairs
+                if (Array.isArray(data) && data.length > 0 && data[0]?.query) {
+                  return {
+                    id: thread.id,
+                    title: thread.title,
+                    timestamp: thread.created_at,
+                    query: thread.query,
+                    results: data, // Full conversation thread
+                  };
+                }
+              }
+
+              // Old format: multiple rows, each with individual results
+              const results = resultsData.map((r: any) => r.result_data);
 
               return {
                 id: thread.id,
                 title: thread.title,
                 timestamp: thread.created_at,
                 query: thread.query,
-                results: results,
+                results: results, // Old format results
               };
             })
           );
@@ -381,6 +406,10 @@ const SearchInterface = () => {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentSearchDocumentIds, setCurrentSearchDocumentIds] = useState<string[]>([]);
+
+  // Conversation thread state - stores history of Q&A
+  const [conversationThread, setConversationThread] = useState<SearchResultsData[]>([]);
+  const MAX_CONVERSATION_LENGTH = 5;
 
   // Follow-up conversation state
   const [followUpQuery, setFollowUpQuery] = useState('');
@@ -511,6 +540,9 @@ const SearchInterface = () => {
       const documentIds = results.results.map((result: any) => result.id);
       setCurrentSearchDocumentIds(documentIds);
       
+      // Initialize conversation thread with first Q&A
+      setConversationThread([results]);
+      
       // Add to recent searches if not already there (FIFO - limit to 6)
       setRecentSearches(prev => {
         const newSearches = [searchValue, ...prev.filter(s => s !== searchValue)];
@@ -527,31 +559,54 @@ const SearchInterface = () => {
   const handleThreadClick = (threadId: string) => {
     setSelectedThread(threadId);
     setShowMobileSidebar(false); // Close mobile sidebar when selecting a thread
+    
+    // Load the conversation thread from the saved thread
+    const thread = conversations.find(t => t.id === threadId);
+    if (thread && thread.results) {
+      // Check if results is already an array of conversation items or old format
+      if (Array.isArray(thread.results) && thread.results.length > 0) {
+        // If first item has 'query' property, it's the new conversation format
+        const firstItem: any = thread.results[0];
+        if (firstItem && typeof firstItem === 'object' && 'query' in firstItem && 'results' in firstItem) {
+          setConversationThread(thread.results as any);
+          // Extract document IDs from first search for reference
+          if (firstItem.results && Array.isArray(firstItem.results)) {
+            const docIds = firstItem.results.map((r: any) => r.id);
+            setCurrentSearchDocumentIds(docIds);
+          }
+          console.log(`📖 Loaded thread with ${thread.results.length} Q&A pairs`);
+        }
+      }
+    }
   };
 
   const handleBackToSearch = async () => {
-    // Save current search results as a thread if they exist AND it's a new search (not viewing an existing thread)
-    if (searchResults && !selectedThread && user) {
+    // Save current conversation thread if it exists AND it's a new search (not viewing an existing thread)
+    const shouldSaveThread = conversationThread.length > 0 && !selectedThread && user;
+    
+    if (shouldSaveThread) {
       try {
+        // Use the first query as the title
+        const firstQuery = conversationThread[0].query;
+        
         // Create a new thread in the database
         const { data: newThread, error: threadError } = await (supabase as any)
           .from('search_threads')
           .insert({
             user_id: user.id,
-            title: searchResults.query.substring(0, 100), // Limit title length
-            query: searchResults.query,
+            title: firstQuery.substring(0, 100), // Limit title length
+            query: firstQuery,
           })
           .select()
           .single();
 
         if (!threadError && newThread) {
-          // Save all results for this thread
-          const resultsToInsert = searchResults.results.map((result) => ({
+          // Save the ENTIRE conversation thread (all Q&A pairs)
+          // Store as a single JSONB object containing the full conversation
+          await (supabase as any).from('search_thread_results').insert({
             thread_id: newThread.id,
-            result_data: result,
-          }));
-
-          await (supabase as any).from('search_thread_results').insert(resultsToInsert);
+            result_data: conversationThread, // Save entire conversation thread
+          });
 
           // Add to local state at the beginning (most recent first)
           const newConversation = {
@@ -559,7 +614,7 @@ const SearchInterface = () => {
             title: newThread.title,
             timestamp: newThread.created_at,
             query: newThread.query,
-            results: searchResults.results,
+            results: conversationThread, // Store full conversation
           };
 
           setConversations((prev) => {
@@ -567,7 +622,7 @@ const SearchInterface = () => {
             // Keep only the 10 most recent threads
             return updated.slice(0, 10);
           });
-          console.log('✅ Thread saved to database');
+          console.log(`✅ Thread saved to database with ${conversationThread.length} Q&A pairs`);
         }
       } catch (error) {
         console.error('Error saving thread:', error);
@@ -580,6 +635,7 @@ const SearchInterface = () => {
     setSearchResults(null);
     setSearchError(null);
     setCurrentSearchDocumentIds([]);
+    setConversationThread([]); // Clear conversation thread
     setSearchValue(''); // Also clear the search input
   };
 
@@ -589,6 +645,7 @@ const SearchInterface = () => {
     setSearchResults(null);
     setSearchError(null);
     setCurrentSearchDocumentIds([]);
+    setConversationThread([]); // Clear conversation thread
     setSearchValue(''); // Clear any existing search
   };
 
@@ -630,6 +687,13 @@ const SearchInterface = () => {
           // For now, we'll just show a success message
         }
       } else if (searchResults && currentSearchDocumentIds.length > 0) {
+        // Check if we've reached the conversation limit
+        if (conversationThread.length >= MAX_CONVERSATION_LENGTH) {
+          setSearchError(`You've reached the limit of ${MAX_CONVERSATION_LENGTH} questions per thread. Start a new search to continue.`);
+          setIsFollowUpLoading(false);
+          return;
+        }
+        
         // Handle follow-up in search results - search WITHIN already found documents (RAG)
         setSearchError(null);
         
@@ -653,11 +717,14 @@ const SearchInterface = () => {
           }
 
           const results = await response.json();
-          setSearchResults(results);
           
-          // Update document IDs to the new results for further follow-ups
-          const documentIds = results.results.map((result: any) => result.id);
-          setCurrentSearchDocumentIds(documentIds);
+          // APPEND to conversation thread instead of replacing
+          setConversationThread(prev => [...prev, results]);
+          setSearchResults(results); // Keep for compatibility
+          
+          // Keep document IDs the SAME (search within same documents)
+          // Don't update document IDs - we want to stay within the original set
+          console.log(`📝 Conversation: ${conversationThread.length + 1}/${MAX_CONVERSATION_LENGTH} questions`);
         } catch (error) {
           setSearchError('Failed to process follow-up question. Please try again.');
           console.error('Follow-up search error:', error);
@@ -902,6 +969,28 @@ const SearchInterface = () => {
     }
   };
 
+  // Helper to get individual results from thread (handles both old and new formats)
+  const getThreadResultsForDisplay = (thread: any) => {
+    if (!thread.results || thread.results.length === 0) return [];
+    
+    const firstItem = thread.results[0];
+    
+    // New conversation format: array of SearchResultsData
+    if (firstItem && typeof firstItem === 'object' && 'query' in firstItem && 'results' in firstItem) {
+      // Flatten all results from all Q&A pairs
+      return thread.results.flatMap((qa: any) => qa.results || []);
+    }
+    
+    // Old format: array of individual results
+    return thread.results;
+  };
+
+  // Get result count for thread
+  const getThreadResultCount = (thread: any) => {
+    const results = getThreadResultsForDisplay(thread);
+    return results.length;
+  };
+
   return (
     <div className="h-screen bg-background flex">
       {/* Mobile Sidebar Overlay */}
@@ -1023,23 +1112,23 @@ const SearchInterface = () => {
                         </p>
                         <div className="mt-2 flex items-center gap-2">
                           <div className="flex -space-x-1">
-                            {thread.results.slice(0, 3).map((result, idx) => (
+                            {getThreadResultsForDisplay(thread).slice(0, 3).map((result: any, idx: number) => (
                               <div
                                 key={idx}
                                 className="w-5 h-5 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30 flex items-center justify-center text-xs font-medium"
-                                title={result.source}
+                                title={result?.source || 'Unknown'}
                               >
-                                {result.source.charAt(0)}
+                                {result?.source?.charAt(0) || '?'}
                               </div>
                             ))}
-                            {thread.results.length > 3 && (
+                            {getThreadResultCount(thread) > 3 && (
                               <div className="w-5 h-5 rounded-full bg-secondary/50 border border-border/50 flex items-center justify-center text-xs font-medium">
-                                +{thread.results.length - 3}
+                                +{getThreadResultCount(thread) - 3}
                               </div>
                             )}
                           </div>
                           <span className="text-xs text-muted-foreground">
-                            {thread.results.length} result{thread.results.length !== 1 ? 's' : ''}
+                            {getThreadResultCount(thread)} result{getThreadResultCount(thread) !== 1 ? 's' : ''}
                           </span>
                         </div>
                       </div>
@@ -1428,18 +1517,45 @@ const SearchInterface = () => {
               </div>
             </div>
 
-            {searchResults ? (
+            {conversationThread.length > 0 ? (
               <>
-                <SearchResults
-                  data={searchResults}
-                  isLoading={isSearchLoading}
-                  onResultClick={handleSearchResultClick}
-                  onRetry={handleSearchRetry}
-                  hasMore={false}
-                />
+                {/* Display all Q&A pairs in the conversation */}
+                {conversationThread.map((qa, index) => (
+                  <div key={index} className="mb-8">
+                    {/* Question Header */}
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/30 rounded-lg">
+                        <MessageSquare className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold text-foreground">
+                          Question {index + 1}: {qa.query}
+                        </span>
+                      </div>
+                      {index === 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          Initial Search
+                        </Badge>
+                      )}
+                      {index > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          Follow-up {index}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {/* Results */}
+                    <SearchResults
+                      data={qa}
+                      isLoading={false}
+                      onResultClick={handleSearchResultClick}
+                      onRetry={handleSearchRetry}
+                      hasMore={false}
+                    />
+                  </div>
+                ))}
                 
                 {/* Follow-up Input for Search Results - Enhanced */}
-                <div className="mt-8">
+                {conversationThread.length < MAX_CONVERSATION_LENGTH && (
+                  <div className="mt-8">
                   <form onSubmit={handleFollowUpQuestion} className="relative">
                     <div className="relative transition-all duration-500 hover:scale-[1.01]">
                       {/* Glow effect */}
@@ -1477,10 +1593,26 @@ const SearchInterface = () => {
                             )}
                           </Button>
                         </div>
+                        <div className="mt-2 text-center text-xs text-muted-foreground">
+                          Question {conversationThread.length} of {MAX_CONVERSATION_LENGTH}
+                        </div>
                       </div>
                     </div>
                   </form>
                 </div>
+                )}
+                
+                {/* Limit reached message */}
+                {conversationThread.length >= MAX_CONVERSATION_LENGTH && (
+                  <div className="mt-8 p-6 bg-secondary/20 border border-border/50 rounded-xl text-center">
+                    <p className="text-muted-foreground mb-3">
+                      You've reached the limit of {MAX_CONVERSATION_LENGTH} questions in this conversation.
+                    </p>
+                    <Button onClick={handleNewConversation} variant="default">
+                      Start New Search
+                    </Button>
+                  </div>
+                )}
               </>
             ) : isSearchLoading ? (
               <div className="flex items-center justify-center min-h-[400px]">
@@ -1500,9 +1632,55 @@ const SearchInterface = () => {
               </div>
             ) : null}
           </div>
+        ) : selectedThread && conversationThread.length > 0 ? (
+          <div className="w-full relative z-10 pb-8">
+            {/* Display saved conversation thread */}
+            {conversationThread.map((qa, index) => (
+              <div key={index} className="mb-8">
+                {/* Question Header */}
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/30 rounded-lg">
+                    <MessageSquare className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold text-foreground">
+                      Question {index + 1}: {qa.query}
+                    </span>
+                  </div>
+                  {index === 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      Initial Search
+                    </Badge>
+                  )}
+                  {index > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Follow-up {index}
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Results */}
+                <SearchResults
+                  data={qa}
+                  isLoading={false}
+                  onResultClick={handleSearchResultClick}
+                  onRetry={handleSearchRetry}
+                  hasMore={false}
+                />
+              </div>
+            ))}
+            
+            {/* Info message for saved threads */}
+            <div className="mt-8 p-6 bg-secondary/20 border border-border/50 rounded-xl text-center">
+              <p className="text-muted-foreground mb-3">
+                This is a saved conversation with {conversationThread.length} question{conversationThread.length > 1 ? 's' : ''}.
+              </p>
+              <Button onClick={handleNewConversation} variant="default">
+                Start New Search
+              </Button>
+            </div>
+          </div>
         ) : selectedThread ? (
           <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 relative z-10">
-            {/* Conversation Header */}
+            {/* Conversation Header - Legacy view for old threads */}
             <div className="text-center space-y-2">
               <h1 className="text-2xl font-semibold text-foreground">
                 {conversations.find(t => t.id === selectedThread)?.title}
