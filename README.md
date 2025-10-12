@@ -1,93 +1,330 @@
-# Welcome to your Lovable project
+# Haven7 - AI-Powered Workplace Search
 
-## Project info
+<div align="center">
 
-**URL**: https://lovable.dev/projects/4e37fb69-8307-4fb8-8bcb-76c195504780
+![Haven7](https://img.shields.io/badge/Haven7-AI%20Search-blue?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Active-success?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-## How can I edit this code?
+**Search your work knowledge in seconds. All your scattered information from Slack, Notion, and Google Drive in one place.**
 
-There are several ways of editing your application.
+[Features](#-key-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Tech Stack](#-tech-stack)
 
-**Use Lovable**
+</div>
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/4e37fb69-8307-4fb8-8bcb-76c195504780) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🎯 What is Haven7?
 
-**Use your preferred IDE**
+Haven7 is an AI-powered search platform that unifies your workplace knowledge across multiple tools. Instead of searching through Slack messages, Notion pages, and Google Drive files separately, Haven7 provides a single, intelligent search interface that:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Searches across all your connected platforms** simultaneously
+- **Generates AI summaries** of search results using OpenAI's GPT models
+- **Enables conversational follow-ups** to dig deeper into your findings
+- **Maintains search history** with persistent conversation threads
+- **Provides contextual answers** using Retrieval Augmented Generation (RAG)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+**Built for Product Managers** and teams who need to quickly access distributed information without context switching.
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## ✨ Key Features
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 🔍 **Unified Search**
+Search across Slack messages, Notion pages, and Google Drive documents with a single query. No more app switching.
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 🤖 **AI-Powered Summaries**
+Get instant AI-generated summaries of your search results, highlighting the most relevant information.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### 💬 **Conversational Search**
+Ask follow-up questions to refine your search. Haven7 maintains context and searches within your initial results.
+
+### 📚 **Document Sync & Embeddings**
+Automatically syncs and indexes your documents with vector embeddings for semantic search capabilities.
+
+### 🔐 **Secure OAuth Integration**
+Connect your accounts securely using OAuth 2.0. We never store your passwords.
+
+### 📝 **Thread Management**
+Save and revisit your search conversations. Never lose track of important research.
+
+### 🎨 **Modern UI/UX**
+Beautiful, intuitive interface built with modern design principles for the best user experience.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 18+ and npm ([Install with nvm](https://github.com/nvm-sh/nvm))
+- **Supabase Account** ([Sign up free](https://supabase.com))
+- **OpenAI API Key** ([Get one here](https://platform.openai.com/api-keys))
+- **OAuth Credentials** for Slack, Google Drive, and Notion
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <YOUR_GIT_URL>
+   cd source-searcher-pro
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp env.example .env.local
+   ```
+   
+   Configure your `.env.local` with:
+   - Supabase URL and keys
+   - OpenAI API key
+   - OAuth credentials for Slack, Google, and Notion
+   
+   See [Environment Setup Guide](./docs/setup/LOVABLE_ENV_SETUP.md) for details.
+
+4. **Set up the database**
+   ```bash
+   # Run the schema and migrations in order
+   # See database/README.md for detailed instructions
+   ```
+
+5. **Start the development servers**
+   ```bash
+   npm run dev
+   ```
+   This starts both the frontend (Vite) and backend (Express) concurrently.
+
+6. **Open in browser**
+   ```
+   http://localhost:8080
+   ```
+
+For detailed setup instructions, see the [Quick Start Guide](./docs/setup/QUICK_START.md).
+
+---
+
+## 💡 How It Works
+
+### Search Flow
+
+```
+User enters query
+    ↓
+Search across connected sources (Slack, Notion, Google Drive)
+    ↓
+Retrieve relevant documents using vector similarity
+    ↓
+Generate AI summary with OpenAI GPT-4
+    ↓
+Display results with source attribution
+    ↓
+User can ask follow-up questions (RAG within results)
 ```
 
-**Edit a file directly in GitHub**
+### Architecture Overview
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+┌─────────────────┐         ┌──────────────────┐
+│  React Frontend │ ←──────→│  Express Backend │
+│   (Vite + TS)   │         │    (Node.js)     │
+└─────────────────┘         └──────────────────┘
+         ↓                            ↓
+    ┌─────────┐              ┌────────────────┐
+    │ Supabase│              │  OpenAI API    │
+    │   Auth  │              │  (Embeddings   │
+    │   DB    │              │   + GPT-4)     │
+    └─────────┘              └────────────────┘
+                                     ↓
+                         ┌─────────────────────┐
+                         │ External Services   │
+                         │ - Slack API         │
+                         │ - Google Drive API  │
+                         │ - Notion API        │
+                         └─────────────────────┘
+```
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📁 Project Structure
 
-## What technologies are used for this project?
+```
+source-searcher-pro/
+├── src/                      # Frontend React application
+│   ├── components/           # React components
+│   ├── pages/                # Page components (routes)
+│   ├── contexts/             # React contexts (Auth, etc.)
+│   ├── hooks/                # Custom React hooks
+│   ├── lib/                  # Utility libraries
+│   └── integrations/         # Supabase client
+├── server/                   # Backend Express server
+│   ├── index.js              # Main server file
+│   └── services/             # Business logic services
+│       ├── search-service.js # Search & AI logic
+│       ├── document-sync.js  # Document syncing
+│       └── notion-sync.js    # Notion integration
+├── database/                 # SQL files (organized)
+│   ├── schema/               # Database schemas
+│   ├── migrations/           # Database migrations
+│   ├── fixes/                # Bug fixes & patches
+│   └── debug/                # Diagnostic queries
+├── docs/                     # Documentation (organized)
+│   ├── authentication/       # Auth & OAuth guides
+│   ├── features/             # Feature documentation
+│   ├── setup/                # Setup guides
+│   └── ...                   # More categories
+├── public/                   # Static assets
+└── dist/                     # Production build output
+```
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🛠️ Tech Stack
+
+### Frontend
+- **React 18** - UI framework
+- **TypeScript** - Type safety
+- **Vite** - Fast build tool
+- **Tailwind CSS** - Styling
+- **shadcn/ui** - UI component library
+- **React Router** - Routing
+- **TanStack Query** - Data fetching
+
+### Backend
+- **Node.js + Express** - API server
+- **Supabase** - Database & authentication
+- **OpenAI API** - Embeddings & GPT-4
+- **OAuth 2.0** - Third-party integrations
+
+### Integrations
+- **Slack API** - Message search
+- **Google Drive API** - Document search
+- **Notion API** - Page search
+
+---
 
 ## 📚 Documentation
 
-All project documentation has been organized in the [`docs/`](./docs/) folder. Visit the [Documentation Index](./docs/INDEX.md) for a complete guide to available documentation.
+All documentation has been organized for easy navigation:
 
-**Quick links:**
-- [Quick Start Guide](./docs/setup/QUICK_START.md) - Get started with the project
-- [Authentication Guide](./docs/authentication/AUTH_README.md) - Set up authentication
-- [Supabase Setup](./docs/supabase/SUPABASE_SETUP.md) - Configure the database
-- [Feature Documentation](./docs/features/) - Feature-specific guides
+### Getting Started
+- [Quick Start Guide](./docs/setup/QUICK_START.md) - Get up and running
+- [Environment Setup](./docs/setup/LOVABLE_ENV_SETUP.md) - Configure environment variables
+- [Documentation Index](./docs/INDEX.md) - Complete navigation guide
 
-## 🗄️ Database
+### Features
+- [Notion Integration](./docs/features/NOTION_INTEGRATION_COMPLETE.md) - Notion setup
+- [Search Improvements](./docs/features/SEARCH_IMPROVEMENTS_README.md) - Search capabilities
+- [Search Results](./docs/features/SEARCH_RESULTS_README.md) - Results display
 
-All SQL files have been organized in the [`database/`](./database/) folder. See the [Database README](./database/README.md) for details.
+### Authentication
+- [Auth Setup](./docs/authentication/AUTH_README.md) - Authentication overview
+- [OAuth Setup](./docs/authentication/PRODUCTION_OAUTH_GUIDE.md) - OAuth integration
+- [OAuth Debug Guide](./docs/authentication/OAUTH_DEBUG_GUIDE.md) - Troubleshooting
 
-**Structure:**
-- [`database/schema/`](./database/schema/) - Database schemas and table definitions
-- [`database/migrations/`](./database/migrations/) - Version updates and migrations
-- [`database/fixes/`](./database/fixes/) - Bug fixes and performance patches
-- [`database/debug/`](./database/debug/) - Debugging and diagnostic queries
+### Database
+- [Database README](./database/README.md) - SQL file organization
+- [Schema Files](./database/schema/) - Database structure
+- [Migrations](./database/migrations/) - Version updates
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/4e37fb69-8307-4fb8-8bcb-76c195504780) and click on Share -> Publish.
+## 🔐 Security & Privacy
 
-## Can I connect a custom domain to my Lovable project?
+- **OAuth 2.0** - Secure authentication without storing passwords
+- **Token Encryption** - Access tokens are encrypted at rest
+- **Row Level Security (RLS)** - Database-level access control
+- **API Rate Limiting** - Protection against abuse
+- **Environment Variables** - Sensitive data never committed to git
 
-Yes, you can!
+See [Security Guide](./docs/authentication/SUPABASE_AUTH_SECURITY_GUIDE.md) for details.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🎨 User Interface
+
+Haven7 features a modern, minimalist interface designed specifically for product managers:
+
+- **Clean search interface** - Focus on what matters
+- **Thread-based navigation** - Organized sidebar with search history
+- **Real-time feedback** - Loading states and progress indicators
+- **Responsive design** - Works on desktop and mobile
+- **Dark mode support** - Easy on the eyes
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how to get started:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+Please ensure your code:
+- Follows the existing code style
+- Includes appropriate tests
+- Updates documentation as needed
+
+---
+
+## 📊 Project Status
+
+**Current Version:** Beta  
+**Last Updated:** October 2025  
+**Active Development:** Yes
+
+### Recent Updates
+- ✅ Notion integration complete
+- ✅ AI summary regeneration
+- ✅ Conversational follow-up questions
+- ✅ Thread persistence and management
+- ✅ OAuth for all major platforms
+
+### Roadmap
+- 🔄 Microsoft Teams integration
+- 🔄 Advanced filtering options
+- 🔄 Team collaboration features
+- 🔄 Analytics dashboard
+- 🔄 Mobile app
+
+---
+
+## 🙏 Acknowledgments
+
+Built with:
+- [React](https://react.dev/)
+- [Supabase](https://supabase.com/)
+- [OpenAI](https://openai.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
+
+---
+
+## 📞 Support
+
+- **Documentation:** [docs/INDEX.md](./docs/INDEX.md)
+- **Issues:** Open an issue on GitHub
+- **Email:** [Your support email]
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+<div align="center">
+
+**Built for Product Managers**
+
+Made with ❤️ by the Haven7 team
+
+</div>
