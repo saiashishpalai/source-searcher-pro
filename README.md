@@ -8,7 +8,7 @@
 
 **Search your work knowledge in seconds. All your scattered information from Slack, Notion, and Google Drive in one place.**
 
-[Features](#-key-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Tech Stack](#-tech-stack)
+[Features](#key-features) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Tech Stack](#tech-stack)
 
 </div>
 
@@ -311,7 +311,7 @@ Built with:
 
 - **Documentation:** [docs/INDEX.md](./docs/INDEX.md)
 - **Issues:** Open an issue on GitHub
-- **Email:** [Your support email]
+- **Email:** saiashishpalai74@gmail.com
 
 ---
 
