@@ -28,6 +28,8 @@ Haven7 is an AI-powered search platform that unifies your workplace knowledge ac
 
 ---
 
+<a name="key-features"></a>
+
 ## ✨ Key Features
 
 ### 🔍 **Unified Search**
@@ -52,6 +54,8 @@ Save and revisit your search conversations. Never lose track of important resear
 Beautiful, intuitive interface built with modern design principles for the best user experience.
 
 ---
+
+<a name="quick-start"></a>
 
 ## 🚀 Quick Start
 
@@ -183,6 +187,8 @@ source-searcher-pro/
 
 ---
 
+<a name="tech-stack"></a>
+
 ## 🛠️ Tech Stack
 
 ### Frontend
@@ -206,6 +212,8 @@ source-searcher-pro/
 - **Notion API** - Page search
 
 ---
+
+<a name="documentation"></a>
 
 ## 📚 Documentation
 
