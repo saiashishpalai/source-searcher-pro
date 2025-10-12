@@ -1,4 +1,9 @@
 # ==========================================
+# Cursor AI - Ignore patterns
+# Files that should not be indexed by Cursor
+# ==========================================
+
+# ==========================================
 # Dependencies
 # ==========================================
 node_modules/
@@ -16,16 +21,6 @@ out/
 *.tsbuildinfo
 
 # ==========================================
-# Environment variables
-# ==========================================
-.env
-.env.local
-.env.local.backup
-.env.development.local
-.env.test.local
-.env.production.local
-
-# ==========================================
 # Logs
 # ==========================================
 logs/
@@ -39,24 +34,34 @@ frontend.log
 server.log
 
 # ==========================================
-# Editor directories and files
+# Environment files (sensitive data)
 # ==========================================
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-*.swp
-*~
-.cursor/
+.env
+.env.local
+.env.local.backup
+.env.development.local
+.env.test.local
+.env.production.local
 
 # ==========================================
-# Testing
+# Lock files (large, no need to index)
+# ==========================================
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# ==========================================
+# Cache directories
+# ==========================================
+.cache/
+.parcel-cache/
+.vite/
+.turbo/
+.vercel/
+
+# ==========================================
+# Test coverage
 # ==========================================
 coverage/
 .nyc_output/
@@ -86,21 +91,56 @@ Thumbs.db
 desktop.ini
 
 # ==========================================
-# Package manager files (commented - usually should be committed)
+# Editor files (keep .cursor visible for Cursor settings)
 # ==========================================
-# Uncomment the lock files you want to ignore
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-# bun.lockb
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*~
 
 # ==========================================
-# Local development
+# Binary and media files (no need to index)
 # ==========================================
-*.local
-.cache/
-.parcel-cache/
-.vite/
+*.exe
+*.dll
+*.so
+*.dylib
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.mp4
+*.mp3
+*.mov
+*.avi
+*.wav
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.ico
+*.svg
+*.webp
+*.pdf
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.otf
+
+# ==========================================
+# Minified files
+# ==========================================
+*.min.js
+*.min.css
+*.bundle.js
+*.chunk.js
 
 # ==========================================
 # Supabase local
@@ -108,7 +148,9 @@ desktop.ini
 .supabase/
 
 # ==========================================
-# Misc
+# Documentation that doesn't need indexing
 # ==========================================
-.vercel
-.turbo
+# Uncomment if you don't want docs indexed
+# docs/
+# *.md
+
