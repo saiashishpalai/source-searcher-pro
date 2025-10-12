@@ -60,6 +60,26 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## 📚 Documentation
+
+All project documentation has been organized in the [`docs/`](./docs/) folder. Visit the [Documentation Index](./docs/INDEX.md) for a complete guide to available documentation.
+
+**Quick links:**
+- [Quick Start Guide](./docs/setup/QUICK_START.md) - Get started with the project
+- [Authentication Guide](./docs/authentication/AUTH_README.md) - Set up authentication
+- [Supabase Setup](./docs/supabase/SUPABASE_SETUP.md) - Configure the database
+- [Feature Documentation](./docs/features/) - Feature-specific guides
+
+## 🗄️ Database
+
+All SQL files have been organized in the [`database/`](./database/) folder. See the [Database README](./database/README.md) for details.
+
+**Structure:**
+- [`database/schema/`](./database/schema/) - Database schemas and table definitions
+- [`database/migrations/`](./database/migrations/) - Version updates and migrations
+- [`database/fixes/`](./database/fixes/) - Bug fixes and performance patches
+- [`database/debug/`](./database/debug/) - Debugging and diagnostic queries
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/4e37fb69-8307-4fb8-8bcb-76c195504780) and click on Share -> Publish.
