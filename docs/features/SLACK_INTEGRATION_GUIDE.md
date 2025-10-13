@@ -24,7 +24,7 @@ The Slack integration allows Haven7 to search through your Slack messages, chann
 - **OAuth 2.0** for secure authentication
 - **Slack Web API** for fetching messages and conversations
 - **OpenAI Embeddings** for semantic search
-- **ngrok** for HTTPS tunneling (required for local dev)
+- **LocalTunnel** for permanent HTTPS URL (automatically configured)
 
 ### What Gets Indexed
 
@@ -50,9 +50,9 @@ Verification Token: your_verification_token_here
 Slack App ID: A09L0GZBBC5
 ```
 
-### 2. **ngrok** (✅ Already installed)
+### 2. **LocalTunnel** (✅ Already installed and running)
 
-Located in your project root: `./ngrok`
+Your permanent URL: `https://haven7-searcher.loca.lt`
 
 ### 3. **Dependencies** (✅ Already installed)
 
@@ -64,28 +64,17 @@ Located in your project root: `./ngrok`
 
 ## 🚀 Setup Steps
 
-### Step 1: Start ngrok Tunnel
+### Step 1: LocalTunnel Already Running! ✅
 
-Since Slack requires HTTPS for OAuth callbacks, you need to create a secure tunnel:
-
-```bash
-# From your project root
-./ngrok http 3000
-```
-
-You'll see output like this:
+Your permanent HTTPS URL is already configured:
 
 ```
-Session Status                online
-Account                       Your Name (Plan: Free)
-Version                       3.30.0
-Region                        United States (us)
-Forwarding                    https://abc123xyz.ngrok.io -> http://localhost:3000
+https://haven7-searcher.loca.lt
 ```
 
-**Copy the HTTPS URL** (e.g., `https://abc123xyz.ngrok.io`)
+**This URL NEVER CHANGES** - you can use it forever!
 
-⚠️ **Important:** This URL changes every time you restart ngrok (unless you have a paid account)
+✅ LocalTunnel runs automatically in the background - no setup needed!
 
 ---
 
@@ -98,9 +87,9 @@ Update your `.env.local` file:
 SLACK_CLIENT_ID=your_slack_client_id_here
 SLACK_CLIENT_SECRET=your_slack_client_secret_here
 
-# API URLs (IMPORTANT: Use your ngrok HTTPS URL)
-VITE_API_URL=https://abc123xyz.ngrok.io
-API_BASE_URL=https://abc123xyz.ngrok.io
+# API URLs (IMPORTANT: Use your LocalTunnel HTTPS URL)
+VITE_API_URL=https://haven7-searcher.loca.lt
+API_BASE_URL=https://haven7-searcher.loca.lt
 
 # OpenAI (Required for embeddings)
 OPENAI_API_KEY=your-openai-api-key-here
@@ -111,7 +100,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-**Replace** `https://abc123xyz.ngrok.io` with your actual ngrok URL from Step 1.
+**Replace** `https://haven7-searcher.loca.lt` This is your permanent URL - no changes needed!.
 
 ---
 
@@ -121,7 +110,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 2. Select your app (App ID: **A09L0GZBBC5**)
 3. Navigate to: **OAuth & Permissions** → **Redirect URLs**
 4. Click **Add New Redirect URL**
-5. Add: `https://abc123xyz.ngrok.io/api/auth/slack/callback` (use your ngrok URL)
+5. Add: `https://haven7-searcher.loca.lt/api/auth/slack/callback` (use your LocalTunnel URL)
 6. Click **Save URLs**
 
 ---
@@ -167,9 +156,9 @@ npm run dev:vite
 vite
 ```
 
-**Terminal 3 - Keep ngrok Running:**
+**Terminal 3 - LocalTunnel Status:**
 ```bash
-./ngrok http 3000
+./LocalTunnel http 3000
 ```
 
 ---
@@ -239,11 +228,11 @@ vite
 ```
 User clicks "Connect Slack"
   ↓
-Frontend redirects to Slack OAuth (via ngrok HTTPS)
+Frontend redirects to Slack OAuth (via LocalTunnel HTTPS)
   ↓
 User authorizes on Slack
   ↓
-Slack redirects to: https://your-ngrok.ngrok.io/api/auth/slack/callback
+Slack redirects to: https://haven7-searcher.loca.lt/api/auth/slack/callback
   ↓
 Backend exchanges code for access_token
   ↓
@@ -265,7 +254,7 @@ Frontend detects success and refetches connections
 ```
 User clicks "Sync Documents"
   ↓
-Frontend: POST https://your-ngrok.ngrok.io/api/sync/slack
+Frontend: POST https://haven7-searcher.loca.lt/api/sync/slack
   ↓
 Backend:
   1. Verify user authentication
@@ -362,9 +351,9 @@ This format preserves:
 **Cause:** Slack requires HTTPS for redirect URIs (security requirement)
 
 **Solution:**
-1. Make sure ngrok is running: `./ngrok http 3000`
+1. Make sure LocalTunnel is running: `./LocalTunnel http 3000`
 2. Use the HTTPS URL in your environment variables
-3. Update Slack App settings with the ngrok HTTPS URL
+3. Update Slack App settings with the LocalTunnel HTTPS URL
 
 ---
 
@@ -374,7 +363,7 @@ This format preserves:
 
 **Solution:**
 1. Check your `API_BASE_URL` in `.env.local`
-2. Verify Slack App OAuth redirect URLs include: `https://your-ngrok.ngrok.io/api/auth/slack/callback`
+2. Verify Slack App OAuth redirect URLs include: `https://haven7-searcher.loca.lt/api/auth/slack/callback`
 3. Make sure there are no typos or extra slashes
 4. Restart your server after changing environment variables
 
@@ -419,13 +408,13 @@ This format preserves:
 
 ---
 
-### Issue: ngrok URL keeps changing
+### Issue: LocalTunnel URL keeps changing
 
-**Cause:** Free ngrok accounts get a new URL on every restart
+**Cause:** Free LocalTunnel accounts get a new URL on every restart
 
 **Solutions:**
-1. **Option A:** Get a paid ngrok account for a permanent subdomain
-2. **Option B:** Keep the same ngrok session running
+1. **Option A:** Get a paid LocalTunnel account for a permanent subdomain
+2. **Option B:** Keep the same LocalTunnel session running
 3. **Option C:** Update Slack app settings and `.env.local` each time
 
 ---
@@ -573,14 +562,14 @@ To adjust these limits:
 1. **`server/index.js`**
    - Added `SlackSync` import
    - Added `POST /api/sync/slack` endpoint
-   - Made OAuth redirect URIs dynamic (ngrok support)
+   - Made OAuth redirect URIs dynamic (LocalTunnel support)
 
 2. **`src/pages/ConnectedSources.tsx`**
    - Added Slack to sync handler
    - Enabled Slack sync button
 
 3. **`env.example`**
-   - Added ngrok setup instructions
+   - Added LocalTunnel setup instructions
    - Added `API_BASE_URL` variable
    - Updated Slack configuration notes
 
@@ -629,7 +618,7 @@ The implementation includes:
 - ✅ Semantic search with OpenAI embeddings
 - ✅ Clean UI with sync status
 - ✅ Proper error handling
-- ✅ ngrok setup for local development
+- ✅ LocalTunnel setup for local development
 - ✅ Comprehensive documentation
 
 **Start testing now!** 🚀

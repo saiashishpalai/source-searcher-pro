@@ -23,35 +23,29 @@ VITE_SLACK_CLIENT_ID=your_slack_client_id_here
 
 ---
 
-### Step 2: Start ngrok Tunnel
+### Step 2: LocalTunnel is Already Running! ✅
 
-In a **new terminal**, start ngrok:
-
-```bash
-./ngrok http 3000
+Your permanent tunnel URL is:
+```
+https://haven7-searcher.loca.lt
 ```
 
-You'll see:
-```
-Forwarding   https://abc123xyz.ngrok.io -> http://localhost:3000
-```
+This URL **NEVER CHANGES** - you can use it forever!
 
-**COPY THIS URL!** (e.g., `https://abc123xyz.ngrok.io`)
-
-> ⚠️ **Keep this terminal open** - don't close it!
+> ✅ **Already set up** - LocalTunnel runs in the background automatically!
 
 ---
 
-### Step 3: Update Environment Variables
+### Step 3: Environment Variables Already Configured! ✅
 
-Edit `.env.local` and update these two lines:
+Your `.env.local` is already set with the permanent URL:
 
 ```bash
-VITE_API_URL=https://abc123xyz.ngrok.io
-API_BASE_URL=https://abc123xyz.ngrok.io
+VITE_API_URL=https://haven7-searcher.loca.lt
+API_BASE_URL=https://haven7-searcher.loca.lt
 ```
 
-Replace `abc123xyz` with YOUR actual ngrok subdomain from Step 2.
+No need to change these - they're permanent!
 
 ---
 
@@ -59,21 +53,22 @@ Replace `abc123xyz` with YOUR actual ngrok subdomain from Step 2.
 
 1. Go to: https://api.slack.com/apps/A09L0GZBBC5/oauth
 2. Under **Redirect URLs**, click **Add New Redirect URL**
-3. Paste: `https://abc123xyz.ngrok.io/api/auth/slack/callback`
-   - (Replace `abc123xyz` with your ngrok URL)
+3. Paste: `https://haven7-searcher.loca.lt/api/auth/slack/callback`
 4. Click **Save URLs**
+
+**This URL is permanent - you only need to set it once!**
 
 ---
 
 ### Step 5: Start Your Application
-
-In a **different terminal** (keep ngrok running):
 
 ```bash
 npm run dev
 ```
 
 This starts both the frontend (port 8080) and API server (port 3000).
+
+LocalTunnel runs in the background automatically!
 
 ---
 
@@ -155,7 +150,7 @@ Try a query that should return results from multiple sources:
 ### Problem: "redirect_uri_mismatch"
 
 **Solution:**
-1. Double-check your ngrok URL is correct in `.env.local`
+1. Verify your permanent URL is set in `.env.local`: `https://haven7-searcher.loca.lt`
 2. Verify Slack App has the EXACT URL (including `/callback`)
 3. Restart your server: `npm run dev`
 
@@ -170,15 +165,14 @@ Try a query that should return results from multiple sources:
 
 ---
 
-### Problem: ngrok URL changed
+### Problem: LocalTunnel URL not working
 
-**Cause:** ngrok creates a new URL each time it restarts
+**Cause:** LocalTunnel may require confirmation on first visit
 
 **Solution:**
-1. Get the new ngrok URL
-2. Update `.env.local` with new URL
-3. Update Slack App OAuth settings with new URL
-4. Restart server
+1. Visit: `https://haven7-searcher.loca.lt`
+2. Click "Continue" on the warning page (first time only)
+3. Your permanent URL: `https://haven7-searcher.loca.lt` never changes!
 
 ---
 
@@ -187,8 +181,8 @@ Try a query that should return results from multiple sources:
 **Solution:**
 1. Verify your credentials in `.env.local`:
    ```
-   SLACK_CLIENT_ID=9686909204692.9680577385413
-   SLACK_CLIENT_SECRET=843eda4877df61a3461a441cb13c58f8
+   SLACK_CLIENT_ID=your_slack_client_id_here
+   SLACK_CLIENT_SECRET=your_slack_client_secret_here
    ```
 2. Try disconnecting and reconnecting Slack
 
@@ -206,8 +200,8 @@ Try a query that should return results from multiple sources:
 ### Modified Files
 - ✅ `server/index.js` - Added `/api/sync/slack` endpoint
 - ✅ `src/pages/ConnectedSources.tsx` - Enabled Slack sync
-- ✅ `package.json` - Added `@slack/web-api` + npm scripts
-- ✅ `env.example` - Added ngrok instructions
+- ✅ `package.json` - Added `@slack/web-api` + LocalTunnel
+- ✅ `.env.local` - Permanent LocalTunnel URL configured
 
 ### Dependencies Added
 - ✅ `@slack/web-api` - Slack SDK for Node.js

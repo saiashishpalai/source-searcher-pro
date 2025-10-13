@@ -16,7 +16,7 @@ out/
 *.tsbuildinfo
 
 # ==========================================
-# Environment variables
+# Environment variables & Secrets
 # ==========================================
 .env
 .env.local
@@ -24,6 +24,29 @@ out/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*.local
+*.env.local
+
+# Secret files
+*.secret
+*.secrets
+secrets/
+secret.json
+credentials.json
+
+# API Keys & Tokens
+*_api_key
+*_secret_key
+*_access_token
+*_refresh_token
+
+# Certificate files
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
 
 # ==========================================
 # Logs

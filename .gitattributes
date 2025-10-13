@@ -1,0 +1,30 @@
+# Git attributes for better secret detection and security
+
+# Mark sensitive files as binary to prevent diffs in logs
+*.pem binary
+*.key binary
+*.p12 binary
+*.pfx binary
+
+# Prevent certain files from being committed (double protection with .gitignore)
+.env.local filter=secret
+.env.production filter=secret
+*.secret filter=secret
+
+# Normalize line endings
+* text=auto
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+
+# Exclude files from Git archives (for clean exports)
+.gitignore export-ignore
+.gitattributes export-ignore
+.env.* export-ignore
+*.log export-ignore
+

@@ -29,7 +29,7 @@ A complete Slack integration for Haven7 that allows users to:
 
 2. **API Endpoint** (`server/index.js`)
    - `POST /api/sync/slack` - Sync Slack messages
-   - Dynamic OAuth redirect URIs (ngrok support)
+   - Dynamic OAuth redirect URIs (LocalTunnel support)
    - Slack WebClient integration
 
 3. **Frontend Integration** (`src/pages/ConnectedSources.tsx`)
@@ -40,7 +40,7 @@ A complete Slack integration for Haven7 that allows users to:
 
 4. **OAuth Support**
    - Dynamic redirect URIs for local + production
-   - HTTPS support via ngrok
+   - HTTPS support via LocalTunnel
    - Secure token storage in Supabase
 
 ---
@@ -62,8 +62,8 @@ setup-slack.sh                        # Automated setup script
 ```
 server/index.js                       # Added Slack sync endpoint + dynamic OAuth
 src/pages/ConnectedSources.tsx        # Enabled Slack sync button
-src/pages/ConnectSources.tsx          # Added comment about ngrok URLs
-env.example                           # Added ngrok instructions + API_BASE_URL
+src/pages/ConnectSources.tsx          # Added comment about LocalTunnel URLs
+env.example                           # Added LocalTunnel instructions + API_BASE_URL
 package.json                          # Added @slack/web-api + npm scripts
 ```
 
@@ -75,7 +75,7 @@ package.json                          # Added @slack/web-api + npm scripts
 - **OAuth 2.0:** Slack OAuth v2 with bot tokens
 - **Embeddings:** OpenAI `text-embedding-3-small`
 - **Database:** Supabase (PostgreSQL with pgvector)
-- **HTTPS Tunneling:** ngrok (for local development)
+- **HTTPS Tunneling:** LocalTunnel (for local development)
 
 ---
 
@@ -156,7 +156,7 @@ Results include Slack messages!
 
 ### OAuth & Connection
 - ✅ OAuth 2.0 authentication flow
-- ✅ HTTPS support via ngrok
+- ✅ HTTPS support via LocalTunnel
 - ✅ Dynamic redirect URIs
 - ✅ Token storage with metadata
 - ✅ Connect/disconnect functionality
@@ -224,16 +224,16 @@ Bot Token Scopes:
 
 ```json
 {
-  "ngrok": "./ngrok http 3000",
+  "LocalTunnel": "./LocalTunnel http 3000",
   "setup:slack": "./setup-slack.sh",
-  "dev:all": "concurrently \"npm run dev:vite\" \"npm run dev:api\" \"npm run ngrok\""
+  "dev:all": "concurrently \"npm run dev:vite\" \"npm run dev:api\" \"npm run LocalTunnel\""
 }
 ```
 
 **Usage:**
 ```bash
 npm run setup:slack   # Configure Slack credentials
-npm run ngrok         # Start ngrok tunnel
+npm run LocalTunnel         # Start LocalTunnel tunnel
 npm run dev:all       # Start everything at once
 ```
 
@@ -261,7 +261,7 @@ npm run dev:all       # Start everything at once
    - Step-by-step instructions
 
 4. **env.example** (updated)
-   - ngrok setup instructions
+   - LocalTunnel setup instructions
    - Environment variable reference
    - API_BASE_URL documentation
 
@@ -305,9 +305,9 @@ npm run dev:all       # Start everything at once
 
 ## 🐛 Known Limitations
 
-1. **ngrok URL Changes**
-   - Free ngrok URLs change on restart
-   - Solution: Keep ngrok running or get paid account
+1. **LocalTunnel URL Changes**
+   - Free LocalTunnel URLs change on restart
+   - Solution: Keep LocalTunnel running or get paid account
 
 2. **Manual Channel Addition**
    - App must be manually added to channels
@@ -330,7 +330,7 @@ npm run dev:all       # Start everything at once
 - ✅ Read-only access (cannot send messages)
 - ✅ Per-user data isolation
 - ✅ Secure token exchange
-- ✅ HTTPS-only OAuth (via ngrok)
+- ✅ HTTPS-only OAuth (via LocalTunnel)
 
 ---
 
@@ -367,7 +367,7 @@ npm run dev:all       # Start everything at once
 
 ### For Production Deployment
 
-1. **Replace ngrok with proper HTTPS:**
+1. **Replace LocalTunnel with proper HTTPS:**
    ```
    API_BASE_URL=https://api.yourdomain.com
    ```
@@ -445,10 +445,10 @@ The Slack integration is **complete and ready for testing**!
 # 1. Configure credentials
 ./setup-slack.sh
 
-# 2. Start ngrok
-./ngrok http 3000
+# 2. Start LocalTunnel
+./LocalTunnel http 3000
 
-# 3. Update .env.local with ngrok URL
+# 3. Update .env.local with LocalTunnel URL
 
 # 4. Update Slack App OAuth settings
 
@@ -477,5 +477,5 @@ For detailed instructions, see:
 - ✅ Semantic search with embeddings
 - ✅ Complete documentation
 - ✅ Setup automation scripts
-- ✅ ngrok HTTPS support
+- ✅ LocalTunnel HTTPS support
 

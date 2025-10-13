@@ -12,33 +12,31 @@
 ```
 This adds your Slack credentials to `.env.local`
 
-### Step 2: Start ngrok
-```bash
-npm run ngrok
+### Step 2: LocalTunnel Already Running! ✅
+Your permanent tunnel URL is:
 ```
-Copy the HTTPS URL (e.g., `https://abc123.ngrok.io`)
+https://haven7-searcher.loca.lt
+```
+This URL **NEVER CHANGES** - no need to update it!
 
-### Step 3: Update Environment
-Edit `.env.local`:
+### Step 3: Environment Already Configured! ✅
+Your `.env.local` already has:
 ```bash
-VITE_API_URL=https://abc123.ngrok.io
-API_BASE_URL=https://abc123.ngrok.io
+VITE_API_URL=https://haven7-searcher.loca.lt
+API_BASE_URL=https://haven7-searcher.loca.lt
 ```
 
-### Step 4: Update Slack App
+### Step 4: Update Slack App (One Time Only)
 1. Go to: https://api.slack.com/apps/A09L0GZBBC5
 2. OAuth & Permissions → Redirect URLs
-3. Add: `https://abc123.ngrok.io/api/auth/slack/callback`
+3. Add: `https://haven7-searcher.loca.lt/api/auth/slack/callback`
 4. Save
 
-### Step 5: Start Servers
+### Step 5: Start Server
 ```bash
-# In one terminal (keep ngrok running)
-npm run ngrok
-
-# In another terminal
 npm run dev
 ```
+LocalTunnel runs automatically in the background!
 
 ### Step 6: Test
 1. Open http://localhost:8080
@@ -77,9 +75,7 @@ Client Secret: your_slack_client_secret_here
 
 ```bash
 npm run setup:slack    # Configure Slack credentials
-npm run ngrok          # Start ngrok tunnel
-npm run dev            # Start frontend + API
-npm run dev:all        # Start everything (frontend + API + ngrok)
+npm run dev            # Start frontend + API (LocalTunnel auto-starts)
 ```
 
 ---
@@ -87,13 +83,13 @@ npm run dev:all        # Start everything (frontend + API + ngrok)
 ## 🐛 Common Issues
 
 ### "redirect_uri_mismatch"
-→ Make sure Slack app has the ngrok URL in OAuth settings
+→ Make sure Slack app has `https://haven7-searcher.loca.lt/api/auth/slack/callback` in OAuth settings
 
 ### "No conversations found"
 → Add the app to channels: `/invite @YourAppName`
 
-### ngrok URL keeps changing
-→ Keep ngrok running, or get a paid account for permanent URL
+### LocalTunnel shows warning page
+→ Click "Continue" on first visit - this is normal and only happens once
 
 ### "Token expired"
 → Reconnect Slack from the Connect Sources page
