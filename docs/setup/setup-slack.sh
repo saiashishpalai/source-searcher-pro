@@ -17,31 +17,28 @@ if [ ! -f ".env.local" ]; then
     exit 1
 fi
 
-echo "Step 1: Updating Slack credentials..."
+echo "Step 1: Adding Slack credential placeholders..."
 
-# Update Slack credentials
+# Add Slack credential placeholders
 if grep -q "^SLACK_CLIENT_ID=" .env.local; then
-    sed -i.bak 's/^SLACK_CLIENT_ID=.*/SLACK_CLIENT_ID=9686909204692.9680577385413/' .env.local
-    echo "✅ Updated SLACK_CLIENT_ID"
+    echo "✅ SLACK_CLIENT_ID already exists"
 else
-    echo "SLACK_CLIENT_ID=9686909204692.9680577385413" >> .env.local
-    echo "✅ Added SLACK_CLIENT_ID"
+    echo "SLACK_CLIENT_ID=your_slack_client_id_here" >> .env.local
+    echo "✅ Added SLACK_CLIENT_ID placeholder"
 fi
 
 if grep -q "^SLACK_CLIENT_SECRET=" .env.local; then
-    sed -i.bak 's/^SLACK_CLIENT_SECRET=.*/SLACK_CLIENT_SECRET=843eda4877df61a3461a441cb13c58f8/' .env.local
-    echo "✅ Updated SLACK_CLIENT_SECRET"
+    echo "✅ SLACK_CLIENT_SECRET already exists"
 else
-    echo "SLACK_CLIENT_SECRET=843eda4877df61a3461a441cb13c58f8" >> .env.local
-    echo "✅ Added SLACK_CLIENT_SECRET"
+    echo "SLACK_CLIENT_SECRET=your_slack_client_secret_here" >> .env.local
+    echo "✅ Added SLACK_CLIENT_SECRET placeholder"
 fi
 
 if grep -q "^VITE_SLACK_CLIENT_ID=" .env.local; then
-    sed -i.bak 's/^VITE_SLACK_CLIENT_ID=.*/VITE_SLACK_CLIENT_ID=9686909204692.9680577385413/' .env.local
-    echo "✅ Updated VITE_SLACK_CLIENT_ID"
+    echo "✅ VITE_SLACK_CLIENT_ID already exists"
 else
-    echo "VITE_SLACK_CLIENT_ID=9686909204692.9680577385413" >> .env.local
-    echo "✅ Added VITE_SLACK_CLIENT_ID"
+    echo "VITE_SLACK_CLIENT_ID=your_slack_client_id_here" >> .env.local
+    echo "✅ Added VITE_SLACK_CLIENT_ID placeholder"
 fi
 
 # Add API_BASE_URL if not present

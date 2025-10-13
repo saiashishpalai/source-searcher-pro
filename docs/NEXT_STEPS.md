@@ -16,9 +16,9 @@ Run this script to add your Slack credentials to `.env.local`:
 
 If that doesn't work, manually add to `.env.local`:
 ```bash
-SLACK_CLIENT_ID=9686909204692.9680577385413
-SLACK_CLIENT_SECRET=843eda4877df61a3461a441cb13c58f8
-VITE_SLACK_CLIENT_ID=9686909204692.9680577385413
+SLACK_CLIENT_ID=your_slack_client_id_here
+SLACK_CLIENT_SECRET=your_slack_client_secret_here
+VITE_SLACK_CLIENT_ID=your_slack_client_id_here
 ```
 
 ---

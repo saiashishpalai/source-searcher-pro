@@ -43,10 +43,10 @@ The Slack integration allows Haven7 to search through your Slack messages, chann
 ### 1. **Slack App Credentials** (✅ You have these)
 
 ```
-Slack Client ID: 9686909204692.9680577385413
-Slack Client Secret: 843eda4877df61a3461a441cb13c58f8
-Slack Signing Secret: 96bee7fc14949629a663349c2118b901
-Verification Token: of5Mb7kqdSPLfTX4TPCFKzLH
+Slack Client ID: your_slack_client_id_here
+Slack Client Secret: your_slack_client_secret_here
+Slack Signing Secret: your_slack_signing_secret_here
+Verification Token: your_verification_token_here
 Slack App ID: A09L0GZBBC5
 ```
 
@@ -95,8 +95,8 @@ Update your `.env.local` file:
 
 ```bash
 # Slack OAuth Configuration
-SLACK_CLIENT_ID=9686909204692.9680577385413
-SLACK_CLIENT_SECRET=843eda4877df61a3461a441cb13c58f8
+SLACK_CLIENT_ID=your_slack_client_id_here
+SLACK_CLIENT_SECRET=your_slack_client_secret_here
 
 # API URLs (IMPORTANT: Use your ngrok HTTPS URL)
 VITE_API_URL=https://abc123xyz.ngrok.io

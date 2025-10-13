@@ -54,8 +54,8 @@ npm run dev
 
 ```
 App ID: A09L0GZBBC5
-Client ID: 9686909204692.9680577385413
-Client Secret: 843eda4877df61a3461a441cb13c58f8
+Client ID: your_slack_client_id_here
+Client Secret: your_slack_client_secret_here
 ```
 
 ---
