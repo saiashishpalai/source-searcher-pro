@@ -415,7 +415,8 @@ const ConnectSources = () => {
         const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
         slackAuthUrl.searchParams.set('client_id', clientId);
         slackAuthUrl.searchParams.set('redirect_uri', redirectUri);
-        slackAuthUrl.searchParams.set('scope', 'channels:read,channels:history,groups:read,groups:history,im:read,im:history,mpim:read,mpim:history,files:read,users:read,users:read.email,team:read');
+        // Request basic user identity only - bot scopes were already granted during app installation
+        slackAuthUrl.searchParams.set('user_scope', 'identity.basic,identity.email');
         slackAuthUrl.searchParams.set('state', state);
         
         console.log('🔗 Redirecting to Slack OAuth:', slackAuthUrl.toString());

@@ -12,10 +12,12 @@ import { createClient } from '@supabase/supabase-js';
 import { DocumentSync } from './services/document-sync.js';
 import { SearchService } from './services/search-service.js';
 import { NotionSync } from './services/notion-sync.js';
+import { SlackSync } from './services/slack-sync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}`;
 
 
 app.use(cors({ 
@@ -34,6 +36,7 @@ const supabaseAdmin = createClient(
 const documentSync = new DocumentSync(process.env.OPENAI_API_KEY);
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
+const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -136,7 +139,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: `http://localhost:3000/api/auth/google/callback`,
+        redirect_uri: `${API_BASE_URL}/api/auth/google/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -203,9 +206,12 @@ app.get('/api/auth/google/callback', async (req, res) => {
 
 // SLACK OAUTH CALLBACK
 app.get('/api/auth/slack/callback', async (req, res) => {
+  console.log('🎯 SLACK CALLBACK RECEIVED!', req.query);
+  
   const { code, state } = req.query;
   
   if (!code || !state) {
+    console.error('❌ Missing code or state in callback');
     return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
   }
 
@@ -216,6 +222,11 @@ app.get('/api/auth/slack/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=expired`);
     }
 
+    console.log('🔄 Attempting Slack token exchange...');
+    console.log('   Code:', code.substring(0, 20) + '...');
+    console.log('   Client ID:', process.env.SLACK_CLIENT_ID);
+    console.log('   Redirect URI:', `${API_BASE_URL}/api/auth/slack/callback`);
+    
     const tokenResponse = await fetch('https://slack.com/api/oauth.v2.access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -223,14 +234,16 @@ app.get('/api/auth/slack/callback', async (req, res) => {
         code,
         client_id: process.env.SLACK_CLIENT_ID,
         client_secret: process.env.SLACK_CLIENT_SECRET,
-        redirect_uri: `http://localhost:3000/api/auth/slack/callback`,
+        redirect_uri: `${API_BASE_URL}/api/auth/slack/callback`,
       }),
     });
 
     const tokens = await tokenResponse.json();
+    console.log('📥 Slack API response:', JSON.stringify(tokens, null, 2));
 
     if (!tokens.ok) {
-      console.error('Slack token exchange failed:', tokens);
+      console.error('❌ Slack token exchange failed!');
+      console.error('   Full error response:', JSON.stringify(tokens, null, 2));
       return res.redirect(`${APP_URL}/connect-sources?error=token_failed`);
     }
     
@@ -252,7 +265,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
         user_id: stateData.userId,
         source_type: 'slack',
         source_user_id: slackUserId, // Required by schema
-        access_token: tokens.access_token,
+        access_token: tokens.access_token || process.env.SLACK_BOT_TOKEN, // Use bot token if no user token
         refresh_token: tokens.refresh_token || null,
         token_expires_at: null, // Slack tokens don't expire
         is_active: true,
@@ -261,6 +274,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
           team_name: teamName,
           scope: tokens.scope,
           authed_user: tokens.authed_user,
+          bot_token: process.env.SLACK_BOT_TOKEN, // Store bot token separately
         },
         updated_at: new Date().toISOString(),
       }, { 
@@ -308,7 +322,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
       body: JSON.stringify({
         code,
         grant_type: 'authorization_code',
-        redirect_uri: `http://localhost:3000/api/auth/notion/callback`,
+        redirect_uri: `${API_BASE_URL}/api/auth/notion/callback`,
       }),
     });
 
@@ -491,6 +505,62 @@ app.post('/api/sync/notion', async (req, res) => {
     if (error.code === 'notion_api_error' || error.message.includes('Notion')) {
       return res.status(401).json({ 
         error: 'Notion API error. Token may have expired.',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message,
+      code: 'SYNC_FAILED'
+    });
+  }
+});
+
+// SYNC SLACK ENDPOINT
+app.post('/api/sync/slack', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Get Slack connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('source_type', 'slack')
+      .single();
+    
+    if (connError || !connection) {
+      return res.status(400).json({ 
+        error: 'Slack not connected',
+        code: 'NOT_CONNECTED'
+      });
+    }
+    
+    console.log('✓ Starting Slack sync for user:', user.id);
+    
+    // Call sync service
+    const result = await slackSync.syncSlack(user.id, connection.access_token);
+    
+    console.log(`✓ Slack sync complete: ${result.synced} conversations`);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('✗ Slack sync error:', error.message);
+    
+    if (error.code === 'slack_api_error' || error.message.includes('Slack')) {
+      return res.status(401).json({ 
+        error: 'Slack API error. Token may have expired.',
         code: 'TOKEN_EXPIRED'
       });
     }

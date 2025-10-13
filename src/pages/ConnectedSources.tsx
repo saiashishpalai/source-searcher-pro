@@ -185,8 +185,8 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 
       {/* Action Buttons */}
       <div className="space-y-2">
-          {/* Sync Documents Button for Google Drive and Notion */}
-          {(connection.source_type === 'google_drive' || connection.source_type === 'notion') && onSyncDocuments && (
+          {/* Sync Documents Button for Google Drive, Notion, and Slack */}
+          {(connection.source_type === 'google_drive' || connection.source_type === 'notion' || connection.source_type === 'slack') && onSyncDocuments && (
             <div className="space-y-2">
               <div className="space-y-2">
                 <Button
@@ -226,45 +226,61 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                 {!isSyncing && (
                   <>
                     {syncError ? (
-                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                        <div className="flex items-start">
-                          <AlertCircle className="w-4 h-4 text-red-600 mr-2 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm text-red-800 font-medium">Sync Error</p>
-                            <p className="text-sm text-red-700 mt-1">{syncError}</p>
-        <div className="flex gap-2 mt-3">
-          {syncError.includes('expired') && syncError.includes('session') ? (
-            <button
-              onClick={() => window.location.reload()}
-              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Refresh Page
-            </button>
-          ) : syncError.includes('expired') || syncError.includes('reconnect') ? (
-            <button
-              onClick={() => {
-                setSyncError?.(null);
-                window.location.href = '/connect-sources';
-              }}
-              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Reconnect Google Drive
-            </button>
-          ) : (
-            <button
-              onClick={() => handleSyncDocuments?.()}
-              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Try Again
-            </button>
-          )}
-          <button
-            onClick={() => setSyncError?.(null)}
-            className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Dismiss
-          </button>
-        </div>
+                      <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg shadow-sm animate-in fade-in-50 slide-in-from-top-2 duration-300">
+                        <div className="flex items-start gap-3">
+                          <div className="p-1 bg-red-100 rounded-full">
+                            <AlertCircle className="w-4 h-4 text-red-600" />
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div>
+                              <p className="text-sm font-semibold text-red-900">Sync Issue</p>
+                              <p className="text-sm text-red-700 mt-1 leading-relaxed">{syncError}</p>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              {syncError.includes('expired') && syncError.includes('session') ? (
+                                <Button
+                                  onClick={() => window.location.reload()}
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1.5" />
+                                  Refresh Page
+                                </Button>
+                              ) : syncError.includes('expired') || syncError.includes('reconnect') ? (
+                                <Button
+                                  onClick={() => {
+                                    setSyncError?.(null);
+                                    window.location.href = '/connect-sources';
+                                  }}
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  <ExternalLink className="w-3 h-3 mr-1.5" />
+                                  Reconnect
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={() => handleSyncDocuments?.()}
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1.5" />
+                                  Try Again
+                                </Button>
+                              )}
+                              <Button
+                                onClick={() => setSyncError?.(null)}
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 hover:bg-red-50"
+                              >
+                                <X className="w-3 h-3 mr-1.5" />
+                                Dismiss
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -499,7 +515,7 @@ const ConnectedSources = () => {
     isSyncing: false
   });
   const [syncStatusLoading, setSyncStatusLoading] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<Record<string, string | null>>({});
 
   // Mock data for demonstration - in real app this would come from API
   const availableSources = [
@@ -601,6 +617,7 @@ const ConnectedSources = () => {
     
     try {
       // Build OAuth URLs - redirect to API server for callback
+      // Use VITE_API_URL which can be set to ngrok URL for local dev with HTTPS
       const apiUrl = getEnvVar('VITE_API_URL') || 'http://localhost:3000';
       const redirectUri = `${apiUrl}/api/auth/${sourceId === 'googleDrive' ? 'google' : sourceId}/callback`;
       
@@ -789,10 +806,10 @@ const ConnectedSources = () => {
     
     // Set syncing state for this specific source
     setSyncingDocuments(prev => ({ ...prev, [sourceType]: true }));
-    setSyncError(null);
+    setSyncError(prev => ({ ...prev, [sourceType]: null }));
     
     if (!session?.access_token) {
-      setSyncError('Your session has expired. Please refresh the page to log in again.');
+      setSyncError(prev => ({ ...prev, [sourceType]: 'Your session has expired. Please refresh the page to log in again.' }));
       setSyncingDocuments(prev => ({ ...prev, [sourceType]: false }));
       return;
     }
@@ -803,13 +820,18 @@ const ConnectedSources = () => {
         ? '/api/sync/google-drive'
         : sourceType === 'notion'
         ? '/api/sync/notion'
+        : sourceType === 'slack'
+        ? '/api/sync/slack'
         : null;
       
       if (!endpoint) {
         throw new Error(`Sync not implemented for ${sourceType}`);
       }
       
-      const sourceName = sourceType === 'google_drive' ? 'Google Drive' : 'Notion';
+      const sourceName = sourceType === 'google_drive' ? 'Google Drive' 
+        : sourceType === 'notion' ? 'Notion'
+        : sourceType === 'slack' ? 'Slack'
+        : sourceType;
       console.log(`🔄 Calling endpoint: ${endpoint}`);
       
       const response = await fetch(`http://localhost:3000${endpoint}`, {
@@ -824,10 +846,10 @@ const ConnectedSources = () => {
       
       if (!response.ok) {
         if (data.code === 'TOKEN_EXPIRED') {
-          setSyncError(`Your ${sourceName} connection has expired. Please reconnect ${sourceName}.`);
+          setSyncError(prev => ({ ...prev, [sourceType]: `Your ${sourceName} connection has expired. Please reconnect ${sourceName}.` }));
           return;
         } else if (data.code === 'NOT_CONNECTED') {
-          setSyncError(`${sourceName} is not connected. Please connect first.`);
+          setSyncError(prev => ({ ...prev, [sourceType]: `${sourceName} is not connected. Please connect first.` }));
           return;
         }
         throw new Error(data.error || 'Sync failed');
@@ -836,7 +858,7 @@ const ConnectedSources = () => {
       console.log('✅ Sync complete:', data);
       
       if (data.synced === 0) {
-        setSyncError(`No documents were synced from ${sourceName}. Make sure you have accessible content.`);
+        setSyncError(prev => ({ ...prev, [sourceType]: `No documents were synced from ${sourceName}. Make sure you have accessible content.` }));
       }
       
       // Refresh to show updated counts
@@ -845,7 +867,7 @@ const ConnectedSources = () => {
       
     } catch (error) {
       console.error('❌ Sync error:', error);
-      setSyncError(error instanceof Error ? error.message : 'Sync failed');
+      setSyncError(prev => ({ ...prev, [sourceType]: error instanceof Error ? error.message : 'Sync failed' }));
     } finally {
       setSyncingDocuments(prev => ({ ...prev, [sourceType]: false }));
     }
@@ -982,16 +1004,16 @@ const ConnectedSources = () => {
             handleDisconnect(dbSourceType);
           }}
           isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
-          onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion') ? () => {
-            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion' };
+          onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion' || source.id === 'slack') ? () => {
+            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleSyncDocuments(dbSourceType);
           } : undefined}
           isSyncing={syncingDocuments[source.id === 'googleDrive' ? 'google_drive' : source.id] || false}
           syncStatus={syncStatus}
           syncStatusLoading={syncStatusLoading}
-          syncError={syncError}
-          setSyncError={setSyncError}
+          syncError={syncError[source.id === 'googleDrive' ? 'google_drive' : source.id] || null}
+          setSyncError={(error: string | null) => setSyncError(prev => ({ ...prev, [source.id === 'googleDrive' ? 'google_drive' : source.id]: error }))}
           onClearData={() => {
             const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
