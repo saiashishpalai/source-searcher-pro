@@ -368,9 +368,8 @@ const ConnectSources = () => {
     setConnectingSource(sourceId);
     
     try {
-      // Build OAuth URLs - redirect to API server for callback
-      const apiUrl = getEnvVar('VITE_API_URL') || 'http://localhost:3000';
-      const redirectUri = `${apiUrl}/api/auth/${sourceId === 'googleDrive' ? 'google' : sourceId}/callback`;
+      // Build OAuth URLs - ALL services use HTTPS localhost with unified redirect pattern
+      const redirectUri = `https://localhost:3000/api/auth/${sourceId}/callback`;
       
       if (sourceId === 'googleDrive') {
         const clientId = getEnvVar('VITE_GOOGLE_CLIENT_ID');
@@ -392,7 +391,7 @@ const ConnectSources = () => {
         googleAuthUrl.searchParams.set('response_type', 'code');
         googleAuthUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile');
         googleAuthUrl.searchParams.set('access_type', 'offline');
-        googleAuthUrl.searchParams.set('prompt', 'consent');
+        googleAuthUrl.searchParams.set('prompt', 'consent select_account');
         googleAuthUrl.searchParams.set('state', state);
         
         console.log('🔗 Redirecting to Google OAuth:', googleAuthUrl.toString());
@@ -415,7 +414,8 @@ const ConnectSources = () => {
         const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
         slackAuthUrl.searchParams.set('client_id', clientId);
         slackAuthUrl.searchParams.set('redirect_uri', redirectUri);
-        // Request basic user identity only - bot scopes were already granted during app installation
+        // Request bot scopes for accessing workspace data
+        slackAuthUrl.searchParams.set('scope', 'channels:history,channels:read,files:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,users:read,users:read.email,team:read,usergroups:read');
         slackAuthUrl.searchParams.set('user_scope', 'identity.basic,identity.email');
         slackAuthUrl.searchParams.set('state', state);
         
@@ -461,6 +461,7 @@ const ConnectSources = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({ sourceType: sourceId === 'googleDrive' ? 'google_drive' : sourceId }),
       });

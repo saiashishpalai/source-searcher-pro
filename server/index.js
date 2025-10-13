@@ -8,6 +8,8 @@ dotenv.config({ path: join(__dirname, '..', '.env.local') });
 
 import express from 'express';
 import cors from 'cors';
+import https from 'https';
+import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import { DocumentSync } from './services/document-sync.js';
 import { SearchService } from './services/search-service.js';
@@ -16,12 +18,12 @@ import { SlackSync } from './services/slack-sync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'http://localhost:8080';
-const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}`;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'https://localhost:8080';
+const API_BASE_URL = process.env.API_BASE_URL || `https://localhost:${PORT}`;
 
 
 app.use(cors({ 
-  origin: ['http://localhost:8080', 'http://localhost:8083'],
+  origin: ['https://localhost:8080', 'http://localhost:8080', 'http://localhost:8083'],
   credentials: true 
 }));
 app.use(express.json());
@@ -139,7 +141,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: `${API_BASE_URL}/api/auth/google/callback`,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || `${API_BASE_URL}/api/auth/google/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -906,6 +908,23 @@ app.post('/api/search/followup', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`✓ API server running on http://localhost:${PORT}`);
-});
+// Load SSL certificates for HTTPS
+const certPath = join(__dirname, '..', 'localhost.pem');
+const keyPath = join(__dirname, '..', 'localhost-key.pem');
+
+// Check if SSL certificates exist, otherwise fallback to HTTP
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  const httpsOptions = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath)
+  };
+  
+  https.createServer(httpsOptions, app).listen(PORT, () => {
+    console.log(`✓ API server running on https://localhost:${PORT}`);
+  });
+} else {
+  app.listen(PORT, () => {
+    console.log(`⚠️  SSL certificates not found. API server running on http://localhost:${PORT}`);
+    console.log(`   Run 'mkcert -key-file localhost-key.pem -cert-file localhost.pem localhost 127.0.0.1' to enable HTTPS`);
+  });
+}

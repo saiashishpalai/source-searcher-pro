@@ -1,4 +1,4 @@
-# 🎯 Slack Integration - Ready to Test!
+# 🎯 OAuth Integration - Ready to Test!
 
 **All code is complete!** Here's exactly what to do next:
 
@@ -6,247 +6,157 @@
 
 ## ⚡ Quick Start (5 Steps)
 
-### Step 1: Configure Slack Credentials
+### Step 1: Set Up Local HTTPS
 
-Run this script to add your Slack credentials to `.env.local`:
+1. **Install mkcert** (if not already installed):
+   ```bash
+   brew install mkcert
+   ```
+
+2. **Install the local CA** (one-time setup):
+   ```bash
+   sudo mkcert -install
+   ```
+
+3. **Generate SSL certificates**:
+   ```bash
+   mkcert -key-file localhost-key.pem -cert-file localhost.pem localhost 127.0.0.1
+   ```
+
+See [HTTPS Setup Guide](./setup/HTTPS_SETUP.md) for detailed instructions.
+
+---
+
+### Step 2: Configure Environment Variables
+
+Your `.env.local` should have:
 
 ```bash
-./setup-slack.sh
-```
+# HTTPS URLs for local development
+VITE_API_URL=https://localhost:3000
+API_BASE_URL=https://localhost:3000
+VITE_APP_URL=https://localhost:8080
 
-If that doesn't work, manually add to `.env.local`:
-```bash
-SLACK_CLIENT_ID=your_slack_client_id_here
-SLACK_CLIENT_SECRET=your_slack_client_secret_here
-VITE_SLACK_CLIENT_ID=your_slack_client_id_here
+# OAuth Client IDs (for frontend)
+VITE_SLACK_CLIENT_ID=your_slack_client_id
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+VITE_NOTION_CLIENT_ID=your_notion_client_id
+
+# OAuth Client Secrets (for backend)
+SLACK_CLIENT_ID=your_slack_client_id
+SLACK_CLIENT_SECRET=your_slack_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+NOTION_CLIENT_ID=your_notion_client_id
+NOTION_CLIENT_SECRET=your_notion_client_secret
+
+# Other required keys
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ---
 
-### Step 2: LocalTunnel is Already Running! ✅
+### Step 3: Configure OAuth Redirect URIs
 
-Your permanent tunnel URL is:
-```
-https://haven7-searcher.loca.lt
-```
+All three services use the same pattern: `https://localhost:3000/api/auth/[source]/callback`
 
-This URL **NEVER CHANGES** - you can use it forever!
+#### Slack
+1. Go to: https://api.slack.com/apps → Your App → OAuth & Permissions
+2. Under **Redirect URLs**, add:
+   ```
+   https://localhost:3000/api/auth/slack/callback
+   ```
+3. Click **Save URLs**
 
-> ✅ **Already set up** - LocalTunnel runs in the background automatically!
+#### Google Drive
+1. Go to: https://console.cloud.google.com/apis/credentials
+2. Click your OAuth 2.0 Client ID
+3. Under **Authorized redirect URIs**, add:
+   ```
+   https://localhost:3000/api/auth/google/callback
+   ```
+4. Click **Save**
 
----
-
-### Step 3: Environment Variables Already Configured! ✅
-
-Your `.env.local` is already set with the permanent URL:
-
-```bash
-VITE_API_URL=https://haven7-searcher.loca.lt
-API_BASE_URL=https://haven7-searcher.loca.lt
-```
-
-No need to change these - they're permanent!
-
----
-
-### Step 4: Update Slack App OAuth Settings
-
-1. Go to: https://api.slack.com/apps/A09L0GZBBC5/oauth
-2. Under **Redirect URLs**, click **Add New Redirect URL**
-3. Paste: `https://haven7-searcher.loca.lt/api/auth/slack/callback`
-4. Click **Save URLs**
-
-**This URL is permanent - you only need to set it once!**
+#### Notion
+1. Go to: https://www.notion.so/my-integrations
+2. Select your integration
+3. Under **Redirect URIs**, add:
+   ```
+   https://localhost:3000/api/auth/notion/callback
+   ```
+4. Click **Save**
 
 ---
 
-### Step 5: Start Your Application
+### Step 4: Start Your Application
 
 ```bash
 npm run dev
 ```
 
-This starts both the frontend (port 8080) and API server (port 3000).
-
-LocalTunnel runs in the background automatically!
+This starts both:
+- Frontend: `https://localhost:8080`
+- Backend API: `https://localhost:3000`
 
 ---
 
-## 🧪 Test the Integration
+### Step 5: Test the Integration
 
-### Test 1: Connect Slack
-
-1. Open browser to: **http://localhost:8080**
+1. Open browser to: **https://localhost:8080**
 2. Log in to your Haven7 account
 3. Click **Connect Sources** in the navigation
-4. Find the **Slack** card
-5. Click **Connect**
-6. Click **Continue to Slack** in the permission modal
-7. **Authorize** your Slack workspace
-8. You should be redirected back with "Connected ✓"
+4. Connect each service:
+   - **Slack**: Click Connect → Authorize workspace
+   - **Google Drive**: Click Connect → Sign in with Google
+   - **Notion**: Click Connect → Authorize Notion
+5. After connecting, click **Sync Documents** to fetch content
 
-**✅ Success:** Slack shows "Connected" badge
-
----
-
-### Test 2: Add App to Channels
-
-Before syncing, you need to add your app to channels:
-
-1. Open your **Slack workspace**
-2. Go to any channel (e.g., #general)
-3. Type: `/invite @[YourAppName]`
-4. Press Enter
-
-Repeat for any channels you want to index.
-
-> 💡 **Tip:** The app only has access to channels you explicitly invite it to!
+**✅ Success:** All three services show "Connected" with document counts
 
 ---
 
-### Test 3: Sync Messages
+## 🔧 Troubleshooting
 
-1. Back in Haven7, on the **Connected Sources** page
-2. Find your Slack connection
-3. Click **Sync Documents**
-4. Wait 1-2 minutes (you'll see a loading spinner)
-5. Check the stats:
-   - **Documents:** Number of conversations synced
-   - **Chunks:** Number of searchable pieces
-   - **Last Sync:** Current timestamp
+### "ERR_SSL_PROTOCOL_ERROR"
+- Ensure mkcert CA is installed: `sudo mkcert -install`
+- Restart your browser after installing the CA
+- Check that both frontend and backend are running
 
-**✅ Success:** Stats show synced documents and chunks
+### "redirect_uri_mismatch"
+- Verify the redirect URI in your OAuth app settings exactly matches:
+  - `https://localhost:3000/api/auth/[source]/callback`
+- Make sure you clicked "Save" after adding the URI
+- Clear browser cache and try again
 
----
-
-### Test 4: Search Slack Messages
-
-1. Go to the main **Dashboard/Search** page
-2. Enter a search query (e.g., "project status" or "meeting")
-3. Click **Search** 
-4. Look for results with:
-   - **Source badge:** "Slack"
-   - **Title:** "#channel-name - [date range]"
-   - **Content:** Your Slack messages!
-
-**✅ Success:** Search results include Slack messages
+### "Not Secure" warning
+- Ensure you ran `sudo mkcert -install`
+- Restart your browser
+- Check that certificates exist: `ls -la localhost*.pem`
 
 ---
 
-### Test 5: Cross-Source Search
+## 📚 Additional Resources
 
-Try a query that should return results from multiple sources:
-
-- "documentation" (might be in Drive, Notion, AND Slack)
-- "project plan"
-- "customer feedback"
-
-**✅ Success:** Results include documents from Slack, Google Drive, and Notion together!
+- [HTTPS Setup Guide](./setup/HTTPS_SETUP.md) - Detailed mkcert setup
+- [Slack Integration](./features/SLACK_INTEGRATION_GUIDE.md) - Complete Slack setup
+- [Environment Setup](./setup/LOVABLE_ENV_SETUP.md) - Environment variables guide
+- [OAuth Debug Guide](../authentication/OAUTH_DEBUG_GUIDE.md) - Troubleshooting OAuth
 
 ---
 
-## 🐛 Troubleshooting
+## ✨ What's Working
 
-### Problem: "redirect_uri_mismatch"
-
-**Solution:**
-1. Verify your permanent URL is set in `.env.local`: `https://haven7-searcher.loca.lt`
-2. Verify Slack App has the EXACT URL (including `/callback`)
-3. Restart your server: `npm run dev`
-
----
-
-### Problem: "No conversations found"
-
-**Solution:**
-- Add the app to channels using `/invite @[AppName]`
-- Make sure you're a member of those channels
-- Try again after inviting the app
+✅ **Local HTTPS** - Secure local development with mkcert  
+✅ **OAuth 2.0** - Secure authentication for all platforms  
+✅ **Unified Redirect URIs** - All services use `https://localhost:3000`  
+✅ **Connect/Disconnect** - Full lifecycle management  
+✅ **Document Sync** - Automatic content indexing  
+✅ **Search** - Unified search across all sources  
+✅ **AI Summaries** - GPT-4 powered result summaries  
 
 ---
 
-### Problem: LocalTunnel URL not working
-
-**Cause:** LocalTunnel may require confirmation on first visit
-
-**Solution:**
-1. Visit: `https://haven7-searcher.loca.lt`
-2. Click "Continue" on the warning page (first time only)
-3. Your permanent URL: `https://haven7-searcher.loca.lt` never changes!
-
----
-
-### Problem: "Token exchange failed"
-
-**Solution:**
-1. Verify your credentials in `.env.local`:
-   ```
-   SLACK_CLIENT_ID=your_slack_client_id_here
-   SLACK_CLIENT_SECRET=your_slack_client_secret_here
-   ```
-2. Try disconnecting and reconnecting Slack
-
----
-
-## 📁 What Was Built
-
-### New Files
-- ✅ `server/services/slack-sync.js` - Sync service
-- ✅ `docs/features/SLACK_INTEGRATION_GUIDE.md` - Full docs
-- ✅ `SLACK_QUICKSTART.md` - Quick reference
-- ✅ `SLACK_INTEGRATION_SUMMARY.md` - Implementation details
-- ✅ `setup-slack.sh` - Setup script
-
-### Modified Files
-- ✅ `server/index.js` - Added `/api/sync/slack` endpoint
-- ✅ `src/pages/ConnectedSources.tsx` - Enabled Slack sync
-- ✅ `package.json` - Added `@slack/web-api` + LocalTunnel
-- ✅ `.env.local` - Permanent LocalTunnel URL configured
-
-### Dependencies Added
-- ✅ `@slack/web-api` - Slack SDK for Node.js
-
----
-
-## 🎯 Key Features
-
-### What You Can Now Do
-- ✅ Connect Slack workspace via OAuth
-- ✅ Sync messages from channels, DMs, group DMs
-- ✅ Search Slack messages semantically
-- ✅ Include thread replies with parent messages
-- ✅ Cross-source search (Slack + Drive + Notion)
-- ✅ View sync stats per source
-- ✅ Disconnect and clear Slack data
-
-### What Gets Indexed
-- ✅ Public channels (where app is invited)
-- ✅ Private channels (where app is invited)
-- ✅ Direct messages
-- ✅ Group DMs
-- ✅ Message threads
-- ✅ Last 30 days of messages
-- ✅ Up to 20 conversations
-
----
-
-## 📚 Documentation
-
-- **Quick Start:** `SLACK_QUICKSTART.md` (this file)
-- **Full Guide:** `docs/features/SLACK_INTEGRATION_GUIDE.md`
-- **Summary:** `SLACK_INTEGRATION_SUMMARY.md`
-
----
-
-## 🚀 You're All Set!
-
-The Slack integration is **complete and ready to test**!
-
-Start with Step 1 above and follow through Step 5 to get everything running.
-
-**Questions?** Check the troubleshooting section or the full documentation.
-
----
-
-**Happy Searching!** 🎉
-
+**Ready to build amazing features!** 🚀

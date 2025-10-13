@@ -62,6 +62,7 @@ Beautiful, intuitive interface built with modern design principles for the best 
 ### Prerequisites
 
 - **Node.js** 18+ and npm ([Install with nvm](https://github.com/nvm-sh/nvm))
+- **mkcert** for local HTTPS ([Install with Homebrew](https://mkcert.dev))
 - **Supabase Account** ([Sign up free](https://supabase.com))
 - **OpenAI API Key** ([Get one here](https://platform.openai.com/api-keys))
 - **OAuth Credentials** for Slack, Google Drive, and Notion
@@ -79,9 +80,20 @@ Beautiful, intuitive interface built with modern design principles for the best 
    npm install
    ```
 
-3. **Set up environment variables**
+3. **Set up local HTTPS certificates**
    ```bash
-   cp env.example .env.local
+   # Install mkcert CA (one-time setup)
+   sudo mkcert -install
+   
+   # Generate certificates for localhost
+   mkcert -key-file localhost-key.pem -cert-file localhost.pem localhost 127.0.0.1
+   ```
+   
+   See [HTTPS Setup Guide](./docs/setup/HTTPS_SETUP.md) for details.
+
+4. **Set up environment variables**
+   ```bash
+   cp env.local.example .env.local
    ```
    
    Configure your `.env.local` with:
@@ -91,21 +103,21 @@ Beautiful, intuitive interface built with modern design principles for the best 
    
    See [Environment Setup Guide](./docs/setup/LOVABLE_ENV_SETUP.md) for details.
 
-4. **Set up the database**
+5. **Set up the database**
    ```bash
    # Run the schema and migrations in order
    # See database/README.md for detailed instructions
    ```
 
-5. **Start the development servers**
+6. **Start the development servers**
    ```bash
    npm run dev
    ```
-   This starts both the frontend (Vite) and backend (Express) concurrently.
+   This starts both the frontend (Vite on HTTPS) and backend (Express on HTTPS) concurrently.
 
-6. **Open in browser**
+7. **Open in browser**
    ```
-   http://localhost:8080
+   https://localhost:8080
    ```
 
 For detailed setup instructions, see the [Quick Start Guide](./docs/setup/QUICK_START.md).
@@ -292,6 +304,7 @@ Please ensure your code:
 **Active Development:** Yes
 
 ### Recent Updates
+- ✅ **Local HTTPS Setup** - mkcert-based secure local development
 - ✅ **Slack Integration** - Full OAuth, sync, and message search
 - ✅ **Notion Integration** - Complete page and database search
 - ✅ **Google Drive Integration** - Document and file search
@@ -300,6 +313,7 @@ Please ensure your code:
 - ✅ **Thread Management** - Persistent search conversations
 - ✅ **Enhanced Error Handling** - Per-source error states with beautiful UI
 - ✅ **OAuth 2.0** - Secure authentication for all platforms
+- ✅ **Unified HTTPS Architecture** - All OAuth flows use https://localhost:3000
 
 ### Roadmap
 - 🔄 Microsoft Teams integration

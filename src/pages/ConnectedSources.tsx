@@ -705,7 +705,7 @@ const ConnectedSources = () => {
     setRefreshingConnection(sourceType);
     
     try {
-      const response = await fetch('http://localhost:3000/api/connections/disconnect', {
+      const response = await fetch('/api/connections/disconnect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -779,7 +779,7 @@ const ConnectedSources = () => {
 
     setSyncStatusLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/sync/status', {
+      const response = await fetch('/api/sync/status', {
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
         },
@@ -834,7 +834,7 @@ const ConnectedSources = () => {
         : sourceType;
       console.log(`🔄 Calling endpoint: ${endpoint}`);
       
-      const response = await fetch(`http://localhost:3000${endpoint}`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
