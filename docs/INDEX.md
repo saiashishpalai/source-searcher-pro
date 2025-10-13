@@ -40,6 +40,8 @@ Implementation tracking and migration guides.
 ### ✨ [features/](./features/)
 Feature-specific documentation.
 
+- **SLACK_INTEGRATION_GUIDE.md** - Complete Slack integration guide
+- **SLACK_INTEGRATION_SUMMARY.md** - Slack integration summary
 - **NOTION_INTEGRATION_COMPLETE.md** - Notion integration guide
 - **SEARCH_IMPROVEMENTS_README.md** - Search feature improvements
 - **SEARCH_RESULTS_README.md** - Search results implementation
@@ -48,12 +50,18 @@ Feature-specific documentation.
 Initial setup and getting started guides.
 
 - **QUICK_START.md** - Quick start guide for the project
+- **SLACK_QUICKSTART.md** - Fast Slack setup guide
 - **LOVABLE_ENV_SETUP.md** - Environment setup for Lovable
 
 ### 📖 [guides/](./guides/)
 Additional guides and utilities.
 
 - **REGENERATE_SUMMARY_GUIDE.md** - Guide for regenerating summaries
+
+### 📋 Project Management
+Project status and next steps.
+
+- **NEXT_STEPS.md** - Current status and upcoming tasks
 
 ---
 
