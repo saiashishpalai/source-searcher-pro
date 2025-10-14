@@ -511,7 +511,7 @@ const SearchInterface = () => {
       };
       
       // Call real search API
-      const response = await fetch('http://localhost:3000/api/search', {
+      const response = await fetch('https://localhost:3000/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -723,7 +723,7 @@ const SearchInterface = () => {
 
     try {
       const qa = conversationThread[qaIndex];
-      const response = await fetch('http://localhost:3000/api/regenerate-summary', {
+      const response = await fetch('https://localhost:3000/api/regenerate-summary', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -791,7 +791,7 @@ const SearchInterface = () => {
         try {
           console.log('🔍 Follow-up search within', currentSearchDocumentIds.length, 'documents');
           
-          const response = await fetch('http://localhost:3000/api/search/followup', {
+          const response = await fetch('https://localhost:3000/api/search/followup', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

@@ -618,7 +618,7 @@ const ConnectedSources = () => {
     try {
       // Build OAuth URLs - redirect to API server for callback
       // Use VITE_API_URL which can be set to ngrok URL for local dev with HTTPS
-      const apiUrl = getEnvVar('VITE_API_URL') || 'http://localhost:3000';
+      const apiUrl = getEnvVar('VITE_API_URL') || 'https://localhost:3000';
       const redirectUri = `${apiUrl}/api/auth/${sourceId === 'googleDrive' ? 'google' : sourceId}/callback`;
       
       if (sourceId === 'googleDrive') {
@@ -734,7 +734,7 @@ const ConnectedSources = () => {
     console.log(`🗑️ Clearing data for ${sourceType}...`);
     
     try {
-      const response = await fetch('http://localhost:3000/api/clear-data', {
+      const response = await fetch('https://localhost:3000/api/clear-data', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
