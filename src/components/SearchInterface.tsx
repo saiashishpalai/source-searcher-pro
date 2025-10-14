@@ -542,17 +542,30 @@ const SearchInterface = () => {
       const results = await response.json();
       
       // Apply filters to results if any are selected
-      if (filters.applications.length > 0 || filters.authors.length > 0 || filters.documentTypes.length > 0) {
-        const filteredResults = results.results.filter((result: any) => {
-          const matchesApplication = filters.applications.length === 0 || filters.applications.includes(result.source);
-          const matchesAuthor = filters.authors.length === 0 || filters.authors.includes(result.author);
-          const matchesType = filters.documentTypes.length === 0 || filters.documentTypes.includes(result.type);
-          return matchesApplication && matchesAuthor && matchesType;
-        });
-        
-        results.results = filteredResults;
-        results.totalResults = filteredResults.length;
+      let filteredResults = results.results;
+      
+      if (filters.applications.length > 0) {
+        filteredResults = filteredResults.filter((result: any) => 
+          filters.applications.includes(result.source)
+        );
       }
+      
+      if (filters.documentTypes.length > 0) {
+        filteredResults = filteredResults.filter((result: any) => 
+          filters.documentTypes.includes(result.type)
+        );
+      }
+      
+      // Apply author filter only if authors are selected (skip for now as requested)
+      if (filters.authors.length > 0) {
+        filteredResults = filteredResults.filter((result: any) => 
+          filters.authors.includes(result.author)
+        );
+      }
+      
+      // Update results with filtered data
+      results.results = filteredResults;
+      results.totalResults = filteredResults.length;
       
       setSearchResults(results);
       
@@ -697,12 +710,19 @@ const SearchInterface = () => {
   // Search results handlers
   const handleSearchResultClick = (result: any) => {
     console.log('Search result clicked:', result);
-    // In a real app, this would:
-    // 1. Open the source document in a new tab
-    // 2. Show a preview modal
-    // 3. Navigate to a detailed view
-    // 4. Or continue the conversation with context
-    alert(`Opening ${result.title} from ${result.source}`);
+    
+    // Skip Slack for now
+    if (result.source === 'Slack') {
+      console.log('Slack results will be handled later');
+      return;
+    }
+    
+    // Open Notion or Google Drive documents in a new tab
+    if (result.url) {
+      window.open(result.url, '_blank', 'noopener,noreferrer');
+    } else {
+      console.warn('No URL found for result:', result);
+    }
   };
 
   const handleSearchRetry = async () => {
@@ -1652,6 +1672,10 @@ const SearchInterface = () => {
                       isRegeneratingSummary={isRegenerating[index]}
                       canRegenerateSummary={!summaryVersions[index] || summaryVersions[index].length < 2}
                       isClosedThread={false}
+                      parentFilters={{
+                        applications: filters.applications,
+                        documentTypes: filters.documentTypes
+                      }}
                     />
                   </div>
                 ))}
@@ -1769,6 +1793,10 @@ const SearchInterface = () => {
                   hasMore={false}
                   summaryVersions={summaryVersions[index]}
                   isClosedThread={true}
+                  parentFilters={{
+                    applications: filters.applications,
+                    documentTypes: filters.documentTypes
+                  }}
                 />
               </div>
             ))}

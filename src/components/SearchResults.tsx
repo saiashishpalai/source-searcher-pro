@@ -1,11 +1,9 @@
 
 
-import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Filter, SortAsc, SortDesc, Loader2, RefreshCw, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AISummary from './AISummary';
 import SourceSection from './SourceSection';
 import ResultCard from './ResultCard';
@@ -50,6 +48,11 @@ interface SearchResultsProps {
   isRegeneratingSummary?: boolean;
   canRegenerateSummary?: boolean;
   isClosedThread?: boolean;
+  // Filter props from parent
+  parentFilters?: {
+    applications?: string[];
+    documentTypes?: string[];
+  };
 }
 
 const SearchResults: React.FC<SearchResultsProps> = ({
@@ -63,13 +66,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   onRegenerateSummary,
   isRegeneratingSummary = false,
   canRegenerateSummary = true,
-  isClosedThread = false
+  isClosedThread = false,
+  parentFilters
 }) => {
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set(['Slack', 'Google Drive', 'Notion']));
-  const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'source'>('relevance');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [sourceFilter, setSourceFilter] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Get filters from parent
+  const sourceFilter = parentFilters?.applications || [];
+  const typeFilter = parentFilters?.documentTypes || [];
 
   // Group results by source
   const groupedResults = data.results.reduce((acc, result) => {
@@ -80,32 +84,46 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     return acc;
   }, {} as Record<string, SearchResult[]>);
 
-  // Sort results within each group
-  const sortResults = (results: SearchResult[]) => {
-    return [...results].sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'relevance':
-          comparison = b.relevanceScore - a.relevanceScore;
-          break;
-        case 'date':
-          comparison = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-          break;
-        case 'source':
-          comparison = a.source.localeCompare(b.source);
-          break;
-      }
-      
-      return sortOrder === 'asc' ? -comparison : comparison;
-    });
+  // Helper function to normalize source names for comparison
+  const normalizeSourceName = (source: string): string => {
+    return source
+      .replace(/_/g, ' ')  // Replace underscores with spaces
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
-  // Filter and sort results
+  // Helper function to get display name for source
+  const getSourceDisplayName = (source: string): string => {
+    const normalized = normalizeSourceName(source);
+    // Handle special cases
+    const displayNames: Record<string, string> = {
+      'Google Drive': 'Google Drive',
+      'Notion': 'Notion',
+      'Slack': 'Slack'
+    };
+    return displayNames[normalized] || normalized;
+  };
+
+  // Filter results
   const filteredResults = Object.entries(groupedResults)
-    .filter(([source]) => sourceFilter.length === 0 || sourceFilter.includes(source))
+    .filter(([source]) => {
+      if (sourceFilter.length === 0) return true;
+      
+      // Normalize both the source and filter values for comparison
+      const normalizedSource = normalizeSourceName(source);
+      return sourceFilter.some(filter => 
+        normalizeSourceName(filter) === normalizedSource
+      );
+    })
     .reduce((acc, [source, results]) => {
-      acc[source] = sortResults(results);
+      // Filter by type if type filter is active
+      let filteredSourceResults = results;
+      if (typeFilter.length > 0) {
+        filteredSourceResults = results.filter(result => typeFilter.includes(result.type));
+      }
+      
+      acc[source] = filteredSourceResults;
       return acc;
     }, {} as Record<string, SearchResult[]>);
 
@@ -120,8 +138,6 @@ const SearchResults: React.FC<SearchResultsProps> = ({
       return newSet;
     });
   };
-
-  const clearSourceFilter = () => setSourceFilter([]);
 
   const totalFilteredResults = Object.values(filteredResults).reduce((sum, results) => sum + results.length, 0);
 
@@ -170,87 +186,6 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         canRegenerate={canRegenerateSummary}
         isClosedThread={isClosedThread}
       />
-
-      {/* Controls Section */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-4">
-        {/* Left side - Filters and Search */}
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Source Filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <div className="flex gap-2">
-              {['Slack', 'Google Drive', 'Notion'].map((source) => (
-                <Button
-                  key={source}
-                  variant={sourceFilter.includes(source) ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setSourceFilter(prev => 
-                      prev.includes(source) 
-                        ? prev.filter(s => s !== source)
-                        : [...prev, source]
-                    );
-                  }}
-                  className="h-8 text-xs"
-                >
-                  {source}
-                  {sourceFilter.includes(source) && (
-                    <X className="w-3 h-3 ml-1" />
-                  )}
-                </Button>
-              ))}
-              {sourceFilter.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearSourceFilter}
-                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right side - Sort and Results count */}
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-muted-foreground">
-            {totalFilteredResults} result{totalFilteredResults !== 1 ? 's' : ''}
-            {sourceFilter.length > 0 && (
-              <span className="ml-1">
-                from {sourceFilter.join(', ')}
-              </span>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-              <SelectTrigger className="w-32 h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="relevance">Relevance</SelectItem>
-                <SelectItem value="date">Date</SelectItem>
-                <SelectItem value="source">Source</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-              className="h-8 w-8 p-0"
-            >
-              {sortOrder === 'asc' ? (
-                <SortAsc className="w-4 h-4" />
-              ) : (
-                <SortDesc className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
 
       {/* Results Sections */}
       <div className="space-y-6">

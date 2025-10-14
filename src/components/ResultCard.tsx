@@ -12,6 +12,17 @@ interface ResultCardProps {
 }
 
 const ResultCard: React.FC<ResultCardProps> = ({ result, onClick, index = 0 }) => {
+  // Helper function to normalize source names for display
+  const normalizeSourceName = (source: string): string => {
+    return source
+      .replace(/_/g, ' ')  // Replace underscores with spaces
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  const displaySource = normalizeSourceName(result.source);
+
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -103,10 +114,10 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onClick, index = 0 }) =
         <div className="flex items-center gap-2 flex-wrap">
           <Badge 
             variant="outline" 
-            className={`text-xs font-medium ${getSourceColor(result.source)}`}
+            className={`text-xs font-medium ${getSourceColor(displaySource)}`}
           >
-            <span className="mr-1">{getSourceIcon(result.source)}</span>
-            {result.source}
+            <span className="mr-1">{getSourceIcon(displaySource)}</span>
+            {displaySource}
           </Badge>
           
           <Badge 

@@ -23,6 +23,17 @@ const SourceSection: React.FC<SourceSectionProps> = ({
   onResultClick,
   animationDelay = 0
 }) => {
+  // Helper function to normalize source names for display
+  const normalizeSourceName = (source: string): string => {
+    return source
+      .replace(/_/g, ' ')  // Replace underscores with spaces
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  const displaySource = normalizeSourceName(source);
+
   const getSourceIcon = (source: string) => {
     switch (source) {
       case 'Slack':
@@ -69,7 +80,7 @@ const SourceSection: React.FC<SourceSectionProps> = ({
     }
   };
 
-  const colors = getSourceColor(source);
+  const colors = getSourceColor(displaySource);
 
   return (
     <div 
@@ -91,13 +102,13 @@ const SourceSection: React.FC<SourceSectionProps> = ({
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${colors.bg} ${colors.border} border`}>
             <span className={colors.text}>
-              {getSourceIcon(source)}
+              {getSourceIcon(displaySource)}
             </span>
           </div>
           
           <div>
             <h3 className="font-semibold text-foreground">
-              {source}
+              {displaySource}
             </h3>
             <p className="text-sm text-muted-foreground">
               {results.length} result{results.length !== 1 ? 's' : ''}
