@@ -279,12 +279,7 @@ const SearchInterface = () => {
   const [editTitle, setEditTitle] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [recentSearches, setRecentSearches] = useState([
-    'Q3 performance metrics',
-    'Team standup notes',
-    'Product roadmap draft',
-    'Profile feedback analysis',
-  ]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   // Fetch profile data for avatar
   useEffect(() => {
@@ -321,6 +316,54 @@ const SearchInterface = () => {
     return () => {
       window.removeEventListener('profileUpdated', handleProfileUpdate);
     };
+  }, [user]);
+
+  // Fetch recent searches from database
+  const fetchRecentSearches = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('search_queries')
+        .select('query')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (!error && data) {
+        const searches = data.map(item => item.query);
+        setRecentSearches(searches);
+      }
+    } catch (error) {
+      console.error('Error fetching recent searches:', error);
+    }
+  };
+
+  // Save search query to database
+  const saveSearchQuery = async (query: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('search_queries')
+        .insert({
+          user_id: user.id,
+          query: query,
+          results_count: 0, // Will be updated when we get actual results
+          response_time: null
+        });
+
+      if (error) {
+        console.error('Error saving search query:', error);
+      }
+    } catch (error) {
+      console.error('Error saving search query:', error);
+    }
+  };
+
+  // Load recent searches on mount
+  useEffect(() => {
+    fetchRecentSearches();
   }, [user]);
 
   // Load threads from database on mount
@@ -463,8 +506,29 @@ const SearchInterface = () => {
     sort: useRef<HTMLDivElement>(null)
   };
 
-  const handleRemoveRecentSearch = (index: number) => {
-    setRecentSearches(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveRecentSearch = async (index: number) => {
+    if (!user) return;
+    
+    const searchToRemove = recentSearches[index];
+    if (!searchToRemove) return;
+    
+    try {
+      // Remove from database
+      const { error } = await supabase
+        .from('search_queries')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('query', searchToRemove);
+
+      if (error) {
+        console.error('Error removing search query:', error);
+      } else {
+        // Update local state
+        setRecentSearches(prev => prev.filter((_, i) => i !== index));
+      }
+    } catch (error) {
+      console.error('Error removing search query:', error);
+    }
   };
 
   const connectedSources = [
@@ -579,11 +643,11 @@ const SearchInterface = () => {
       // Initialize summary versions for the first Q&A
       setSummaryVersions({ 0: [results.aiSummary] });
       
-      // Add to recent searches if not already there (FIFO - limit to 6)
-      setRecentSearches(prev => {
-        const newSearches = [searchValue, ...prev.filter(s => s !== searchValue)];
-        return newSearches.slice(0, 6); // Keep only last 6 searches
-      });
+      // Save search query to database
+      await saveSearchQuery(searchValue);
+      
+      // Refresh recent searches from database
+      await fetchRecentSearches();
     } catch (error) {
       setSearchError('Failed to load search results. Please try again.');
       console.error('Search error:', error);
@@ -2197,7 +2261,8 @@ const SearchInterface = () => {
         <div className="space-y-6 animate-fade-in" style={{ animationDelay: '0.3s' }}>
           <p className="text-sm text-muted-foreground/80 font-medium">Recent searches</p>
           <div className="flex flex-wrap gap-3">
-            {recentSearches.map((search, index) => (
+            {recentSearches.length > 0 ? (
+              recentSearches.map((search, index) => (
               <div
                 key={index}
                 className="group relative px-5 py-3 bg-secondary/60 text-secondary-foreground rounded-full cursor-pointer hover:bg-secondary/80 hover:scale-105 transition-all duration-300 text-sm font-medium border border-border/30 hover:border-border/60 backdrop-blur-sm animate-fade-in"
@@ -2215,7 +2280,10 @@ const SearchInterface = () => {
                   ×
                 </button>
               </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground/60 italic">No recent searches yet</p>
+            )}
           </div>
         </div>
 
