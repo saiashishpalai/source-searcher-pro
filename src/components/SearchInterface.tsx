@@ -1729,7 +1729,7 @@ const SearchInterface = () => {
                       data={qa}
                       isLoading={false}
                       onResultClick={handleSearchResultClick}
-                      onRetry={handleSearchRetry}
+                      onRetry={index === 0 ? handleSearchRetry : undefined}
                       hasMore={false}
                       summaryVersions={summaryVersions[index]}
                       onRegenerateSummary={() => handleRegenerateSummary(index)}
