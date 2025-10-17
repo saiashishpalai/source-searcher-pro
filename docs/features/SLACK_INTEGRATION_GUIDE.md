@@ -268,10 +268,10 @@ Backend:
   5. For each conversation (max 20):
      a. Fetch messages from last 30 days (max 100 per channel)
      b. For messages with threads: fetch thread replies
-     c. Combine parent + threads into single document
+     c. **NEW: Message-level chunking with thread context**
      d. Format with timestamps and usernames
   6. Store as documents in 'documents' table
-  7. Chunk content (1500 chars per chunk, max 5 chunks)
+  7. **NEW: Create individual chunks per message with thread context**
   8. Generate embeddings via OpenAI
   9. Store chunks in 'document_chunks' table
   ↓
@@ -314,14 +314,21 @@ Frontend displays sync results
   document_id: UUID
   user_id: UUID
   chunk_index: INTEGER
-  content: TEXT (chunk of messages)
+  content: TEXT (individual message with thread context)
   token_count: INTEGER
   embedding: VECTOR(1536) -- OpenAI embedding
   metadata: {
     source_type: 'slack'
-    title: '#general - Oct 1-13, 2025'
+    chunk_type: 'message_with_thread'
     channel_name: '#general'
     channel_type: 'public_channel'
+    timestamp: '2025-10-15T10:30:00Z'
+    author: 'john.doe'
+    participants: ['john.doe', 'jane.smith']
+    has_thread: true
+    reply_count: 3
+    message_type: 'question'
+    parent_message: 'What is the status on the payment feature?'
   }
 }
 ```
@@ -538,7 +545,7 @@ SYNC_LIMITS: {
   MAX_MESSAGES_PER_CHANNEL: 100, // 100 messages per channel
   MESSAGE_DAYS_BACK: 30,         // Last 30 days only
   MAX_TEXT_LENGTH: 15000,        // ~4000 tokens max
-  MAX_CHUNKS_PER_DOC: 5,         // 5 chunks max per conversation
+  // NEW: Message-level chunking (no fixed chunks per doc)
   CHUNK_SIZE: 1500,              // ~400 tokens per chunk
   CHUNK_OVERLAP: 200,            // Overlap to prevent splitting
 }
@@ -549,6 +556,43 @@ To adjust these limits:
 2. Modify the `SYNC_LIMITS` object
 3. Restart the server
 4. Re-sync your Slack data
+
+---
+
+## 🧠 **Message-Level Chunking Strategy**
+
+### **NEW: Enhanced Chunking with Thread Context**
+
+Instead of the old channel-based chunking, we now use **message-level chunking with thread context**:
+
+#### **How It Works:**
+1. **Individual Message Chunks**: Each message becomes its own chunk
+2. **Thread Context**: Parent messages include relevant thread replies
+3. **Smart Thread Handling**: 
+   - **Short threads (≤5 replies)**: Include all replies in parent chunk
+   - **Long threads (>5 replies)**: Include most relevant 4 replies
+4. **Rich Metadata**: Each chunk includes channel, participants, thread info
+
+#### **Example Chunk:**
+```
+Content: "John: What's the status on the payment feature?
+└─ Jane: We're blocked on the API integration
+└─ John: Should be done by Friday"
+
+Metadata: {
+  channel_name: '#product-eng',
+  has_thread: true,
+  reply_count: 2,
+  participants: ['john', 'jane'],
+  message_type: 'question'
+}
+```
+
+#### **Benefits:**
+- ✅ **Preserves Context**: Questions and answers stay together
+- ✅ **Better Search**: Find specific conversations, not just channels  
+- ✅ **Thread Awareness**: Understand who said what and when
+- ✅ **Rich Metadata**: Channel names, participants, message types
 
 ---
 

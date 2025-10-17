@@ -94,7 +94,7 @@ User clicks "Sync Documents"
   ↓
 Backend fetches messages via Slack API
   ↓
-Formats & chunks messages
+Formats & chunks messages (NEW: message-level with thread context)
   ↓
 Generates embeddings via OpenAI
   ↓
@@ -174,12 +174,19 @@ Results include Slack messages!
 - ✅ Safety limits (20 channels, 100 msgs)
 
 ### Search & Embeddings
-- ✅ Text chunking (1500 chars, 200 overlap)
+- ✅ **NEW: Message-level chunking with thread context**
 - ✅ OpenAI embedding generation
 - ✅ Vector similarity search
 - ✅ Cross-source search (Slack + Drive + Notion)
 - ✅ Relevance scoring
 - ✅ Source attribution
+
+#### **NEW: Enhanced Chunking Strategy**
+- **Individual Message Chunks**: Each message becomes its own chunk
+- **Thread Context**: Parent messages include relevant thread replies
+- **Smart Thread Handling**: Short threads (≤5) include all replies, long threads include top 4
+- **Rich Metadata**: Channel names, participants, thread info, message types
+- **Better Context**: Questions and answers stay together for better search results
 
 ### UI/UX
 - ✅ Slack icon and branding
@@ -200,7 +207,7 @@ MAX_CHANNELS: 20              // Process max 20 conversations
 MAX_MESSAGES_PER_CHANNEL: 100 // 100 messages per channel
 MESSAGE_DAYS_BACK: 30         // Last 30 days only
 MAX_TEXT_LENGTH: 15000        // ~4000 tokens max
-MAX_CHUNKS_PER_DOC: 5         // 5 chunks max
+// NEW: Message-level chunking (no fixed chunks per doc)
 CHUNK_SIZE: 1500              // ~400 tokens
 CHUNK_OVERLAP: 200            // Prevent sentence splitting
 ```
