@@ -1853,7 +1853,7 @@ const SearchInterface = () => {
                   data={qa}
                   isLoading={false}
                   onResultClick={handleSearchResultClick}
-                  onRetry={handleSearchRetry}
+                  onRetry={undefined}
                   hasMore={false}
                   summaryVersions={summaryVersions[index]}
                   isClosedThread={true}
