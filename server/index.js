@@ -23,7 +23,7 @@ const API_BASE_URL = process.env.API_BASE_URL || `https://localhost:${PORT}`;
 
 
 app.use(cors({ 
-  origin: ['https://localhost:8080', 'http://localhost:8080', 'http://localhost:8083'],
+  origin: ['https://localhost:8080', 'http://localhost:8080', 'http://localhost:8083', 'https://localhost:8081', 'http://localhost:8081'],
   credentials: true 
 }));
 app.use(express.json());
@@ -42,6 +42,55 @@ const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Test endpoint to check Slack file access
+app.get('/api/test/slack-file-access', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    // Get user's Slack access token
+    const { data: userSource, error: sourceError } = await supabaseAdmin
+      .from('user_sources')
+      .select('access_token')
+      .eq('user_id', userId)
+      .eq('source_type', 'slack')
+      .eq('is_connected', true)
+      .single();
+
+    if (sourceError || !userSource) {
+      return res.status(404).json({ 
+        error: 'Slack not connected for this user',
+        details: sourceError?.message 
+      });
+    }
+
+    // Test file access
+    const fileAccessResult = await slackSync.testRemoteFileAccess(
+      new (await import('@slack/web-api')).WebClient(userSource.access_token)
+    );
+
+    res.json({
+      success: fileAccessResult.success,
+      message: fileAccessResult.success 
+        ? `Remote files access confirmed: ${fileAccessResult.fileCount} files accessible`
+        : `Remote files access failed: ${fileAccessResult.error}`,
+      fileCount: fileAccessResult.fileCount,
+      files: fileAccessResult.files,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Slack file access test error:', error);
+    res.status(500).json({ 
+      error: 'Failed to test Slack file access',
+      details: error.message 
+    });
+  }
 });
 
 // Test endpoint to check Notion connection

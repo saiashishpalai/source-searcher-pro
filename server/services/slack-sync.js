@@ -118,6 +118,66 @@ export class SlackSync {
   }
 
   /**
+   * Test remote files access after scope installation
+   */
+  async testRemoteFileAccess(slack) {
+    try {
+      console.log('🔍 Testing remote_files:read scope...');
+      
+      // Test 1: List recent files
+      const filesResult = await slack.files.list({
+        count: 5,
+        types: 'all'
+      });
+      
+      console.log(`📁 Found ${filesResult.files?.length || 0} files accessible`);
+      
+      if (filesResult.files && filesResult.files.length > 0) {
+        const sampleFile = filesResult.files[0];
+        console.log('📄 Sample file:', {
+          name: sampleFile.name,
+          type: sampleFile.filetype,
+          size: sampleFile.size,
+          hasUrl: !!sampleFile.url_private,
+          hasThumbnail: !!sampleFile.thumb_64
+        });
+      }
+      
+      // Test 2: Try to access file info
+      if (filesResult.files && filesResult.files.length > 0) {
+        const testFile = filesResult.files[0];
+        try {
+          const fileInfo = await slack.files.info({ file: testFile.id });
+          console.log('✅ File info access successful:', fileInfo.file.name);
+        } catch (infoError) {
+          console.log('⚠️ File info access failed:', infoError.message);
+        }
+      }
+      
+      return {
+        success: true,
+        fileCount: filesResult.files?.length || 0,
+        files: filesResult.files?.map(f => ({
+          id: f.id,
+          name: f.name,
+          type: f.filetype,
+          size: f.size,
+          hasUrl: !!f.url_private
+        })) || []
+      };
+      
+    } catch (error) {
+      console.error('❌ Remote files access test failed:', error.message);
+      return {
+        success: false,
+        error: error.message,
+        fileCount: 0,
+        files: []
+      };
+    }
+  }
+
+  /**
    * Build a user map for quick lookup
    */
   async buildUserMap(slack) {
@@ -164,17 +224,27 @@ export class SlackSync {
   }
 
   /**
-   * Sync Slack messages for a user with SAFETY LIMITS
+   * Sync Slack messages with MESSAGE-LEVEL CHUNKING and thread context
    */
   async syncSlack(userId, accessToken) {
     try {
-      console.log(`🔄 Starting Slack sync for user ${userId} with safety limits`);
-      console.log(`📊 Limits: Max ${this.SYNC_LIMITS.MAX_CHANNELS} channels, ${this.SYNC_LIMITS.MAX_MESSAGES_PER_CHANNEL} messages/channel, last ${this.SYNC_LIMITS.MESSAGE_DAYS_BACK} days`);
+      console.log(`🔄 Starting Slack sync with MESSAGE-LEVEL CHUNKING for user ${userId}`);
+      console.log(`📊 Limits: Max ${this.SYNC_LIMITS.MAX_CHANNELS} conversations, ${this.SYNC_LIMITS.MAX_MESSAGES_PER_CHANNEL} messages/conversation, last ${this.SYNC_LIMITS.MESSAGE_DAYS_BACK} days`);
 
       // Initialize Slack client
       const slack = new WebClient(accessToken);
       
-      console.log('✓ Slack client initialized, fetching conversations...');
+      console.log('✓ Slack client initialized');
+      
+      // Test remote files access
+      const fileAccessTest = await this.testRemoteFileAccess(slack);
+      if (fileAccessTest.success) {
+        console.log(`✅ Remote files access confirmed: ${fileAccessTest.fileCount} files accessible`);
+      } else {
+        console.log(`⚠️ Remote files access test failed: ${fileAccessTest.error}`);
+      }
+      
+      console.log('📱 Fetching conversations...');
 
       // Calculate timestamp for X days ago
       const daysAgo = Math.floor(Date.now() / 1000) - (this.SYNC_LIMITS.MESSAGE_DAYS_BACK * 24 * 60 * 60);
@@ -202,11 +272,23 @@ export class SlackSync {
       // Build user map for message formatting
       const userMap = await this.buildUserMap(slack);
 
-      const processedDocs = [];
-      const syncDetails = [];
-      let processedCount = 0;
+      // NEW: Track detailed statistics
+      const syncStats = {
+        totalConversations: conversations.length,
+        processedConversations: 0,
+        totalMessages: 0,
+        totalChunks: 0,
+        channels: 0,
+        dms: 0,
+        groupDms: 0,
+        conversationsWithThreads: 0,
+        conversationsWithFiles: 0
+      };
 
-      // Process each conversation
+      const syncDetails = [];
+      let totalChunksCreated = 0;
+
+      // Process each conversation with MESSAGE-LEVEL CHUNKING
       for (let i = 0; i < conversations.length; i++) {
         const conversation = conversations[i];
         const channelInfo = await this.getChannelInfo(slack, conversation.id, conversation.conversation_type || 'channel');
@@ -221,106 +303,509 @@ export class SlackSync {
             console.log(`  ⊘ Skipped (no recent messages)`);
             syncDetails.push({ 
               name: channelInfo.name, 
+              type: channelInfo.type,
               status: 'skipped', 
-              reason: 'No recent messages' 
+              reason: 'No recent messages',
+              messages: 0,
+              chunks: 0
             });
             continue;
           }
           
           console.log(`  → Found ${messages.length} messages`);
+          syncStats.totalMessages += messages.length;
           
-          // Format messages into readable text
-          const messageText = messages.map(msg => this.formatMessage(msg, userMap)).join('\n\n');
+          // NEW: Create message-level chunks with thread context
+          const messageChunks = await this.createMessageLevelChunks(messages, channelInfo, userMap, conversation);
           
-          if (messageText.length < 50) {
-            console.log(`  ⊘ Skipped (too short: ${messageText.length} chars)`);
+          if (messageChunks.length === 0) {
+            console.log(`  ⊘ Skipped (no valid message chunks created)`);
             syncDetails.push({ 
               name: channelInfo.name, 
+              type: channelInfo.type,
               status: 'skipped', 
-              reason: 'Content too short' 
+              reason: 'No valid chunks',
+              messages: messages.length,
+              chunks: 0
             });
             continue;
           }
           
-          // Calculate date range
-          const oldestMsg = messages[messages.length - 1];
-          const newestMsg = messages[0];
-          const dateRange = `${new Date(parseFloat(oldestMsg.ts) * 1000).toLocaleDateString()} - ${new Date(parseFloat(newestMsg.ts) * 1000).toLocaleDateString()}`;
+          console.log(`  📝 Created ${messageChunks.length} message-level chunks`);
+          syncStats.totalChunks += messageChunks.length;
+          totalChunksCreated += messageChunks.length;
           
-          const title = `${channelInfo.name} - ${dateRange}`;
-          
-          // Store document
-          const { data: doc, error: docError } = await this.supabaseAdmin
-            .from('documents')
-            .upsert({
-              user_id: userId,
-              source_type: 'slack',
-              source_id: conversation.id,
-              title,
-              content: messageText,
-              url: `slack://channel?team=${conversation.context_team_id || ''}&id=${conversation.id}`,
-              author: 'Slack Workspace',
-              metadata: {
-                channel_name: channelInfo.name,
-                channel_type: channelInfo.type,
-                message_count: messages.length,
-                date_range: dateRange,
-                oldest_message: oldestMsg.ts,
-                newest_message: newestMsg.ts,
-              },
-              last_modified_at: new Date(parseFloat(newestMsg.ts) * 1000).toISOString(),
-              synced_at: new Date().toISOString(),
-            }, { onConflict: 'user_id,source_type,source_id' })
-            .select()
-            .single();
-          
-          if (docError) {
-            console.error(`  ❌ Database error:`, docError);
-            syncDetails.push({ 
-              name: channelInfo.name, 
-              status: 'failed', 
-              reason: 'Database error' 
-            });
-            continue;
+          // Store each message chunk as a separate document
+          let chunksStored = 0;
+          for (const chunk of messageChunks) {
+            try {
+              await this.storeMessageChunk(userId, chunk);
+              chunksStored++;
+            } catch (error) {
+              console.error(`  ❌ Failed to store chunk:`, error.message);
+            }
           }
           
-          // Process document into chunks and embeddings
-          await this.processDocument(doc);
+          // Update conversation type statistics
+          if (channelInfo.type === 'public_channel' || channelInfo.type === 'private_channel') {
+            syncStats.channels++;
+          } else if (channelInfo.type === 'dm') {
+            syncStats.dms++;
+          } else if (channelInfo.type === 'group_dm') {
+            syncStats.groupDms++;
+          }
           
-          processedDocs.push(doc);
-          processedCount++;
+          // Check for threads and files
+          const hasThreads = messages.some(msg => msg.thread_ts && msg.thread_ts === msg.ts);
+          const hasFiles = messages.some(msg => msg.files && msg.files.length > 0);
           
-          console.log(`  ✅ Synced successfully`);
+          if (hasThreads) syncStats.conversationsWithThreads++;
+          if (hasFiles) syncStats.conversationsWithFiles++;
+          
+          syncStats.processedConversations++;
+          
+          console.log(`  ✅ Synced successfully: ${chunksStored} chunks stored`);
           syncDetails.push({ 
             name: channelInfo.name, 
+            type: channelInfo.type,
             status: 'success',
             messages: messages.length,
-            chunks: doc.chunks_count || 0
+            chunks: chunksStored,
+            hasThreads,
+            hasFiles
           });
           
         } catch (error) {
           console.error(`  ❌ Failed to process ${channelInfo.name}:`, error.message);
           syncDetails.push({ 
             name: channelInfo.name, 
+            type: channelInfo.type,
             status: 'failed', 
-            reason: error.message 
+            reason: error.message,
+            messages: 0,
+            chunks: 0
           });
         }
       }
 
-      console.log(`\n🎉 Slack sync complete: ${processedCount} of ${conversations.length} conversations processed`);
+      console.log(`\n🎉 MESSAGE-LEVEL CHUNKING sync complete!`);
+      console.log(`📊 Statistics:`);
+      console.log(`   • Conversations processed: ${syncStats.processedConversations}/${syncStats.totalConversations}`);
+      console.log(`   • Total messages: ${syncStats.totalMessages}`);
+      console.log(`   • Total chunks created: ${totalChunksCreated}`);
+      console.log(`   • Channels: ${syncStats.channels}, DMs: ${syncStats.dms}, Group DMs: ${syncStats.groupDms}`);
+      console.log(`   • Conversations with threads: ${syncStats.conversationsWithThreads}`);
+      console.log(`   • Conversations with files: ${syncStats.conversationsWithFiles}`);
       
       return {
-        synced: processedCount,
-        total: conversations.length,
+        synced: syncStats.processedConversations,
+        total: syncStats.totalConversations,
+        totalMessages: syncStats.totalMessages,
+        totalChunks: totalChunksCreated,
+        statistics: syncStats,
         details: syncDetails,
-        message: `Successfully synced ${processedCount} of ${conversations.length} Slack conversations`
+        message: `Successfully created ${totalChunksCreated} message-level chunks from ${syncStats.totalMessages} messages across ${syncStats.processedConversations} conversations`
       };
 
     } catch (error) {
       console.error('❌ Slack sync failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Create message-level chunks with thread context (Option 1: Combined chunks)
+   */
+  async createMessageLevelChunks(messages, channelInfo, userMap, conversation) {
+    const chunks = [];
+    
+    // Filter out thread replies (we'll handle them with their parent messages)
+    const parentMessages = messages.filter(msg => !msg.thread_ts || msg.thread_ts === msg.ts);
+    
+    console.log(`    📝 Processing ${parentMessages.length} parent messages into chunks`);
+    
+    for (const message of parentMessages) {
+      try {
+        const chunk = await this.createChunkFromMessage(message, channelInfo, userMap, conversation);
+        if (chunk) {
+          chunks.push(chunk);
+        }
+      } catch (error) {
+        console.error(`    ❌ Failed to create chunk from message:`, error.message);
+      }
+    }
+    
+    return chunks;
+  }
+
+  /**
+   * Create a single chunk from a message and its thread context
+   */
+  async createChunkFromMessage(message, channelInfo, userMap, conversation) {
+    const userName = userMap[message.user] || 'Unknown User';
+    const timestamp = new Date(parseFloat(message.ts) * 1000);
+    const messageText = message.text || '';
+    
+    // Skip messages without content
+    if (!messageText.trim()) {
+      return null;
+    }
+
+    let chunkContent = '';
+    let threadMetadata = {
+      has_thread: false,
+      reply_count: 0,
+      participants: new Set([userName])
+    };
+
+    // Build chunk content with thread context
+    chunkContent += `${userName}: ${messageText}`;
+    
+    // Handle thread replies (Option 1: Include thread replies in parent message chunk)
+    if (message.thread_messages && message.thread_messages.length > 0) {
+      threadMetadata.has_thread = true;
+      threadMetadata.reply_count = message.thread_messages.length;
+      
+      // Apply your recommendation: combine if <5 replies, limit if more
+      const repliesToInclude = message.thread_messages.length <= 5 
+        ? message.thread_messages 
+        : this.selectMostRelevantReplies(message.thread_messages, 4);
+      
+      chunkContent += '\n\n';
+      
+      for (const reply of repliesToInclude) {
+        const replyUser = userMap[reply.user] || 'Unknown User';
+        const replyText = reply.text || '';
+        
+        chunkContent += `└─ ${replyUser}: ${replyText}\n`;
+        threadMetadata.participants.add(replyUser);
+      }
+      
+      // Add indicator if thread was truncated
+      if (message.thread_messages.length > 5) {
+        chunkContent += `└─ ... ${message.thread_messages.length - 4} more replies`;
+      }
+    }
+
+    // Check chunk size limit
+    if (chunkContent.length > this.SYNC_LIMITS.MAX_TEXT_LENGTH) {
+      chunkContent = this.truncateChunkContent(chunkContent, messageText, userName);
+    }
+
+    return {
+      content: chunkContent.trim(),
+      metadata: {
+        source_type: 'slack',
+        chunk_type: 'message_with_thread',
+        message_id: message.ts,
+        parent_message: messageText,
+        channel_name: channelInfo.name,
+        channel_type: channelInfo.type,
+        timestamp: timestamp.toISOString(),
+        author: userName,
+        participants: Array.from(threadMetadata.participants),
+        has_thread: threadMetadata.has_thread,
+        reply_count: threadMetadata.reply_count,
+        thread_id: message.thread_ts || message.ts,
+        url: this.buildSlackUrl(channelInfo, message.ts, conversation),
+        attachments: message.attachments?.length > 0,
+        reactions: message.reactions || [],
+        // Enhanced semantic metadata
+        conversation_topic: this.extractConversationTopic(messageText),
+        message_type: this.detectMessageType(messageText),
+        urgency_indicators: this.detectUrgency(messageText),
+      }
+    };
+  }
+
+  /**
+   * Select most relevant thread replies (by reactions, recency, length)
+   */
+  selectMostRelevantReplies(replies, limit) {
+    // Sort by relevance score
+    const scoredReplies = replies.map(reply => ({
+      ...reply,
+      relevanceScore: this.calculateReplyRelevance(reply)
+    }));
+    
+    return scoredReplies
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, limit);
+  }
+
+  /**
+   * Calculate relevance score for thread replies
+   */
+  calculateReplyRelevance(reply) {
+    let score = 0;
+    
+    // Higher score for replies with reactions
+    if (reply.reactions && reply.reactions.length > 0) {
+      score += reply.reactions.length * 2;
+    }
+    
+    // Higher score for longer, more substantive replies
+    const textLength = (reply.text || '').length;
+    if (textLength > 100) score += 2;
+    if (textLength > 300) score += 3;
+    
+    // Higher score for replies with URLs (often contain important links)
+    if (reply.text && reply.text.includes('http')) {
+      score += 1;
+    }
+    
+    // Slightly lower score for very recent replies (might be less relevant)
+    const age = Date.now() - (parseFloat(reply.ts) * 1000);
+    if (age < 3600000) score -= 0.5; // Less than 1 hour
+    
+    return score;
+  }
+
+  /**
+   * Truncate chunk content while preserving parent message
+   */
+  truncateChunkContent(fullContent, parentMessage, parentUser) {
+    const maxLength = this.SYNC_LIMITS.MAX_TEXT_LENGTH - 100; // Leave room for truncation indicator
+    const parentPart = `${parentUser}: ${parentMessage}`;
+    
+    if (fullContent.length <= this.SYNC_LIMITS.MAX_TEXT_LENGTH) {
+      return fullContent;
+    }
+    
+    // Keep parent message + truncate thread replies
+    let truncated = parentPart + '\n\n';
+    const remainingSpace = maxLength - truncated.length;
+    
+    // Try to fit as many thread replies as possible
+    const lines = fullContent.split('\n');
+    const threadLines = lines.slice(1); // Skip parent message line
+    
+    let currentLength = truncated.length;
+    let includedReplies = 0;
+    
+    for (const line of threadLines) {
+      if (currentLength + line.length + 1 > maxLength) {
+        break;
+      }
+      truncated += line + '\n';
+      currentLength += line.length + 1;
+      includedReplies++;
+    }
+    
+    if (includedReplies < threadLines.length) {
+      truncated += `└─ ... ${threadLines.length - includedReplies} more replies (truncated)`;
+    }
+    
+    return truncated;
+  }
+
+  /**
+   * Extract conversation topic from message text
+   */
+  extractConversationTopic(text) {
+    // Simple topic extraction - could be enhanced with NLP
+    const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+    const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should']);
+    
+    const significantWords = words
+      .filter(w => !stopWords.has(w) && w.length > 3)
+      .slice(0, 3);
+    
+    return significantWords.join(' ');
+  }
+
+  /**
+   * Detect message type (question, decision, status update, etc.)
+   */
+  detectMessageType(text) {
+    const lowerText = text.toLowerCase();
+    
+    if (lowerText.includes('?') || lowerText.startsWith('what') || lowerText.startsWith('how') || lowerText.startsWith('when')) {
+      return 'question';
+    }
+    if (lowerText.includes('decision') || lowerText.includes('decided') || lowerText.includes('agreed')) {
+      return 'decision';
+    }
+    if (lowerText.includes('status') || lowerText.includes('update') || lowerText.includes('progress')) {
+      return 'status_update';
+    }
+    if (lowerText.includes('blocked') || lowerText.includes('issue') || lowerText.includes('problem')) {
+      return 'blocker';
+    }
+    if (lowerText.includes('review') || lowerText.includes('feedback')) {
+      return 'review_request';
+    }
+    
+    return 'general';
+  }
+
+  /**
+   * Detect urgency indicators in message
+   */
+  detectUrgency(text) {
+    const urgencyWords = ['urgent', 'asap', 'critical', 'blocking', 'deadline', 'emergency'];
+    const lowerText = text.toLowerCase();
+    
+    return urgencyWords.some(word => lowerText.includes(word));
+  }
+
+  /**
+   * Build Slack URL for the message/thread
+   */
+  buildSlackUrl(channelInfo, messageTs, conversation) {
+    const timestamp = messageTs.replace('.', '');
+    return `slack://channel?team=${conversation.context_team_id || ''}&id=${conversation.id}&message=${timestamp}`;
+  }
+
+  /**
+   * Store a message chunk as a document
+   */
+  async storeMessageChunk(userId, chunk) {
+    // Store as document
+    const { data: doc, error: docError } = await this.supabaseAdmin
+      .from('documents')
+      .upsert({
+        user_id: userId,
+        source_type: 'slack',
+        source_id: chunk.metadata.message_id,
+        title: this.generateChunkTitle(chunk),
+        content: chunk.content,
+        url: chunk.metadata.url,
+        author: chunk.metadata.author,
+        metadata: chunk.metadata,
+        last_modified_at: chunk.metadata.timestamp,
+        synced_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,source_type,source_id' })
+      .select()
+      .single();
+
+    if (docError) {
+      console.error('❌ Error storing message chunk:', docError);
+      throw docError;
+    }
+
+    // Process into embeddings
+    await this.processMessageChunk(doc);
+  }
+
+  /**
+   * Generate a meaningful title for the message chunk
+   */
+  generateChunkTitle(chunk) {
+    const { parent_message, channel_name, author, has_thread } = chunk.metadata;
+    
+    let title = `${channel_name}: ${parent_message.slice(0, 50)}${parent_message.length > 50 ? '...' : ''}`;
+    
+    if (has_thread) {
+      title += ` (${chunk.metadata.reply_count} replies)`;
+    }
+    
+    return title;
+  }
+
+  /**
+   * Process message chunk into embeddings (similar to existing processDocument)
+   */
+  async processMessageChunk(document) {
+    try {
+      // Delete existing chunks
+      await this.supabaseAdmin
+        .from('document_chunks')
+        .delete()
+        .eq('document_id', document.id);
+
+      // For message chunks, we typically want the whole message as one chunk
+      // But if it's very long, we might need to split it
+      const chunks = this.chunkMessageContent(document.content);
+      
+      if (chunks.length === 0) return;
+
+      // Generate embeddings
+      const chunkData = [];
+      const batchSize = 20;
+
+      for (let i = 0; i < chunks.length; i += batchSize) {
+        const batch = chunks.slice(i, i + batchSize);
+        
+        let embeddings;
+        try {
+          const response = await this.openai.embeddings.create({
+            model: this.embeddingModel,
+            input: batch,
+          });
+          embeddings = response.data.map(d => d.embedding);
+        } catch (error) {
+          if (error.code === 'insufficient_quota' || error.status === 429) {
+            console.log('⚠️ OpenAI quota exceeded, skipping embeddings');
+            embeddings = new Array(batch.length).fill(null);
+          } else {
+            throw error;
+          }
+        }
+
+        // Prepare chunk data
+        for (let j = 0; j < batch.length; j++) {
+          chunkData.push({
+            document_id: document.id,
+            user_id: document.user_id,
+            chunk_index: i + j,
+            content: batch[j],
+            token_count: Math.ceil(batch[j].length / 4),
+            embedding: embeddings[j],
+            metadata: {
+              ...document.metadata,
+              chunk_index: i + j,
+              total_chunks: chunks.length,
+            },
+          });
+        }
+      }
+
+      // Insert chunks
+      const { error } = await this.supabaseAdmin
+        .from('document_chunks')
+        .insert(chunkData);
+
+      if (error) {
+        console.error('Error inserting message chunks:', error);
+        throw error;
+      }
+
+      console.log(`🧠 Generated ${chunkData.length} embeddings for message chunk`);
+    } catch (error) {
+      console.error('Error processing message chunk:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Chunk message content (usually just one chunk for messages)
+   */
+  chunkMessageContent(content) {
+    // Most message chunks will be small enough to be one chunk
+    if (content.length <= 1500) {
+      return [content];
+    }
+    
+    // If very long, split by sentences
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const chunks = [];
+    let currentChunk = '';
+    
+    for (const sentence of sentences) {
+      if (currentChunk.length + sentence.length > 1500) {
+        chunks.push(currentChunk.trim());
+        currentChunk = sentence;
+      } else {
+        currentChunk += (currentChunk ? '. ' : '') + sentence;
+      }
+    }
+    
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+    
+    return chunks;
   }
 
   /**

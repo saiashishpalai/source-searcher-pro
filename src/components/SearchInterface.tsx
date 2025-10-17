@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link } from 'lucide-react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -2125,12 +2125,50 @@ const SearchInterface = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
+                      {/* Enhanced source badge */}
+                      <Badge 
+                        variant="secondary" 
+                        className={`text-xs ${
+                          result.source === 'slack' 
+                            ? 'bg-green-100 text-green-700 border-green-200' 
+                            : result.source === 'notion' 
+                            ? 'bg-purple-100 text-purple-700 border-purple-200'
+                            : 'bg-blue-100 text-blue-700 border-blue-200'
+                        }`}
+                      >
+                        {result.source === 'slack' && '💬'} 
+                        {result.source === 'notion' && '📝'} 
+                        {result.source === 'google_drive' && '📁'} 
                         {result.source}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {result.author}
+                      
+                      {/* Author badge with enhanced styling */}
+                      <Badge variant="outline" className="text-xs bg-background/50">
+                        👤 {result.author}
                       </Badge>
+                      
+                      {/* Message type indicator for Slack */}
+                      {result.source === 'slack' && (result as any).message_type && (result as any).message_type !== 'general' && (
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            (result as any).message_type === 'question' 
+                              ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                              : (result as any).message_type === 'decision'
+                              ? 'bg-green-100 text-green-700 border-green-200'
+                              : (result as any).message_type === 'blocker'
+                              ? 'bg-red-100 text-red-700 border-red-200'
+                              : 'bg-gray-100 text-gray-700 border-gray-200'
+                          }`}
+                        >
+                          {(result as any).message_type === 'question' && '❓'} 
+                          {(result as any).message_type === 'decision' && '✅'} 
+                          {(result as any).message_type === 'blocker' && '🚫'} 
+                          {(result as any).message_type === 'status_update' && '📊'} 
+                          {(result as any).message_type === 'review_request' && '👀'} 
+                          {(result as any).message_type}
+                        </Badge>
+                      )}
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {formatTimestamp(result.timestamp)}
@@ -2142,14 +2180,42 @@ const SearchInterface = () => {
                   </p>
                   
                   <div className="flex items-center gap-2 text-xs text-muted-foreground group-hover:text-muted-foreground/80 transition-colors">
-                    {result.type === 'message' && result.channel && (
-                      <span>#{result.channel}</span>
+                    {/* Slack message display */}
+                    {result.source === 'slack' && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-full">
+                          <MessageSquare className="w-3 h-3" />
+                          <span className="font-medium">#{result.channel}</span>
+                        </div>
+                        {(result as any).has_thread && (
+                          <div className="flex items-center gap-1 text-blue-600">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span>{(result as any).reply_count} replies</span>
+                          </div>
+                        )}
+                        {(result as any).participants && (result as any).participants.length > 1 && (
+                          <div className="flex items-center gap-1 text-green-600">
+                            <Users className="w-3 h-3" />
+                            <span>{(result as any).participants.length} people</span>
+                          </div>
+                        )}
+                      </div>
                     )}
-                    {result.filename && (
-                      <span>{result.filename}</span>
+                    
+                    {/* Notion page display */}
+                    {result.source === 'notion' && result.page && (
+                      <div className="flex items-center gap-1 bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                        <FileText className="w-3 h-3" />
+                        <span>{result.page}</span>
+                      </div>
                     )}
-                    {result.page && (
-                      <span>📄 {result.page}</span>
+                    
+                    {/* Google Drive file display */}
+                    {result.source === 'google_drive' && result.filename && (
+                      <div className="flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                        <FileText className="w-3 h-3" />
+                        <span>{result.filename}</span>
+                      </div>
                     )}
                   </div>
                   

@@ -24,7 +24,7 @@ The Slack integration allows Haven7 to search through your Slack messages, chann
 - **OAuth 2.0** for secure authentication
 - **Slack Web API** for fetching messages and conversations
 - **OpenAI Embeddings** for semantic search
-- **LocalTunnel** for permanent HTTPS URL (automatically configured)
+- **mkcert HTTPS certificates** for local development with SSL
 
 ### What Gets Indexed
 
@@ -50,9 +50,11 @@ Verification Token: your_verification_token_here
 Slack App ID: A09L0GZBBC5
 ```
 
-### 2. **LocalTunnel** (✅ Already installed and running)
+### 2. **mkcert HTTPS Setup** (✅ Already configured)
 
-Your permanent URL: `https://haven7-searcher.loca.lt`
+Your local HTTPS URLs: 
+- API: `https://localhost:3000`
+- Frontend: `https://localhost:8082`
 
 ### 3. **Dependencies** (✅ Already installed)
 
@@ -64,17 +66,18 @@ Your permanent URL: `https://haven7-searcher.loca.lt`
 
 ## 🚀 Setup Steps
 
-### Step 1: LocalTunnel Already Running! ✅
+### Step 1: mkcert HTTPS Already Configured! ✅
 
-Your permanent HTTPS URL is already configured:
+Your local HTTPS URLs are already configured:
 
 ```
-https://haven7-searcher.loca.lt
+API: https://localhost:3000
+Frontend: https://localhost:8082
 ```
 
-**This URL NEVER CHANGES** - you can use it forever!
+**These URLs work with valid SSL certificates** - no external tunneling needed!
 
-✅ LocalTunnel runs automatically in the background - no setup needed!
+✅ mkcert certificates are generated and configured for local development!
 
 ---
 
@@ -87,9 +90,9 @@ Update your `.env.local` file:
 SLACK_CLIENT_ID=your_slack_client_id_here
 SLACK_CLIENT_SECRET=your_slack_client_secret_here
 
-# API URLs (IMPORTANT: Use your LocalTunnel HTTPS URL)
-VITE_API_URL=https://haven7-searcher.loca.lt
-API_BASE_URL=https://haven7-searcher.loca.lt
+# API URLs (IMPORTANT: Use your mkcert HTTPS URL)
+VITE_API_URL=https://localhost:3000
+API_BASE_URL=https://localhost:3000
 
 # OpenAI (Required for embeddings)
 OPENAI_API_KEY=your-openai-api-key-here
@@ -110,7 +113,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 2. Select your app (App ID: **A09L0GZBBC5**)
 3. Navigate to: **OAuth & Permissions** → **Redirect URLs**
 4. Click **Add New Redirect URL**
-5. Add: `https://haven7-searcher.loca.lt/api/auth/slack/callback` (use your LocalTunnel URL)
+5. Add: `https://localhost:3000/api/auth/slack/callback` (use your mkcert HTTPS URL)
 6. Click **Save URLs**
 
 ---
@@ -156,9 +159,10 @@ npm run dev:vite
 vite
 ```
 
-**Terminal 3 - LocalTunnel Status:**
+**Terminal 3 - mkcert HTTPS Status:**
 ```bash
-./LocalTunnel http 3000
+# mkcert certificates are already configured
+# No additional setup needed - HTTPS works on localhost:3000
 ```
 
 ---
@@ -228,11 +232,11 @@ vite
 ```
 User clicks "Connect Slack"
   ↓
-Frontend redirects to Slack OAuth (via LocalTunnel HTTPS)
+Frontend redirects to Slack OAuth (via mkcert HTTPS)
   ↓
 User authorizes on Slack
   ↓
-Slack redirects to: https://haven7-searcher.loca.lt/api/auth/slack/callback
+Slack redirects to: https://localhost:3000/api/auth/slack/callback
   ↓
 Backend exchanges code for access_token
   ↓
@@ -351,9 +355,9 @@ This format preserves:
 **Cause:** Slack requires HTTPS for redirect URIs (security requirement)
 
 **Solution:**
-1. Make sure LocalTunnel is running: `./LocalTunnel http 3000`
-2. Use the HTTPS URL in your environment variables
-3. Update Slack App settings with the LocalTunnel HTTPS URL
+1. Make sure mkcert certificates are installed: `mkcert -install`
+2. Use the HTTPS URL in your environment variables: `https://localhost:3000`
+3. Update Slack App settings with the mkcert HTTPS URL: `https://localhost:3000`
 
 ---
 
@@ -408,14 +412,14 @@ This format preserves:
 
 ---
 
-### Issue: LocalTunnel URL keeps changing
+### Issue: mkcert certificates not working
 
-**Cause:** Free LocalTunnel accounts get a new URL on every restart
+**Cause:** mkcert certificates may not be properly installed or trusted
 
 **Solutions:**
-1. **Option A:** Get a paid LocalTunnel account for a permanent subdomain
-2. **Option B:** Keep the same LocalTunnel session running
-3. **Option C:** Update Slack app settings and `.env.local` each time
+1. **Install mkcert certificates:** `mkcert -install`
+2. **Generate new certificates:** `mkcert localhost 127.0.0.1 ::1`
+3. **Restart your development servers**
 
 ---
 
@@ -562,14 +566,14 @@ To adjust these limits:
 1. **`server/index.js`**
    - Added `SlackSync` import
    - Added `POST /api/sync/slack` endpoint
-   - Made OAuth redirect URIs dynamic (LocalTunnel support)
+   - Made OAuth redirect URIs dynamic (mkcert HTTPS support)
 
 2. **`src/pages/ConnectedSources.tsx`**
    - Added Slack to sync handler
    - Enabled Slack sync button
 
 3. **`env.example`**
-   - Added LocalTunnel setup instructions
+   - Added mkcert HTTPS setup instructions
    - Added `API_BASE_URL` variable
    - Updated Slack configuration notes
 
@@ -618,7 +622,7 @@ The implementation includes:
 - ✅ Semantic search with OpenAI embeddings
 - ✅ Clean UI with sync status
 - ✅ Proper error handling
-- ✅ LocalTunnel setup for local development
+- ✅ mkcert HTTPS setup for local development
 - ✅ Comprehensive documentation
 
 **Start testing now!** 🚀

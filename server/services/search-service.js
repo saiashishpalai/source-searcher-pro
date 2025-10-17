@@ -134,22 +134,57 @@ export class SearchService {
       const aiSummary = await this.generateSummary(query, chunks);
 
       // 4. Format results
-      const results = chunks.map(chunk => ({
-        id: chunk.id,
-        title: chunk.metadata?.title || 'Unknown Document',
-        content: chunk.content,
-        snippet: this.createSnippet(chunk.content, query),
-        source: chunk.metadata?.source_type || 'google_drive',
-        type: this.getDocumentType(chunk.metadata?.title || ''),
-        author: chunk.metadata?.author || 'Unknown',
-        timestamp: new Date().toISOString(),
-        relevanceScore: chunk.similarity || 0.8, // Use actual similarity score from vector search
-        url: chunk.metadata?.url || '',
-        channel: chunk.metadata?.source_type === 'slack' ? 'general' : undefined,
-        filename: chunk.metadata?.title || 'Unknown Document',
-        page: chunk.metadata?.source_type === 'notion' ? chunk.metadata?.title : undefined,
-        metadata: chunk.metadata || {},
-      }));
+      const results = chunks.map(chunk => {
+        const metadata = chunk.metadata || {};
+        const sourceType = metadata.source_type || 'google_drive';
+        
+        // Format result based on source type
+        let result = {
+          id: chunk.id,
+          title: metadata.title || 'Unknown Document',
+          content: chunk.content,
+          snippet: this.createSnippet(chunk.content, query),
+          source: sourceType,
+          type: this.getDocumentType(metadata.title || ''),
+          author: metadata.author || 'Unknown',
+          timestamp: metadata.timestamp || new Date().toISOString(),
+          relevanceScore: chunk.similarity || 0.8,
+          url: metadata.url || '',
+          metadata: metadata,
+        };
+
+        // Source-specific formatting
+        if (sourceType === 'slack') {
+          result = {
+            ...result,
+            type: 'message',
+            channel: metadata.channel_name || 'Unknown Channel',
+            author: metadata.author || 'Unknown User',
+            timestamp: metadata.timestamp || new Date().toISOString(),
+            // Add Slack-specific metadata
+            has_thread: metadata.has_thread || false,
+            reply_count: metadata.reply_count || 0,
+            participants: metadata.participants || [],
+            message_type: metadata.message_type || 'general',
+          };
+        } else if (sourceType === 'notion') {
+          result = {
+            ...result,
+            type: 'doc',
+            page: metadata.title,
+            author: metadata.author || 'Unknown',
+          };
+        } else if (sourceType === 'google_drive') {
+          result = {
+            ...result,
+            type: this.getDocumentType(metadata.title || ''),
+            filename: metadata.title,
+            author: metadata.author || 'Unknown',
+          };
+        }
+
+        return result;
+      });
 
       const searchTime = Math.floor(Math.random() * 500 + 200); // Simulate search time
 
@@ -177,25 +212,192 @@ export class SearchService {
     try {
       console.log(`🔍 Follow-up search: "${query}" in ${documentIds.length} documents (user: ${userId})`);
 
-      // Search only within the specified document chunks
-      const { data: chunks, error } = await supabaseAdmin
+      // First, get the specific chunks by their IDs
+      const { data: targetChunks, error: fetchError } = await supabaseAdmin
         .from('document_chunks')
         .select(`
           id,
           document_id,
           content,
           chunk_index,
-          metadata
+          metadata,
+          embedding
         `)
         .eq('user_id', userId)
-        .in('id', documentIds)
-        .ilike('content', `%${query}%`)
-        .limit(10);
+        .in('id', documentIds);
 
-      if (error) {
-        console.error('Follow-up search error:', error);
-        throw error;
+      if (fetchError) {
+        console.error('Error fetching target chunks:', fetchError);
+        throw fetchError;
       }
+
+      if (!targetChunks || targetChunks.length === 0) {
+        console.log('❌ No chunks found with the provided IDs');
+        return {
+          query,
+          results: [],
+          aiSummary: "I couldn't find the selected documents. They may have been deleted or you may not have access to them.",
+          totalResults: 0,
+          searchTime: 0,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      console.log(`📊 Found ${targetChunks.length} target chunks to search within`);
+      
+      // Debug: Check if chunks have embeddings
+      const chunksWithEmbeddings = targetChunks.filter(c => c.embedding && c.embedding.length > 0);
+      const chunksWithoutEmbeddings = targetChunks.filter(c => !c.embedding || c.embedding.length === 0);
+      
+      console.log(`  🔍 Chunks with embeddings: ${chunksWithEmbeddings.length}`);
+      console.log(`  🔍 Chunks without embeddings: ${chunksWithoutEmbeddings.length}`);
+      
+      if (chunksWithoutEmbeddings.length > 0) {
+        console.log(`  ⚠️ Some chunks missing embeddings:`, chunksWithoutEmbeddings.map(c => c.id));
+      }
+
+      // Check if any chunks have embeddings
+      if (chunksWithEmbeddings.length === 0) {
+        console.log('⚠️ No chunks have embeddings, falling back to text search');
+        // Fallback to text search if no embeddings
+        const chunks = targetChunks.filter(chunk => 
+          chunk.content.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        if (chunks.length === 0) {
+          console.log('❌ No relevant information found in selected documents (text search)');
+          return {
+            query,
+            results: [],
+            aiSummary: "I couldn't find relevant information about that in the selected documents. Try rephrasing your question or ask something else about these documents.",
+            totalResults: 0,
+            searchTime: 0,
+            timestamp: new Date().toISOString(),
+          };
+        }
+
+        // Use text search results
+        const aiSummary = await this.generateSummary(query, chunks);
+        const results = chunks.map(chunk => ({
+          id: chunk.id,
+          title: chunk.metadata?.title || 'Unknown Document',
+          content: chunk.content,
+          snippet: this.createSnippet(chunk.content, query),
+          source: chunk.metadata?.source_type || 'google_drive',
+          type: this.getDocumentType(chunk.metadata?.title || ''),
+          author: chunk.metadata?.author || 'Unknown',
+          timestamp: new Date().toISOString(),
+          relevanceScore: 0.8,
+          url: chunk.metadata?.url || '',
+          metadata: chunk.metadata || {},
+        }));
+        
+        return {
+          query,
+          results,
+          aiSummary,
+          totalResults: results.length,
+          searchTime: Math.floor(Math.random() * 300 + 100),
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // Generate query embedding for semantic search
+      let queryEmbedding;
+      try {
+        queryEmbedding = await this.generateQueryEmbedding(query);
+        console.log(`  🧠 Query embedding generated: length ${queryEmbedding.length}, first 5 values: [${queryEmbedding.slice(0, 5).join(', ')}]`);
+      } catch (error) {
+        console.log('⚠️ Embedding generation failed, falling back to text search');
+        // Fallback to text search if embedding fails
+        const chunks = targetChunks.filter(chunk => 
+          chunk.content.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        if (chunks.length === 0) {
+          console.log('❌ No relevant information found in selected documents (text search)');
+          return {
+            query,
+            results: [],
+            aiSummary: "I couldn't find relevant information about that in the selected documents. Try rephrasing your question or ask something else about these documents.",
+            totalResults: 0,
+            searchTime: 0,
+            timestamp: new Date().toISOString(),
+          };
+        }
+
+        // Use text search results
+        const aiSummary = await this.generateSummary(query, chunks);
+        const results = chunks.map(chunk => ({
+          id: chunk.id,
+          title: chunk.metadata?.title || 'Unknown Document',
+          content: chunk.content,
+          snippet: this.createSnippet(chunk.content, query),
+          source: chunk.metadata?.source_type || 'google_drive',
+          type: this.getDocumentType(chunk.metadata?.title || ''),
+          author: chunk.metadata?.author || 'Unknown',
+          timestamp: new Date().toISOString(),
+          relevanceScore: 0.8,
+          url: chunk.metadata?.url || '',
+          metadata: chunk.metadata || {},
+        }));
+        
+        return {
+          query,
+          results,
+          aiSummary,
+          totalResults: results.length,
+          searchTime: Math.floor(Math.random() * 300 + 100),
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // Calculate similarity scores for each chunk
+      const chunksWithSimilarity = targetChunks.map(chunk => {
+        if (!chunk.embedding) {
+          // Fallback to text similarity if no embedding
+          const content = chunk.content.toLowerCase();
+          const queryLower = query.toLowerCase();
+          const similarity = content.includes(queryLower) ? 0.8 : 0.0;
+          console.log(`  📝 Chunk ${chunk.id}: No embedding, text similarity: ${similarity}`);
+          return { ...chunk, similarity };
+        }
+
+        // Parse embedding if it's a string (PostgreSQL might return it as JSON string)
+        let embeddingVector = chunk.embedding;
+        if (typeof embeddingVector === 'string') {
+          try {
+            embeddingVector = JSON.parse(embeddingVector);
+          } catch (e) {
+            console.log(`  ⚠️ Failed to parse embedding for chunk ${chunk.id}`);
+            return { ...chunk, similarity: 0.0 };
+          }
+        }
+
+        // Debug: Check embedding format
+        if (!Array.isArray(embeddingVector)) {
+          console.log(`  ⚠️ Embedding is not an array for chunk ${chunk.id}, type: ${typeof embeddingVector}`);
+          return { ...chunk, similarity: 0.0 };
+        }
+
+        console.log(`  📝 Chunk ${chunk.id}: Embedding length: ${embeddingVector.length}, Query embedding length: ${queryEmbedding.length}`);
+
+        // Calculate cosine similarity
+        const similarity = this.calculateCosineSimilarity(queryEmbedding, embeddingVector);
+        console.log(`  📝 Chunk ${chunk.id}: Embedding similarity: ${similarity.toFixed(4)}`);
+        console.log(`      Content preview: ${chunk.content.substring(0, 100)}...`);
+        return { ...chunk, similarity };
+      });
+
+      console.log(`  📊 Similarity scores:`, chunksWithSimilarity.map(c => ({ id: c.id, similarity: c.similarity.toFixed(4) })));
+
+      // Filter and sort by similarity (lower threshold for debugging)
+      const chunks = chunksWithSimilarity
+        .filter(chunk => chunk.similarity > 0.1) // Lowered threshold for debugging
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 5); // Limit to top 5 most relevant
+
+      console.log(`  📊 Filtered chunks (similarity > 0.1): ${chunks.length}`);
 
       if (!chunks || chunks.length === 0) {
         console.log('❌ No relevant information found in selected documents');
@@ -214,23 +416,57 @@ export class SearchService {
       // Generate AI summary using RAG
       const aiSummary = await this.generateSummary(query, chunks);
 
-      // Format results
-      const results = chunks.map(chunk => ({
-        id: chunk.id,
-        title: chunk.metadata?.title || 'Unknown Document',
-        content: chunk.content,
-        snippet: this.createSnippet(chunk.content, query),
-        source: chunk.metadata?.source_type || 'google_drive',
-        type: this.getDocumentType(chunk.metadata?.title || ''),
-        author: chunk.metadata?.author || 'Unknown',
-        timestamp: new Date().toISOString(),
-        relevanceScore: 0.8,
-        url: chunk.metadata?.url || '',
-        channel: chunk.metadata?.source_type === 'slack' ? 'general' : undefined,
-        filename: chunk.metadata?.title || 'Unknown Document',
-        page: chunk.metadata?.source_type === 'notion' ? chunk.metadata?.title : undefined,
-        metadata: chunk.metadata || {},
-      }));
+      // Format results using the same logic as main search
+      const results = chunks.map(chunk => {
+        const metadata = chunk.metadata || {};
+        const sourceType = metadata.source_type || 'google_drive';
+        
+        // Format result based on source type (same logic as main search)
+        let result = {
+          id: chunk.id,
+          title: metadata.title || 'Unknown Document',
+          content: chunk.content,
+          snippet: this.createSnippet(chunk.content, query),
+          source: sourceType,
+          type: this.getDocumentType(metadata.title || ''),
+          author: metadata.author || 'Unknown',
+          timestamp: metadata.timestamp || new Date().toISOString(),
+          relevanceScore: chunk.similarity,
+          url: metadata.url || '',
+          metadata: metadata,
+        };
+
+        // Source-specific formatting
+        if (sourceType === 'slack') {
+          result = {
+            ...result,
+            type: 'message',
+            channel: metadata.channel_name || 'Unknown Channel',
+            author: metadata.author || 'Unknown User',
+            timestamp: metadata.timestamp || new Date().toISOString(),
+            has_thread: metadata.has_thread || false,
+            reply_count: metadata.reply_count || 0,
+            participants: metadata.participants || [],
+            message_type: metadata.message_type || 'general',
+          };
+        } else if (sourceType === 'notion') {
+          result = {
+            ...result,
+            type: 'doc',
+            page: metadata.title,
+            author: metadata.author || 'Unknown',
+          };
+        } else if (sourceType === 'google_drive') {
+          result = {
+            ...result,
+            type: this.getDocumentType(metadata.title || ''),
+            filename: metadata.title,
+            author: metadata.author || 'Unknown',
+          };
+        }
+
+        return result;
+      });
 
       const searchTime = Math.floor(Math.random() * 300 + 100);
 
@@ -249,6 +485,34 @@ export class SearchService {
       console.error('Follow-up search error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  calculateCosineSimilarity(vectorA, vectorB) {
+    if (!vectorA || !vectorB || vectorA.length !== vectorB.length) {
+      return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vectorA.length; i++) {
+      dotProduct += vectorA[i] * vectorB[i];
+      normA += vectorA[i] * vectorA[i];
+      normB += vectorB[i] * vectorB[i];
+    }
+
+    normA = Math.sqrt(normA);
+    normB = Math.sqrt(normB);
+
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (normA * normB);
   }
 
   /**

@@ -12,18 +12,19 @@
 ```
 This adds your Slack credentials to `.env.local`
 
-### Step 2: LocalTunnel Already Running! ✅
-Your permanent tunnel URL is:
+### Step 2: mkcert HTTPS Already Configured! ✅
+Your local HTTPS URLs are:
 ```
-https://haven7-searcher.loca.lt
+API: https://localhost:3000
+Frontend: https://localhost:8082
 ```
-This URL **NEVER CHANGES** - no need to update it!
+These URLs work with valid SSL certificates - no external tunneling needed!
 
 ### Step 3: Environment Already Configured! ✅
 Your `.env.local` already has:
 ```bash
-VITE_API_URL=https://haven7-searcher.loca.lt
-API_BASE_URL=https://haven7-searcher.loca.lt
+VITE_API_URL=https://localhost:3000
+API_BASE_URL=https://localhost:3000
 ```
 
 ### Step 4: Update Slack App (One Time Only)
@@ -36,7 +37,7 @@ API_BASE_URL=https://haven7-searcher.loca.lt
 ```bash
 npm run dev
 ```
-LocalTunnel runs automatically in the background!
+mkcert certificates work automatically with localhost!
 
 ### Step 6: Test
 1. Open http://localhost:8080
@@ -75,7 +76,7 @@ Client Secret: your_slack_client_secret_here
 
 ```bash
 npm run setup:slack    # Configure Slack credentials
-npm run dev            # Start frontend + API (LocalTunnel auto-starts)
+npm run dev            # Start frontend + API (mkcert HTTPS auto-configured)
 ```
 
 ---
@@ -83,12 +84,12 @@ npm run dev            # Start frontend + API (LocalTunnel auto-starts)
 ## 🐛 Common Issues
 
 ### "redirect_uri_mismatch"
-→ Make sure Slack app has `https://haven7-searcher.loca.lt/api/auth/slack/callback` in OAuth settings
+→ Make sure Slack app has `https://localhost:3000/api/auth/slack/callback` in OAuth settings
 
 ### "No conversations found"
 → Add the app to channels: `/invite @YourAppName`
 
-### LocalTunnel shows warning page
+### Browser shows SSL certificate warning
 → Click "Continue" on first visit - this is normal and only happens once
 
 ### "Token expired"

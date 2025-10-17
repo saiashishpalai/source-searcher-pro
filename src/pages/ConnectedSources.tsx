@@ -287,13 +287,39 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                     ) : (
                       <>
                         <div className="flex justify-between">
-                          <span>Documents:</span>
-                          <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Chunks:</span>
+                          <span>Message Chunks:</span>
                           <span className="font-medium">{syncStatus?.[connection.source_type]?.totalChunks ?? 0}</span>
                         </div>
+                        {connection.source_type === 'slack' && syncStatus?.[connection.source_type]?.statistics && (
+                          <>
+                            <div className="flex justify-between">
+                              <span>Total Messages:</span>
+                              <span className="font-medium">{syncStatus[connection.source_type].statistics.totalMessages ?? 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Conversations:</span>
+                              <span className="font-medium">{syncStatus[connection.source_type].statistics.processedConversations ?? 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>DMs:</span>
+                              <span className="font-medium">{syncStatus[connection.source_type].statistics.dms ?? 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Channels:</span>
+                              <span className="font-medium">{syncStatus[connection.source_type].statistics.channels ?? 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>With Threads:</span>
+                              <span className="font-medium">{syncStatus[connection.source_type].statistics.conversationsWithThreads ?? 0}</span>
+                            </div>
+                          </>
+                        )}
+                        {connection.source_type !== 'slack' && (
+                          <div className="flex justify-between">
+                            <span>Documents:</span>
+                            <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span>Last Sync:</span>
                           <span className="font-medium">
@@ -508,12 +534,7 @@ const ConnectedSources = () => {
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
   const [syncingDocuments, setSyncingDocuments] = useState<Record<string, boolean>>({});
-  const [syncStatus, setSyncStatus] = useState({
-    totalDocuments: 0,
-    totalChunks: 0,
-    lastSyncTime: null,
-    isSyncing: false
-  });
+  const [syncStatus, setSyncStatus] = useState<Record<string, any>>({});
   const [syncStatusLoading, setSyncStatusLoading] = useState(false);
   const [syncError, setSyncError] = useState<Record<string, string | null>>({});
 
@@ -860,6 +881,20 @@ const ConnectedSources = () => {
       if (data.synced === 0) {
         setSyncError(prev => ({ ...prev, [sourceType]: `No documents were synced from ${sourceName}. Make sure you have accessible content.` }));
       }
+      
+      // Store sync statistics for this source
+      setSyncStatus(prev => ({
+        ...prev,
+        [sourceType]: {
+          totalDocuments: data.totalDocuments || 0,
+          totalChunks: data.totalChunks || 0,
+          totalMessages: data.totalMessages || 0,
+          statistics: data.statistics || null,
+          lastSyncTime: new Date().toISOString(),
+          isSyncing: false,
+          details: data.details || []
+        }
+      }));
       
       // Refresh to show updated counts
       await fetchSyncStatus();
