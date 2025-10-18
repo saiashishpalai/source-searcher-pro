@@ -18,12 +18,12 @@ import { SlackSync } from './services/slack-sync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'https://localhost:8080';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'https://localhost:8081';
 const API_BASE_URL = process.env.API_BASE_URL || `https://localhost:${PORT}`;
 
 
 app.use(cors({ 
-  origin: ['https://localhost:8080', 'http://localhost:8080', 'http://localhost:8083', 'https://localhost:8081', 'http://localhost:8081'],
+  origin: ['https://localhost:8081', 'http://localhost:8081'],
   credentials: true 
 }));
 app.use(express.json());
@@ -170,13 +170,12 @@ app.get('/api/connections/get', async (req, res) => {
 
 // GOOGLE OAUTH CALLBACK - COMPLETE IMPLEMENTATION
 app.get('/api/auth/google/callback', async (req, res) => {
-  const { code, state } = req.query;
-  
-  if (!code || !state) {
-    return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
-  }
-
   try {
+    const { code, state } = req.query;
+    
+    if (!code || !state) {
+      return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
+    }
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     
     if (Date.now() - stateData.timestamp > 600000) {
@@ -248,7 +247,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     
     console.log('✓ Google Drive connection saved to database');
 
-    return res.redirect(`${APP_URL}/connect-sources?connected=google`);
+    return res.redirect(`${APP_URL}/connected-sources?connected=google`);
   } catch (error) {
     console.error('OAuth callback error:', error);
     return res.redirect(`${APP_URL}/connect-sources?error=failed`);
@@ -339,7 +338,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
     
     console.log('✓ Slack connection saved to database');
 
-    return res.redirect(`${APP_URL}/connect-sources?connected=slack`);
+    return res.redirect(`${APP_URL}/connected-sources?connected=slack`);
   } catch (error) {
     console.error('Slack OAuth callback error:', error);
     return res.redirect(`${APP_URL}/connect-sources?error=failed`);
@@ -426,7 +425,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
     
     console.log('✓ Notion connection saved to database');
 
-    return res.redirect(`${APP_URL}/connect-sources?connected=notion`);
+    return res.redirect(`${APP_URL}/connected-sources?connected=notion`);
   } catch (error) {
     console.error('Notion OAuth callback error:', error);
     return res.redirect(`${APP_URL}/connect-sources?error=failed`);
@@ -466,18 +465,32 @@ app.post('/api/sync/google-drive', async (req, res) => {
     console.log('✓ Starting Google Drive sync...');
     
     // Validate OAuth token first
+    console.log('🔍 Testing Google Drive token...');
     const testResponse = await fetch(
       'https://www.googleapis.com/drive/v3/about?fields=user',
-      { headers: { Authorization: `Bearer ${connection.access_token}` } }
+      { 
+        headers: { 
+          'Authorization': `Bearer ${connection.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      }
     );
     
+    console.log(`📊 Token test response: ${testResponse.status} ${testResponse.ok ? 'OK' : 'FAILED'}`);
+    
     if (!testResponse.ok) {
-      console.error('✗ OAuth token invalid');
+      const errorText = await testResponse.text();
+      console.error('✗ OAuth token invalid:', errorText);
+      
+      // Don't disconnect automatically - just return error
       return res.status(401).json({ 
         error: 'Google OAuth token expired',
-        code: 'TOKEN_EXPIRED'
+        code: 'TOKEN_EXPIRED',
+        message: 'Please reconnect Google Drive'
       });
     }
+    
+    console.log('✅ OAuth token is valid');
     
     // Call sync service with real-time logging
     const docs = await documentSync.syncGoogleDrive(
@@ -743,6 +756,9 @@ app.post('/api/clear-data', async (req, res) => {
   }
 });
 
+// Rate limiting for disconnect operations
+const disconnectAttempts = new Map();
+
 // DISCONNECT ENDPOINT
 app.post('/api/connections/disconnect', async (req, res) => {
   try {
@@ -759,6 +775,21 @@ app.post('/api/connections/disconnect', async (req, res) => {
     if (authError || !user) {
       return res.status(401).json({ error: 'Invalid token' });
     }
+    
+    // Rate limiting: prevent rapid disconnect/reconnect attempts
+    const userKey = `${user.id}_${sourceType}`;
+    const now = Date.now();
+    const lastAttempt = disconnectAttempts.get(userKey);
+    
+    if (lastAttempt && (now - lastAttempt) < 5000) { // 5 second cooldown
+      console.log(`⏳ Rate limiting disconnect for ${userKey}`);
+      return res.status(429).json({ 
+        error: 'Please wait before disconnecting again',
+        code: 'RATE_LIMITED'
+      });
+    }
+    
+    disconnectAttempts.set(userKey, now);
     
     // Delete connection
     const { error: deleteError } = await supabaseAdmin

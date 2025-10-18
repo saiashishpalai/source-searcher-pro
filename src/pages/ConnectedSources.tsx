@@ -620,6 +620,22 @@ const ConnectedSources = () => {
     }
   }, []);
 
+  // Detect OAuth completion and show success message
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const connected = urlParams.get('connected');
+    
+    if (connected) {
+      console.log('✅ OAuth success detected for:', connected);
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refetch connections to show the new connection
+      fetchConnections();
+      // Show success message
+      alert(`✅ Successfully connected ${connected}!`);
+    }
+  }, []);
+
   // Fetch sync status when user changes
   useEffect(() => {
     if (user && session?.access_token) {

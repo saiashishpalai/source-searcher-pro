@@ -42,7 +42,7 @@ export class DocumentSync {
         console.log('✅ OAuth token is valid');
       } catch (authError) {
         console.error('❌ OAuth token invalid or expired:', authError.message);
-        throw new Error('Google OAuth token expired. Please reconnect Google Drive.');
+        throw new Error('invalid authentication');
       }
 
       // List all files
@@ -217,47 +217,55 @@ export class DocumentSync {
         console.log(`✂️ Truncated ${document.title} - was ${document.content.length} chars, now ${content.length}`);
       }
 
-      // Chunk the content
-      const chunks = this.chunkText(content);
-      console.log(`📝 Chunking ${document.title}: ${chunks.length} chunks`);
+      // Chunk the content using smart sentence-boundary chunking
+      const chunkObjects = this.chunkTextSmart(content, document.mime_type);
+      console.log(`📝 Smart chunking ${document.title}: ${chunkObjects.length} chunks`);
 
       // Generate embeddings in batches
       const batchSize = 20;
       const chunkData = [];
 
-      for (let i = 0; i < chunks.length; i += batchSize) {
-        const batch = chunks.slice(i, i + batchSize);
+      for (let i = 0; i < chunkObjects.length; i += batchSize) {
+        const batch = chunkObjects.slice(i, i + batchSize);
+        const batchContent = batch.map(chunk => chunk.content);
         
-      let embeddings;
-      try {
-        const response = await this.openai.embeddings.create({
-          model: this.embeddingModel,
-          input: batch,
-        });
-        embeddings = response.data.map(d => d.embedding);
-      } catch (error) {
-        if (error.code === 'insufficient_quota' || error.status === 429) {
-          console.log('⚠️ OpenAI quota exceeded, skipping embeddings for this batch');
-          embeddings = new Array(batch.length).fill(null);
-        } else {
-          throw error;
+        let embeddings;
+        try {
+          const response = await this.openai.embeddings.create({
+            model: this.embeddingModel,
+            input: batchContent,
+          });
+          embeddings = response.data.map(d => d.embedding);
+        } catch (error) {
+          if (error.code === 'insufficient_quota' || error.status === 429) {
+            console.log('⚠️ OpenAI quota exceeded, skipping embeddings for this batch');
+            embeddings = new Array(batch.length).fill(null);
+          } else {
+            throw error;
+          }
         }
-      }
 
-        // Prepare chunk data
+        // Prepare chunk data with enhanced metadata
         for (let j = 0; j < batch.length; j++) {
+          const chunkObj = batch[j];
+          const estimatedPageNumber = Math.floor(chunkObj.startPos / 3000) + 1; // ~3000 chars per page
+          
           chunkData.push({
             document_id: document.id,
             user_id: document.user_id,
             chunk_index: i + j,
-            content: batch[j],
-            token_count: Math.ceil(batch[j].length / 4),
+            content: chunkObj.content,
+            token_count: Math.ceil(chunkObj.content.length / 4),
             embedding: embeddings[j],
             metadata: {
               source_type: document.source_type,
               title: document.title,
               url: document.url,
               author: document.author,
+              // Enhanced metadata for Google Drive
+              page_number: estimatedPageNumber,
+              section_heading: chunkObj.sectionHeading,
+              file_type: chunkObj.fileType,
             },
           });
         }
@@ -300,5 +308,157 @@ export class DocumentSync {
     }
 
     return chunks.filter(c => c.length > 50); // Min 50 chars
+  }
+
+  /**
+   * Smart sentence-boundary chunking for better RAG results
+   */
+  chunkTextSmart(text, fileType) {
+    const chunks = [];
+    const CHUNK_SIZE = 1200; // 1000-1200 chars as specified
+    const OVERLAP = 150; // 150 chars overlap
+    const MAX_CHUNKS = this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC;
+    
+    // Split text into sentences first
+    const sentences = this.splitIntoSentences(text);
+    
+    let currentChunk = '';
+    let chunkStartPos = 0;
+    let sectionHeading = this.extractSectionHeading(text, 0);
+    
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      const nextChunkLength = currentChunk.length + sentence.length;
+      
+      // If adding this sentence would exceed chunk size, finalize current chunk
+      if (nextChunkLength > CHUNK_SIZE && currentChunk.length > 0) {
+        chunks.push({
+          content: currentChunk.trim(),
+          startPos: chunkStartPos,
+          sectionHeading: sectionHeading,
+          fileType: this.getFileTypeFromMimeType(fileType)
+        });
+        
+        // Start new chunk with overlap
+        const overlapText = this.getOverlapText(currentChunk, OVERLAP);
+        currentChunk = overlapText + sentence;
+        chunkStartPos = chunkStartPos + currentChunk.length - overlapText.length;
+        
+        // Update section heading for new chunk
+        sectionHeading = this.extractSectionHeading(text, chunkStartPos);
+        
+        // SAFETY: Stop at max chunks
+        if (chunks.length >= MAX_CHUNKS) {
+          console.log(`🛑 Chunk limit reached: ${chunks.length}/${MAX_CHUNKS} chunks`);
+          break;
+        }
+      } else {
+        currentChunk += sentence;
+      }
+    }
+    
+    // Add final chunk if it has content
+    if (currentChunk.trim().length > 50) {
+      chunks.push({
+        content: currentChunk.trim(),
+        startPos: chunkStartPos,
+        sectionHeading: sectionHeading,
+        fileType: this.getFileTypeFromMimeType(fileType)
+      });
+    }
+    
+    return chunks;
+  }
+
+  /**
+   * Split text into sentences while preserving sentence boundaries
+   */
+  splitIntoSentences(text) {
+    // Regex to split on sentence boundaries (. ! ?) followed by space or newline
+    const sentenceRegex = /([.!?])\s+/g;
+    const sentences = [];
+    
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = sentenceRegex.exec(text)) !== null) {
+      const sentenceEnd = match.index + 1;
+      const sentence = text.slice(lastIndex, sentenceEnd).trim();
+      if (sentence.length > 0) {
+        sentences.push(sentence + ' ');
+      }
+      lastIndex = sentenceEnd + 1;
+    }
+    
+    // Add remaining text as final sentence
+    const remaining = text.slice(lastIndex).trim();
+    if (remaining.length > 0) {
+      sentences.push(remaining + ' ');
+    }
+    
+    return sentences;
+  }
+
+  /**
+   * Extract section heading near the given position
+   */
+  extractSectionHeading(text, position) {
+    const lines = text.split('\n');
+    const targetLineIndex = Math.floor(position / (text.length / lines.length));
+    
+    // Look backwards from target position for heading patterns
+    for (let i = Math.max(0, targetLineIndex - 5); i <= Math.min(lines.length - 1, targetLineIndex + 2); i++) {
+      const line = lines[i].trim();
+      
+      // Check for markdown headers
+      if (line.match(/^#{1,6}\s+/)) {
+        return line.replace(/^#{1,6}\s+/, '');
+      }
+      
+      // Check for lines ending with colon (common heading pattern)
+      if (line.match(/^[A-Z][^.!?]*:$/) && line.length < 100) {
+        return line.replace(':', '');
+      }
+      
+      // Check for all caps lines (common heading pattern)
+      if (line.match(/^[A-Z\s]{3,}$/) && line.length < 50 && line.length > 3) {
+        return line;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get overlap text from the end of current chunk
+   */
+  getOverlapText(text, overlapSize) {
+    if (text.length <= overlapSize) {
+      return text;
+    }
+    
+    // Try to break at sentence boundary within overlap
+    const overlapText = text.slice(-overlapSize);
+    const sentenceEnd = overlapText.lastIndexOf('.');
+    
+    if (sentenceEnd > overlapSize * 0.5) {
+      return overlapText.slice(sentenceEnd + 1).trim() + ' ';
+    }
+    
+    return overlapText;
+  }
+
+  /**
+   * Convert mime type to readable file type
+   */
+  getFileTypeFromMimeType(mimeType) {
+    if (!mimeType) return 'document';
+    
+    if (mimeType === 'application/pdf') return 'PDF';
+    if (mimeType === 'application/vnd.google-apps.document') return 'Google Doc';
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'Word Document';
+    if (mimeType.startsWith('text/')) return 'Text File';
+    
+    return 'Document';
   }
 }

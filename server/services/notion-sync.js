@@ -21,7 +21,7 @@ export class NotionSync {
   }
 
   /**
-   * Extract text from Notion blocks
+   * Extract text from Notion blocks (legacy method for backward compatibility)
    */
   extractTextFromBlocks(blocks) {
     let text = '';
@@ -77,6 +77,80 @@ export class NotionSync {
   }
 
   /**
+   * Extract structured blocks with hierarchy for better chunking
+   */
+  extractBlocksWithHierarchy(blocks) {
+    const structuredBlocks = [];
+    let headingStack = []; // Track heading hierarchy (h1, h2, h3)
+    
+    for (const block of blocks) {
+      try {
+        const blockData = {
+          type: block.type,
+          id: block.id,
+          content: '',
+          headingHierarchy: [...headingStack], // Copy current heading stack
+        };
+
+        switch (block.type) {
+          case 'paragraph':
+            blockData.content = block.paragraph?.rich_text?.map(t => t.plain_text).join('') || '';
+            break;
+          case 'heading_1':
+          case 'heading_2':
+          case 'heading_3':
+            const headingText = block[block.type]?.rich_text?.map(t => t.plain_text).join('') || '';
+            blockData.content = headingText;
+            
+            // Update heading stack based on heading level
+            const level = parseInt(block.type.split('_')[1]);
+            headingStack = headingStack.slice(0, level - 1); // Remove deeper levels
+            headingStack.push(headingText);
+            blockData.headingHierarchy = [...headingStack];
+            break;
+          case 'bulleted_list_item':
+          case 'numbered_list_item':
+            const item = block[block.type]?.rich_text?.map(t => t.plain_text).join('') || '';
+            blockData.content = `- ${item}`;
+            break;
+          case 'code':
+            const code = block.code?.rich_text?.map(t => t.plain_text).join('') || '';
+            blockData.content = `\`\`\`\n${code}\n\`\`\``;
+            break;
+          case 'quote':
+            const quote = block.quote?.rich_text?.map(t => t.plain_text).join('') || '';
+            blockData.content = `> ${quote}`;
+            break;
+          case 'to_do':
+            const todo = block.to_do?.rich_text?.map(t => t.plain_text).join('') || '';
+            const checked = block.to_do?.checked ? '[x]' : '[ ]';
+            blockData.content = `${checked} ${todo}`;
+            break;
+          case 'toggle':
+            const toggle = block.toggle?.rich_text?.map(t => t.plain_text).join('') || '';
+            blockData.content = toggle;
+            break;
+          case 'callout':
+            const callout = block.callout?.rich_text?.map(t => t.plain_text).join('') || '';
+            blockData.content = `> ${callout}`;
+            break;
+          default:
+            // Skip unsupported block types but still include in hierarchy
+            continue;
+        }
+
+        if (blockData.content.trim()) {
+          structuredBlocks.push(blockData);
+        }
+      } catch (error) {
+        console.error(`Error extracting block type ${block.type}:`, error.message);
+      }
+    }
+    
+    return structuredBlocks;
+  }
+
+  /**
    * Get page title from Notion page object
    */
   getPageTitle(page) {
@@ -101,7 +175,7 @@ export class NotionSync {
   }
 
   /**
-   * Chunk text for embeddings with safety limits
+   * Chunk text for embeddings with safety limits (legacy method)
    */
   chunkText(text) {
     const chunks = [];
@@ -123,6 +197,139 @@ export class NotionSync {
     }
     
     return chunks;
+  }
+
+  /**
+   * Chunk by block hierarchy for better RAG results
+   */
+  chunkByHierarchy(structuredBlocks, pageTitle) {
+    const chunks = [];
+    const CHUNK_SIZE = 1000; // 800-1000 chars as specified
+    const OVERLAP = 100; // Smaller overlap for hierarchical chunks
+    const MAX_CHUNKS = this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC;
+    
+    let currentChunk = '';
+    let currentHeading = null;
+    let chunkStartIndex = 0;
+    
+    for (let i = 0; i < structuredBlocks.length; i++) {
+      const block = structuredBlocks[i];
+      
+      // Check if this is a heading
+      if (block.type.startsWith('heading_')) {
+        currentHeading = block.content;
+      }
+      
+      // Build chunk content with heading context
+      let blockContent = block.content;
+      if (currentHeading && !block.type.startsWith('heading_')) {
+        // Include heading context for non-heading blocks
+        blockContent = `## ${currentHeading}\n${blockContent}`;
+      }
+      
+      const nextChunkLength = currentChunk.length + blockContent.length + 1; // +1 for newline
+      
+      // If adding this block would exceed chunk size, finalize current chunk
+      if (nextChunkLength > CHUNK_SIZE && currentChunk.length > 0) {
+        chunks.push({
+          content: currentChunk.trim(),
+          headingHierarchy: this.getHeadingHierarchy(structuredBlocks, chunkStartIndex),
+          blockType: this.getPrimaryBlockType(structuredBlocks, chunkStartIndex, i),
+          parentPage: pageTitle
+        });
+        
+        // Start new chunk with overlap
+        const overlapText = this.getOverlapText(currentChunk, OVERLAP);
+        currentChunk = overlapText + blockContent + '\n';
+        chunkStartIndex = i;
+      } else {
+        currentChunk += blockContent + '\n';
+      }
+      
+      // SAFETY: Stop at max chunks
+      if (chunks.length >= MAX_CHUNKS) {
+        console.log(`🛑 Chunk limit reached: ${chunks.length}/${MAX_CHUNKS} chunks`);
+        break;
+      }
+    }
+    
+    // Add final chunk if it has content
+    if (currentChunk.trim().length > 50) {
+      chunks.push({
+        content: currentChunk.trim(),
+        headingHierarchy: this.getHeadingHierarchy(structuredBlocks, chunkStartIndex),
+        blockType: this.getPrimaryBlockType(structuredBlocks, chunkStartIndex, structuredBlocks.length),
+        parentPage: pageTitle
+      });
+    }
+    
+    return chunks;
+  }
+
+  /**
+   * Get heading hierarchy for a chunk
+   */
+  getHeadingHierarchy(structuredBlocks, startIndex) {
+    const headingStack = [];
+    let currentLevel = 0;
+    
+    // Look backwards from start index to find current heading context
+    for (let i = Math.max(0, startIndex - 10); i < startIndex; i++) {
+      const block = structuredBlocks[i];
+      if (block.type.startsWith('heading_')) {
+        const level = parseInt(block.type.split('_')[1]);
+        
+        // Remove deeper levels and add current heading
+        headingStack.splice(level - 1);
+        headingStack[level - 1] = block.content;
+        currentLevel = level;
+      }
+    }
+    
+    return headingStack.filter(h => h).join(' > ');
+  }
+
+  /**
+   * Get primary block type for a chunk
+   */
+  getPrimaryBlockType(structuredBlocks, startIndex, endIndex) {
+    const blockTypes = new Set();
+    
+    for (let i = startIndex; i < endIndex; i++) {
+      if (structuredBlocks[i]) {
+        blockTypes.add(structuredBlocks[i].type);
+      }
+    }
+    
+    // Return most important block type
+    if (blockTypes.has('heading_1')) return 'heading_1';
+    if (blockTypes.has('heading_2')) return 'heading_2';
+    if (blockTypes.has('heading_3')) return 'heading_3';
+    if (blockTypes.has('code')) return 'code';
+    if (blockTypes.has('quote')) return 'quote';
+    if (blockTypes.has('bulleted_list_item')) return 'bulleted_list_item';
+    if (blockTypes.has('numbered_list_item')) return 'numbered_list_item';
+    
+    return 'paragraph'; // Default
+  }
+
+  /**
+   * Get overlap text from the end of current chunk
+   */
+  getOverlapText(text, overlapSize) {
+    if (text.length <= overlapSize) {
+      return text;
+    }
+    
+    // Try to break at line boundary within overlap
+    const overlapText = text.slice(-overlapSize);
+    const lineBreak = overlapText.lastIndexOf('\n');
+    
+    if (lineBreak > overlapSize * 0.5) {
+      return overlapText.slice(lineBreak + 1);
+    }
+    
+    return overlapText;
   }
 
   /**
@@ -176,7 +383,21 @@ export class NotionSync {
             page_size: 100,
           });
           
-          const text = this.extractTextFromBlocks(blocksResponse.results);
+          // Extract structured blocks with hierarchy
+          const structuredBlocks = this.extractBlocksWithHierarchy(blocksResponse.results);
+          
+          if (structuredBlocks.length === 0) {
+            console.log(`  ⊘ Skipped (no content blocks)`);
+            syncDetails.push({ 
+              name: title, 
+              status: 'skipped', 
+              reason: 'No content blocks' 
+            });
+            continue;
+          }
+          
+          // Create text for document storage (legacy format for compatibility)
+          const text = structuredBlocks.map(block => block.content).join('\n');
           
           if (!text || text.length < 50) {
             console.log(`  ⊘ Skipped (too short: ${text.length} chars)`);
@@ -188,7 +409,7 @@ export class NotionSync {
             continue;
           }
           
-          console.log(`  → Extracted ${text.length} characters`);
+          console.log(`  → Extracted ${text.length} characters from ${structuredBlocks.length} blocks`);
           
           // Store document
           const { data: doc, error: docError } = await this.supabaseAdmin
@@ -223,8 +444,8 @@ export class NotionSync {
             continue;
           }
           
-          // Process document into chunks and embeddings
-          await this.processDocument(doc);
+          // Process document into chunks and embeddings with hierarchical chunking
+          await this.processDocumentWithHierarchy(doc, structuredBlocks);
           
           processedDocs.push(doc);
           processedCount++;
@@ -262,7 +483,7 @@ export class NotionSync {
   }
 
   /**
-   * Process document: chunk + generate embeddings
+   * Process document: chunk + generate embeddings (legacy method)
    */
   async processDocument(document) {
     try {
@@ -336,6 +557,92 @@ export class NotionSync {
       console.log(`  🧠 Generated ${chunkData.length} embeddings`);
     } catch (error) {
       console.error('  ❌ Error processing document:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process document with hierarchical chunking: chunk + generate embeddings
+   */
+  async processDocumentWithHierarchy(document, structuredBlocks) {
+    try {
+      // Delete existing chunks
+      await this.supabaseAdmin
+        .from('document_chunks')
+        .delete()
+        .eq('document_id', document.id);
+
+      // Chunk the content using hierarchical chunking
+      const chunkObjects = this.chunkByHierarchy(structuredBlocks, document.title);
+      console.log(`  📝 Created ${chunkObjects.length} hierarchical chunks`);
+
+      if (chunkObjects.length === 0) {
+        console.log(`  ⚠️ No chunks created for ${document.title}`);
+        return;
+      }
+
+      // Generate embeddings in batches
+      const batchSize = 20;
+      const chunkData = [];
+
+      for (let i = 0; i < chunkObjects.length; i += batchSize) {
+        const batch = chunkObjects.slice(i, i + batchSize);
+        const batchContent = batch.map(chunk => chunk.content);
+        
+        let embeddings;
+        try {
+          const response = await this.openai.embeddings.create({
+            model: this.embeddingModel,
+            input: batchContent,
+          });
+          embeddings = response.data.map(d => d.embedding);
+        } catch (error) {
+          if (error.code === 'insufficient_quota' || error.status === 429) {
+            console.log('  ⚠️ OpenAI quota exceeded, skipping embeddings for this batch');
+            embeddings = new Array(batch.length).fill(null);
+          } else {
+            throw error;
+          }
+        }
+
+        // Prepare chunk data with enhanced metadata
+        for (let j = 0; j < batch.length; j++) {
+          const chunkObj = batch[j];
+          
+          chunkData.push({
+            document_id: document.id,
+            user_id: document.user_id,
+            chunk_index: i + j,
+            content: chunkObj.content,
+            token_count: Math.ceil(chunkObj.content.length / 4),
+            embedding: embeddings[j],
+            metadata: {
+              source_type: document.source_type,
+              title: document.title,
+              url: document.url,
+              author: document.author,
+              // Enhanced metadata for Notion
+              block_type: chunkObj.blockType,
+              heading_hierarchy: chunkObj.headingHierarchy,
+              parent_page: chunkObj.parentPage,
+            },
+          });
+        }
+      }
+
+      // Insert chunks
+      const { error } = await this.supabaseAdmin
+        .from('document_chunks')
+        .insert(chunkData);
+
+      if (error) {
+        console.error('  ❌ Error inserting chunks:', error);
+        throw error;
+      }
+
+      console.log(`  🧠 Generated ${chunkData.length} embeddings with hierarchical metadata`);
+    } catch (error) {
+      console.error('  ❌ Error processing document with hierarchy:', error);
       throw error;
     }
   }
