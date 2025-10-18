@@ -1,7 +1,7 @@
 
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, RefreshCw, SearchX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import AISummary from './AISummary';
@@ -154,7 +154,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
       <div className="w-full max-w-4xl mx-auto text-center space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
         <div className="space-y-4">
           <div className="w-24 h-24 mx-auto rounded-full bg-muted/20 flex items-center justify-center">
-            <RefreshCw className="w-12 h-12 text-muted-foreground" />
+            <SearchX className="w-12 h-12 text-muted-foreground" />
           </div>
           <div className="space-y-2">
             <h3 className="text-xl font-semibold text-foreground">No results found</h3>
