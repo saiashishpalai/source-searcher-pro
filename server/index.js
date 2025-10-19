@@ -119,7 +119,11 @@ app.get('/api/test/slack-file-access', async (req, res) => {
           type: f.filetype,
           size: f.size,
           created: new Date(f.created * 1000).toISOString(),
-          channels: f.channels
+          channels: f.channels,
+          url_private: f.url_private,
+          url_private_download: f.url_private_download,
+          is_public: f.is_public,
+          public_url_shared: f.public_url_shared
         }))
       },
       timestamp: new Date().toISOString()
@@ -710,11 +714,31 @@ app.get('/api/sync/status', async (req, res) => {
           .eq('user_id', user.id)
           .in('document_id', documents.map(d => d.id));
 
+        // For Slack, get additional file statistics
+        let filesProcessed = 0;
+        let filesTotal = 0;
+        
+        if (sourceType === 'slack') {
+          // Count files by checking documents with file metadata
+          const { data: slackFiles } = await supabaseAdmin
+            .from('documents')
+            .select('id, metadata')
+            .eq('user_id', user.id)
+            .eq('source_type', 'slack')
+            .not('metadata->file_type', 'is', null);
+          
+          filesTotal = slackFiles?.length || 0;
+          filesProcessed = slackFiles?.length || 0; // For now, assume all files are processed
+          
+          console.log(`📊 Slack file stats for user ${user.id}: ${filesProcessed}/${filesTotal} files`);
+        }
+
         statsBySource[sourceType] = {
           totalDocuments,
           totalChunks: chunks?.length || 0,
           lastSyncTime,
-          isSyncing: false
+          isSyncing: false,
+          ...(sourceType === 'slack' && { filesProcessed, filesTotal })
         };
       } else {
         statsBySource[sourceType] = {

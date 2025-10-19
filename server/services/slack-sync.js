@@ -504,14 +504,17 @@ export class SlackSync {
       console.log(`   • Conversations with files: ${syncStats.conversationsWithFiles}`);
       
       const unchangedConversations = syncStats.totalConversations - syncStats.processedConversations;
+      const totalSynced = syncStats.processedConversations + (fileStats?.processed || 0);
       return {
-        synced: syncStats.processedConversations,
-        total: syncStats.totalConversations,
+        synced: totalSynced, // Include files in total
+        total: syncStats.totalConversations + (fileStats?.total || 0),
         totalMessages: syncStats.totalMessages,
         totalChunks: totalChunksCreated,
+        filesProcessed: fileStats?.processed || 0,
+        filesTotal: fileStats?.total || 0,
         statistics: syncStats,
         details: syncDetails,
-        message: `Successfully created ${totalChunksCreated} message-level chunks from ${syncStats.totalMessages} messages across ${syncStats.processedConversations} conversations (incremental)`,
+        message: `Successfully synced ${fileStats?.processed || 0} files and created ${totalChunksCreated} message chunks from ${syncStats.totalMessages} messages across ${syncStats.processedConversations} conversations`,
         // User-friendly incremental sync feedback
         incrementalStats: {
           totalConversations: syncStats.totalConversations,
@@ -1025,11 +1028,18 @@ export class SlackSync {
       console.log('📁 Fetching Slack files...');
       
       // Get files from the last 30 days
+      // NOTE: Always fetch last 30 days of files, not just since last sync
+      // This ensures files uploaded before the first sync are still processed
       const daysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+      
+      console.log(`📅 File search parameters:`);
+      console.log(`   Searching from: ${new Date(daysAgo * 1000).toISOString()} (last 30 days)`);
+      console.log(`   Note: Ignoring lastSyncTimestamp for files to ensure all files are processed`);
+      
       const filesResult = await slack.files.list({
         count: 100, // Get up to 100 files
         types: 'all', // Include all file types
-        ts_from: lastSyncTimestamp ? Math.floor(new Date(lastSyncTimestamp).getTime() / 1000) : daysAgo
+        ts_from: daysAgo // Always use 30 days back, not lastSyncTimestamp
       });
 
       const files = filesResult.files || [];
@@ -1040,6 +1050,23 @@ export class SlackSync {
 
       for (const file of files) {
         try {
+          console.log(`\n  🔍 Processing file: ${file.name} (${file.filetype}, ${Math.round(file.size / 1024)}KB)`);
+          
+          // Check if file already exists in database
+          const { data: existingDoc } = await this.supabaseAdmin
+            .from('documents')
+            .select('id, synced_at')
+            .eq('user_id', userId)
+            .eq('source_type', 'slack')
+            .eq('source_id', file.id)
+            .single();
+          
+          if (existingDoc) {
+            console.log(`  ✓ Already synced: ${file.name} (last synced: ${existingDoc.synced_at})`);
+            processed++; // Count as processed
+            continue;
+          }
+          
           // Skip files that are too old or not accessible
           if (file.size > 50 * 1024 * 1024) { // Skip files larger than 50MB
             console.log(`  ⊘ Skipped ${file.name} (too large: ${Math.round(file.size / 1024 / 1024)}MB)`);
@@ -1047,21 +1074,25 @@ export class SlackSync {
           }
 
           // Get file info
+          console.log(`  📋 Getting file info for: ${file.name}`);
           const fileInfo = await slack.files.info({ file: file.id });
           const fileData = fileInfo.file;
+          console.log(`  📋 File info received. URL available: ${!!fileData.url_private}`);
 
           // Skip if file is not accessible
           if (!fileData.url_private) {
-            console.log(`  ⊘ Skipped ${file.name} (not accessible)`);
+            console.log(`  ⊘ Skipped ${file.name} (not accessible - no url_private)`);
             continue;
           }
 
           // Download file content
           const fileContent = await this.downloadSlackFile(slack, fileData);
           if (!fileContent) {
-            console.log(`  ⊘ Skipped ${file.name} (could not download)`);
+            console.log(`  ⊘ Skipped ${file.name} (could not download - no content returned)`);
             continue;
           }
+          console.log(`  ✓ File content downloaded: ${fileContent.length} characters`);
+
 
           // Generate content vector for similarity detection
           const contentVector = this.generateContentVector(fileContent);
@@ -1132,21 +1163,46 @@ export class SlackSync {
    */
   async downloadSlackFile(slack, fileData) {
     try {
-      // For text files, we can get the content directly
+      console.log(`  📥 Attempting to download: ${fileData.name} (${fileData.filetype})`);
+      
+      // Check if file has accessible URL
+      if (!fileData.url_private && !fileData.url_private_download) {
+        console.log(`  ⚠️ No private URL available for ${fileData.name}`);
+        return null;
+      }
+
+      // For text-based files, try to get content directly
       if (fileData.filetype === 'text' || fileData.filetype === 'javascript' || fileData.filetype === 'json') {
-        const response = await slack.files.sharedPublicURL({ file: fileData.id });
-        if (response.file?.permalink_public) {
-          // For now, we'll skip downloading and just return a placeholder
-          // In a real implementation, you'd fetch the file content
-          return `File: ${fileData.name}\nType: ${fileData.filetype}\nSize: ${fileData.size} bytes`;
+        try {
+          // Use url_private_download to fetch content
+          const response = await fetch(fileData.url_private_download, {
+            headers: {
+              'Authorization': `Bearer ${slack.token}`
+            }
+          });
+          
+          if (response.ok) {
+            const content = await response.text();
+            console.log(`  ✓ Downloaded text file: ${fileData.name} (${content.length} chars)`);
+            return content;
+          }
+        } catch (fetchError) {
+          console.log(`  ⚠️ Could not fetch text content: ${fetchError.message}`);
         }
       }
 
+      // For PDF files, return metadata with note that PDF extraction needs implementation
+      if (fileData.filetype === 'pdf') {
+        console.log(`  📄 PDF file detected: ${fileData.name}`);
+        return `PDF Document: ${fileData.name}\n\nNote: PDF text extraction is not yet implemented. This file contains ${Math.round(fileData.size / 1024)}KB of data.\n\nTo enable PDF search:\n1. The file needs to be downloaded from Slack\n2. PDF text extraction library (like pdf-parse) needs to be added\n3. Text content would be extracted and indexed\n\nFile URL: ${fileData.permalink}\nCreated: ${new Date(fileData.created * 1000).toISOString()}`;
+      }
+
       // For other file types, return metadata
-      return `File: ${fileData.name}\nType: ${fileData.filetype}\nSize: ${fileData.size} bytes\nCreated: ${new Date(fileData.created * 1000).toISOString()}`;
+      console.log(`  📎 File type ${fileData.filetype} - returning metadata`);
+      return `File: ${fileData.name}\nType: ${fileData.filetype}\nSize: ${fileData.size} bytes\nCreated: ${new Date(fileData.created * 1000).toISOString()}\nURL: ${fileData.permalink || 'N/A'}`;
 
     } catch (error) {
-      console.error(`Error downloading file ${fileData.name}:`, error);
+      console.error(`  ❌ Error downloading file ${fileData.name}:`, error.message);
       return null;
     }
   }
