@@ -292,7 +292,11 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
               ) : (
                 <>
                   <div className="flex justify-between">
-                    <span>Message Chunks:</span>
+                    <span>
+                      {connection.source_type === 'slack' ? 'Message Chunks:' : 
+                       connection.source_type === 'google_drive' ? 'Document Chunks:' :
+                       connection.source_type === 'notion' ? 'Page Chunks:' : 'Chunks:'}
+                    </span>
                     <span className="font-medium">{syncStatus?.[connection.source_type]?.totalChunks ?? 0}</span>
                   </div>
                   {connection.source_type === 'slack' && syncStatus?.[connection.source_type]?.statistics && (
@@ -321,7 +325,10 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                   )}
                   {connection.source_type !== 'slack' && (
                     <div className="flex justify-between">
-                      <span>Documents:</span>
+                      <span>
+                        {connection.source_type === 'google_drive' ? 'Files:' :
+                         connection.source_type === 'notion' ? 'Pages:' : 'Documents:'}
+                      </span>
                       <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
                     </div>
                   )}

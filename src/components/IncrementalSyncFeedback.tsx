@@ -123,31 +123,31 @@ const IncrementalSyncFeedback: React.FC<IncrementalSyncFeedbackProps> = ({
 
         {/* Compact Statistics Grid */}
         <div className="grid grid-cols-4 gap-1.5 text-xs">
-          {sourceType === 'google_drive' && (
-            <>
-              <div className="text-center p-1.5 bg-muted/30 rounded">
-                <div className="text-muted-foreground text-[10px]">Total</div>
-                <div className="font-semibold">{stats.totalFiles || 0}</div>
-              </div>
-              <div className="text-center p-1.5 bg-green-500/10 rounded">
-                <div className="text-green-400 text-[10px]">Changed</div>
-                <div className="font-semibold text-green-400">{stats.changedFiles || 0}</div>
-              </div>
-              <div className="text-center p-1.5 bg-muted/30 rounded">
-                <div className="text-muted-foreground text-[10px]">Skipped</div>
-                <div className="font-semibold">{stats.unchangedFiles || 0}</div>
-              </div>
-              <div className="text-center p-1.5 bg-blue-500/10 rounded">
-                <div className="text-blue-400 text-[10px]">Efficiency</div>
-                <div className="font-semibold text-blue-400">{efficiencyPercentage}%</div>
-              </div>
-            </>
-          )}
+            {sourceType === 'google_drive' && (
+              <>
+                <div className="text-center p-1.5 bg-muted/30 rounded">
+                  <div className="text-muted-foreground text-[10px]">Files</div>
+                  <div className="font-semibold">{stats.totalFiles || 0}</div>
+                </div>
+                <div className="text-center p-1.5 bg-green-500/10 rounded">
+                  <div className="text-green-400 text-[10px]">Changed</div>
+                  <div className="font-semibold text-green-400">{stats.changedFiles || 0}</div>
+                </div>
+                <div className="text-center p-1.5 bg-muted/30 rounded">
+                  <div className="text-muted-foreground text-[10px]">Skipped</div>
+                  <div className="font-semibold">{stats.unchangedFiles || 0}</div>
+                </div>
+                <div className="text-center p-1.5 bg-blue-500/10 rounded">
+                  <div className="text-blue-400 text-[10px]">Efficiency</div>
+                  <div className="font-semibold text-blue-400">{efficiencyPercentage}%</div>
+                </div>
+              </>
+            )}
 
           {sourceType === 'notion' && (
             <>
               <div className="text-center p-1.5 bg-muted/30 rounded">
-                <div className="text-muted-foreground text-[10px]">Total</div>
+                <div className="text-muted-foreground text-[10px]">Pages</div>
                 <div className="font-semibold">{stats.totalPages || 0}</div>
               </div>
               <div className="text-center p-1.5 bg-green-500/10 rounded">
@@ -168,7 +168,7 @@ const IncrementalSyncFeedback: React.FC<IncrementalSyncFeedbackProps> = ({
           {sourceType === 'slack' && (
             <>
               <div className="text-center p-1.5 bg-muted/30 rounded">
-                <div className="text-muted-foreground text-[10px]">Total</div>
+                <div className="text-muted-foreground text-[10px]">Chats</div>
                 <div className="font-semibold">{stats.totalConversations || 0}</div>
               </div>
               <div className="text-center p-1.5 bg-green-500/10 rounded">
