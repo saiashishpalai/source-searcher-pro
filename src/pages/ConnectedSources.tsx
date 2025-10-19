@@ -302,11 +302,11 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                   {connection.source_type === 'slack' && syncStatus?.[connection.source_type]?.statistics && (
                     <>
                       <div className="flex justify-between">
-                        <span>Total Messages:</span>
+                        <span>Messages:</span>
                         <span className="font-medium">{syncStatus[connection.source_type].statistics.totalMessages ?? 0}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Conversations:</span>
+                        <span>Chats:</span>
                         <span className="font-medium">{syncStatus[connection.source_type].statistics.processedConversations ?? 0}</span>
                       </div>
                       <div className="flex justify-between">
