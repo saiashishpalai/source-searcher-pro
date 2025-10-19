@@ -333,25 +333,72 @@ export class NotionSync {
   }
 
   /**
-   * Sync Notion pages for a user with SAFETY LIMITS
+   * Get last sync timestamp for this user and source
+   */
+  async getLastSyncTimestamp(userId, sourceType) {
+    const { data } = await this.supabaseAdmin
+      .from('user_connections')
+      .select('last_synced_at')
+      .eq('user_id', userId)
+      .eq('source_type', sourceType)
+      .single();
+    return data?.last_synced_at || null;
+  }
+
+  /**
+   * Update last sync timestamp for this user and source
+   */
+  async updateLastSyncTimestamp(userId, sourceType) {
+    await this.supabaseAdmin
+      .from('user_connections')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('source_type', sourceType);
+  }
+
+  /**
+   * Sync Notion pages for a user with incremental sync
    */
   async syncNotion(userId, accessToken) {
     try {
-      console.log(`🔄 Starting Notion sync for user ${userId} with safety limits`);
+      console.log(`🔄 Starting Notion incremental sync for user ${userId} with safety limits`);
       console.log(`📊 Limits: Max ${this.SYNC_LIMITS.MAX_DOCUMENTS} pages, ${this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC} chunks/page`);
+
+      // Get last sync timestamp
+      const lastSyncTimestamp = await this.getLastSyncTimestamp(userId, 'notion');
+      console.log(`📅 Last sync: ${lastSyncTimestamp || 'Never'}`);
 
       // Initialize Notion client
       const notion = new Client({ auth: accessToken });
       
       console.log('✓ Notion client initialized, fetching pages...');
 
-      // Search for all pages the integration has access to
-      const searchResponse = await notion.search({
-        filter: { property: 'object', value: 'page' },
-        page_size: this.SYNC_LIMITS.MAX_DOCUMENTS,
-      });
+      // Search for pages with incremental filtering
+      let searchResponse;
+      if (lastSyncTimestamp) {
+        // Only get pages edited since last sync
+        console.log(`🔍 Fetching pages edited since ${lastSyncTimestamp}`);
+        searchResponse = await notion.search({
+          filter: { 
+            property: 'object', 
+            value: 'page'
+          },
+          sort: {
+            direction: 'descending',
+            timestamp: 'last_edited_time'
+          },
+          page_size: this.SYNC_LIMITS.MAX_DOCUMENTS,
+        });
+      } else {
+        // First sync - get all pages
+        console.log(`🔍 First sync - fetching all pages`);
+        searchResponse = await notion.search({
+          filter: { property: 'object', value: 'page' },
+          page_size: this.SYNC_LIMITS.MAX_DOCUMENTS,
+        });
+      }
 
-      const pages = searchResponse.results;
+      let pages = searchResponse.results;
       
       if (!pages || pages.length === 0) {
         console.log('⚠️ No Notion pages found');
@@ -363,7 +410,19 @@ export class NotionSync {
         };
       }
 
-      console.log(`📁 Found ${pages.length} Notion pages`);
+      // Filter pages by last_edited_time if this is an incremental sync
+      if (lastSyncTimestamp) {
+        const lastSyncDate = new Date(lastSyncTimestamp);
+        const filteredPages = pages.filter(page => {
+          const pageLastEdited = new Date(page.last_edited_time);
+          return pageLastEdited > lastSyncDate;
+        });
+        
+        console.log(`📁 Found ${pages.length} total pages, ${filteredPages.length} edited since last sync`);
+        pages = filteredPages;
+      } else {
+        console.log(`📁 Found ${pages.length} Notion pages (first sync)`);
+      }
 
       const processedDocs = [];
       const syncDetails = [];
@@ -467,13 +526,32 @@ export class NotionSync {
         }
       }
 
-      console.log(`\n🎉 Notion sync complete: ${processedCount} of ${pages.length} pages processed`);
+      // Update last sync timestamp
+      await this.updateLastSyncTimestamp(userId, 'notion');
+
+      console.log(`\n🎉 Notion incremental sync complete: ${processedCount} of ${pages.length} pages processed`);
+      
+      // Calculate stats based on whether this was incremental or full sync
+      const totalPagesFound = lastSyncTimestamp ? 
+        (searchResponse.results?.length || 0) : 
+        pages.length;
+      const unchangedPages = totalPagesFound - processedCount;
       
       return {
         synced: processedCount,
         total: pages.length,
         details: syncDetails,
-        message: `Successfully synced ${processedCount} of ${pages.length} Notion pages`
+        message: `Successfully synced ${processedCount} of ${pages.length} Notion pages (incremental)`,
+        // User-friendly incremental sync feedback
+        incrementalStats: {
+          totalPages: totalPagesFound,
+          changedPages: processedCount,
+          unchangedPages: unchangedPages,
+          isIncremental: lastSyncTimestamp !== null,
+          efficiencyMessage: lastSyncTimestamp !== null
+            ? `Smart sync: Only ${processedCount} of ${totalPagesFound} pages were edited since last sync (${Math.round((unchangedPages / totalPagesFound) * 100)}% were unchanged)`
+            : `Full sync: All ${pages.length} pages were processed`
+        }
       };
 
     } catch (error) {

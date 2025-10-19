@@ -130,11 +130,15 @@ export class SearchService {
       const sources = [...new Set(chunks.map(c => c.metadata?.source_type))];
       console.log(`📁 Results from sources: ${sources.join(', ')}`);
 
+      // Apply recency boost to search results
+      const boostedChunks = this.applyRecencyBoost(chunks);
+      console.log(`📈 Applied recency boost to ${boostedChunks.length} chunks`);
+
       // 3. Generate AI summary using RAG
-      const aiSummary = await this.generateSummary(query, chunks);
+      const aiSummary = await this.generateSummary(query, boostedChunks);
 
       // 4. Format results
-      const results = chunks.map(chunk => {
+      const results = boostedChunks.map(chunk => {
         const metadata = chunk.metadata || {};
         const sourceType = metadata.source_type || 'google_drive';
         
@@ -148,7 +152,7 @@ export class SearchService {
           type: this.getDocumentType(metadata.title || ''),
           author: metadata.author || 'Unknown',
           timestamp: metadata.timestamp || new Date().toISOString(),
-          relevanceScore: chunk.similarity || 0.8,
+          relevanceScore: chunk.final_score || chunk.similarity || 0.8,
           url: metadata.url || '',
           metadata: metadata,
         };
@@ -663,6 +667,43 @@ Please provide a clear, concise summary that directly addresses the user's quest
     
     const snippet = words.slice(startIndex, startIndex + 30).join(' '); // 30 words
     return snippet + (words.length > startIndex + 30 ? '...' : '');
+  }
+
+  /**
+   * Apply recency boost to search results
+   */
+  applyRecencyBoost(chunks) {
+    const now = Date.now();
+    
+    return chunks.map(chunk => {
+      // Try to get sync timestamp from various sources
+      const syncedAt = chunk.synced_at || 
+                      chunk.metadata?.timestamp || 
+                      chunk.metadata?.last_modified_at ||
+                      Date.now();
+      
+      const syncedAtTime = new Date(syncedAt).getTime();
+      const daysSince = (now - syncedAtTime) / (1000 * 60 * 60 * 24);
+      
+      let multiplier = 1.0;
+      if (daysSince <= 7) multiplier = 1.5;
+      else if (daysSince <= 30) multiplier = 1.3;
+      else if (daysSince <= 90) multiplier = 1.1;
+      else if (daysSince <= 180) multiplier = 1.0;
+      else multiplier = 0.7;
+      
+      const baseScore = chunk.similarity || 0.8;
+      const finalScore = baseScore * multiplier;
+      
+      console.log(`📈 Recency boost: ${chunk.metadata?.title || 'Unknown'} scored ${finalScore.toFixed(3)} (base: ${baseScore.toFixed(3)}, days: ${Math.floor(daysSince)}, multiplier: ${multiplier})`);
+      
+      return {
+        ...chunk,
+        final_score: finalScore,
+        days_since_sync: Math.floor(daysSince),
+        recency_multiplier: multiplier
+      };
+    }).sort((a, b) => b.final_score - a.final_score);
   }
 
   /**

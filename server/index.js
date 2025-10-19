@@ -12,6 +12,7 @@ import https from 'https';
 import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import { DocumentSync } from './services/document-sync.js';
+import { GoogleDriveSync } from './services/google-drive-sync.js';
 import { SearchService } from './services/search-service.js';
 import { NotionSync } from './services/notion-sync.js';
 import { SlackSync } from './services/slack-sync.js';
@@ -36,6 +37,7 @@ const supabaseAdmin = createClient(
 
 // Initialize services
 const documentSync = new DocumentSync(process.env.OPENAI_API_KEY);
+const googleDriveSync = new GoogleDriveSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
@@ -493,19 +495,14 @@ app.post('/api/sync/google-drive', async (req, res) => {
     console.log('✅ OAuth token is valid');
     
     // Call sync service with real-time logging
-    const docs = await documentSync.syncGoogleDrive(
+    const result = await googleDriveSync.syncGoogleDrive(
       user.id, 
-      connection.access_token, 
-      supabaseAdmin
+      connection.access_token
     );
     
-    console.log(`✓ Sync complete: ${docs.length} documents`);
+    console.log(`✓ Sync complete: ${result.synced} documents, ${result.skipped} skipped`);
     
-    res.json({ 
-      synced: docs.length,
-      total: docs.length,
-      message: `Successfully synced ${docs.length} documents`
-    });
+    res.json(result);
     
   } catch (error) {
     console.error('✗ Sync error:', error.message);

@@ -24,125 +24,13 @@ export class DocumentSync {
   }
 
   /**
-   * Sync Google Drive documents for a user with SAFETY LIMITS
+   * DEPRECATED: Google Drive sync has been moved to google-drive-sync.js
+   * This method is kept for backward compatibility but should not be used.
    */
   async syncGoogleDrive(userId, accessToken, supabaseAdmin, progressCallback = null) {
-    try {
-      console.log(`🔄 Starting Google Drive sync for user ${userId} with safety limits`);
-      console.log(`📊 Limits: Max ${this.SYNC_LIMITS.MAX_DOCUMENTS} docs, ${this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC} chunks/doc, $${this.SYNC_LIMITS.STOP_AT_COST} max cost`);
-
-      // Setup Google Drive API
-      const oauth2Client = new google.auth.OAuth2();
-      oauth2Client.setCredentials({ access_token: accessToken });
-      const drive = google.drive({ version: 'v3', auth: oauth2Client });
-
-      // Test OAuth token first
-      try {
-        await drive.about.get({ fields: 'user' });
-        console.log('✅ OAuth token is valid');
-      } catch (authError) {
-        console.error('❌ OAuth token invalid or expired:', authError.message);
-        throw new Error('invalid authentication');
-      }
-
-      // List all files
-      const response = await drive.files.list({
-        pageSize: 100,
-        fields: 'files(id, name, mimeType, modifiedTime, size, webViewLink, owners)',
-        q: "trashed=false",
-      });
-
-      const files = response.data.files || [];
-      console.log(`📁 Found ${files.length} files in Google Drive`);
-
-      const processedDocs = [];
-      let processedCount = 0;
-      let totalCost = 0;
-
-      for (const file of files) {
-        // SAFETY CHECK #1: Document limit
-        if (processedCount >= this.SYNC_LIMITS.MAX_DOCUMENTS) {
-          console.log(`🛑 Safety limit reached: Processed ${processedCount}/${this.SYNC_LIMITS.MAX_DOCUMENTS} documents`);
-          break;
-        }
-
-        // SAFETY CHECK #2: File size limit
-        if (file.size && parseInt(file.size) > this.SYNC_LIMITS.MAX_FILE_SIZE) {
-          console.log(`⏭️ Skipping ${file.name} - too large (${file.size} bytes)`);
-          continue;
-        }
-
-        try {
-          console.log(`📄 Processing document ${processedCount + 1}/${this.SYNC_LIMITS.MAX_DOCUMENTS}: ${file.name}`);
-          const content = await this.extractFileContent(drive, file);
-          
-          if (!content) {
-            console.log(`⏭️ Skipping ${file.name} - no text content`);
-            continue;
-          }
-
-          // SAFETY CHECK #3: Cost estimation
-          const estimatedTokens = content.length / 4; // Rough estimate
-          const estimatedCost = (estimatedTokens / 1000000) * 0.10; // $0.10 per 1M tokens
-          totalCost += estimatedCost;
-
-          if (totalCost > this.SYNC_LIMITS.STOP_AT_COST) {
-            console.log(`🛑 Safety limit reached: Estimated cost $${totalCost.toFixed(2)} > $${this.SYNC_LIMITS.STOP_AT_COST}`);
-            break;
-          }
-
-          // Store document
-          const { data: doc, error: docError } = await supabaseAdmin
-            .from('documents')
-            .upsert({
-              user_id: userId,
-              source_type: 'google_drive',
-              source_id: file.id,
-              title: file.name,
-              content,
-              url: file.webViewLink,
-              author: file.owners?.[0]?.displayName || 'Unknown',
-              mime_type: file.mimeType,
-              file_size: parseInt(file.size) || 0,
-              last_modified_at: file.modifiedTime,
-              metadata: { owners: file.owners },
-              synced_at: new Date().toISOString(),
-            }, { onConflict: 'user_id,source_type,source_id' })
-            .select()
-            .single();
-
-          if (docError) {
-            console.error(`❌ Error storing document ${file.name}:`, docError);
-            continue;
-          }
-
-          // Process document into chunks and embeddings
-          await this.processDocument(doc, supabaseAdmin);
-          processedDocs.push(doc);
-          processedCount++;
-
-          console.log(`✅ Processed: ${file.name} (${processedCount}/${this.SYNC_LIMITS.MAX_DOCUMENTS}) - Est. cost: $${totalCost.toFixed(3)}`);
-          
-          // Update progress callback if provided
-          if (progressCallback) {
-            progressCallback({
-              status: 'processing',
-              processedDocuments: processedCount,
-              totalDocuments: this.SYNC_LIMITS.MAX_DOCUMENTS,
-              currentDocument: file.name
-            });
-          }
-        } catch (error) {
-          console.error(`❌ Error processing ${file.name}:`, error);
-        }
-      }
-
-      console.log(`🎉 Google Drive sync complete: ${processedDocs.length} documents processed, estimated cost: $${totalCost.toFixed(3)}`);
-      return processedDocs;
-    } catch (error) {
-      console.error('❌ Google Drive sync failed:', error);
-      throw error;
-    }
+    console.warn('⚠️ DEPRECATED: Google Drive sync has been moved to google-drive-sync.js');
+    console.warn('⚠️ Please use GoogleDriveSync class from server/services/google-drive-sync.js instead');
+    throw new Error('Google Drive sync has been moved to google-drive-sync.js. Please use the new GoogleDriveSync class.');
   }
 
   /**

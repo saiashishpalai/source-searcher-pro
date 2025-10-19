@@ -80,13 +80,44 @@ export class SlackSync {
   }
 
   /**
+   * Get last sync timestamp for this user and source
+   */
+  async getLastSyncTimestamp(userId, sourceType) {
+    const { data } = await this.supabaseAdmin
+      .from('user_connections')
+      .select('last_synced_at')
+      .eq('user_id', userId)
+      .eq('source_type', sourceType)
+      .single();
+    return data?.last_synced_at || null;
+  }
+
+  /**
+   * Update last sync timestamp for this user and source
+   */
+  async updateLastSyncTimestamp(userId, sourceType) {
+    await this.supabaseAdmin
+      .from('user_connections')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('source_type', sourceType);
+  }
+
+  /**
    * Fetch messages from a conversation with thread replies
    */
-  async fetchMessages(slack, channelId, oldest) {
+  async fetchMessages(slack, channelId, oldest, lastSyncTimestamp = null) {
     try {
+      // Use last sync timestamp if available, otherwise use the provided oldest timestamp
+      const oldestTimestamp = lastSyncTimestamp ? 
+        Math.floor(new Date(lastSyncTimestamp).getTime() / 1000) : 
+        oldest;
+        
+      console.log(`  📅 Fetching messages since: ${new Date(oldestTimestamp * 1000).toISOString()}`);
+      
       const result = await slack.conversations.history({
         channel: channelId,
-        oldest: oldest.toString(),
+        oldest: oldestTimestamp.toString(),
         limit: this.SYNC_LIMITS.MAX_MESSAGES_PER_CHANNEL,
       });
 
@@ -224,12 +255,16 @@ export class SlackSync {
   }
 
   /**
-   * Sync Slack messages with MESSAGE-LEVEL CHUNKING and thread context
+   * Sync Slack messages with incremental sync and MESSAGE-LEVEL CHUNKING
    */
   async syncSlack(userId, accessToken) {
     try {
-      console.log(`🔄 Starting Slack sync with MESSAGE-LEVEL CHUNKING for user ${userId}`);
+      console.log(`🔄 Starting Slack incremental sync with MESSAGE-LEVEL CHUNKING for user ${userId}`);
       console.log(`📊 Limits: Max ${this.SYNC_LIMITS.MAX_CHANNELS} conversations, ${this.SYNC_LIMITS.MAX_MESSAGES_PER_CHANNEL} messages/conversation, last ${this.SYNC_LIMITS.MESSAGE_DAYS_BACK} days`);
+
+      // Get last sync timestamp
+      const lastSyncTimestamp = await this.getLastSyncTimestamp(userId, 'slack');
+      console.log(`📅 Last sync: ${lastSyncTimestamp || 'Never'}`);
 
       // Initialize Slack client
       const slack = new WebClient(accessToken);
@@ -246,7 +281,7 @@ export class SlackSync {
       
       console.log('📱 Fetching conversations...');
 
-      // Calculate timestamp for X days ago
+      // Calculate timestamp for X days ago (fallback if no last sync)
       const daysAgo = Math.floor(Date.now() / 1000) - (this.SYNC_LIMITS.MESSAGE_DAYS_BACK * 24 * 60 * 60);
 
       // Get all conversations (channels, DMs, group DMs)
@@ -296,8 +331,8 @@ export class SlackSync {
         console.log(`\n💬 [${i + 1}/${conversations.length}] Processing: ${channelInfo.name}`);
         
         try {
-          // Fetch messages from this conversation
-          const messages = await this.fetchMessages(slack, conversation.id, daysAgo);
+          // Fetch messages from this conversation with incremental sync
+          const messages = await this.fetchMessages(slack, conversation.id, daysAgo, lastSyncTimestamp);
           
           if (messages.length === 0) {
             console.log(`  ⊘ Skipped (no recent messages)`);
@@ -388,7 +423,10 @@ export class SlackSync {
         }
       }
 
-      console.log(`\n🎉 MESSAGE-LEVEL CHUNKING sync complete!`);
+      // Update last sync timestamp
+      await this.updateLastSyncTimestamp(userId, 'slack');
+
+      console.log(`\n🎉 Slack incremental sync complete!`);
       console.log(`📊 Statistics:`);
       console.log(`   • Conversations processed: ${syncStats.processedConversations}/${syncStats.totalConversations}`);
       console.log(`   • Total messages: ${syncStats.totalMessages}`);
@@ -397,6 +435,7 @@ export class SlackSync {
       console.log(`   • Conversations with threads: ${syncStats.conversationsWithThreads}`);
       console.log(`   • Conversations with files: ${syncStats.conversationsWithFiles}`);
       
+      const unchangedConversations = syncStats.totalConversations - syncStats.processedConversations;
       return {
         synced: syncStats.processedConversations,
         total: syncStats.totalConversations,
@@ -404,7 +443,18 @@ export class SlackSync {
         totalChunks: totalChunksCreated,
         statistics: syncStats,
         details: syncDetails,
-        message: `Successfully created ${totalChunksCreated} message-level chunks from ${syncStats.totalMessages} messages across ${syncStats.processedConversations} conversations`
+        message: `Successfully created ${totalChunksCreated} message-level chunks from ${syncStats.totalMessages} messages across ${syncStats.processedConversations} conversations (incremental)`,
+        // User-friendly incremental sync feedback
+        incrementalStats: {
+          totalConversations: syncStats.totalConversations,
+          activeConversations: syncStats.processedConversations,
+          unchangedConversations: unchangedConversations,
+          totalMessages: syncStats.totalMessages,
+          isIncremental: lastSyncTimestamp !== null,
+          efficiencyMessage: lastSyncTimestamp !== null
+            ? `Smart sync: Only ${syncStats.processedConversations} of ${syncStats.totalConversations} conversations had new messages since last sync (${Math.round((unchangedConversations / syncStats.totalConversations) * 100)}% were unchanged)`
+            : `Full sync: All ${syncStats.totalConversations} conversations were processed`
+        }
       };
 
     } catch (error) {

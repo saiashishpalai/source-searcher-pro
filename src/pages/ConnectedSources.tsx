@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { getEnvVar } from '@/lib/env';
 import { ApiClient } from '@/lib/api-client';
+import IncrementalSyncFeedback from '@/components/IncrementalSyncFeedback';
 
 // SVG Icon Components (reusing from existing components)
 const SlackIcon = ({ className = "" }: { className?: string }) => (
@@ -104,7 +105,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 );
 
 // Connection Status Component
-    const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing, onSyncDocuments, isSyncing, syncStatus, syncStatusLoading = false, syncError = null, setSyncError, onClearData }: {
+    const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing, onSyncDocuments, isSyncing, syncStatus, syncStatusLoading = false, syncError = null, setSyncError, onClearData, incrementalSyncResults }: {
       connection: any;
       onRefresh: () => void;
       onDisconnect: () => void;
@@ -116,6 +117,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
       syncError?: string | null;
       setSyncError?: (error: string | null) => void;
       onClearData?: () => void;
+      incrementalSyncResults?: any;
     }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -148,9 +150,9 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col min-h-[310px]">
       {/* Status Overview */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${connection.status === 'healthy' ? 'bg-green-400' : connection.status === 'warning' ? 'bg-yellow-400' : 'bg-red-400'} animate-pulse`} />
           <span className="text-sm font-medium text-foreground">
@@ -174,7 +176,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 
       {/* Sync Progress */}
       {connection.sync_in_progress && (
-        <div className="space-y-2">
+        <div className="space-y-2 mb-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Syncing...</span>
             <span className="font-medium">{connection.sync_progress || 0}%</span>
@@ -184,184 +186,195 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
       )}
 
       {/* Action Buttons */}
-      <div className="space-y-2">
+      <div className="space-y-2 mb-3">
           {/* Sync Documents Button for Google Drive, Notion, and Slack */}
           {(connection.source_type === 'google_drive' || connection.source_type === 'notion' || connection.source_type === 'slack') && onSyncDocuments && (
             <div className="space-y-2">
-              <div className="space-y-2">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={onSyncDocuments}
-                  disabled={isSyncing}
-                  className="w-full bg-primary hover:bg-primary/90"
-                >
-                  {isSyncing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <Database className="w-4 h-4 mr-2" />
-                      {(syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 ? 'Re-sync Documents' : 'Sync Documents'}
-                    </>
-                  )}
-                </Button>
-                
-                {(syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onClearData}
-                    className="w-full text-xs text-red-600 hover:text-white hover:bg-red-600"
-                  >
-                    Clear All Data
-                  </Button>
-                )}
-              </div>
-              
-              {/* Sync Status Info */}
-              <div className="text-xs text-muted-foreground space-y-1">
-                {!isSyncing && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onSyncDocuments}
+                disabled={isSyncing}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                {isSyncing ? (
                   <>
-                    {syncError ? (
-                      <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg shadow-sm animate-in fade-in-50 slide-in-from-top-2 duration-300">
-                        <div className="flex items-start gap-3">
-                          <div className="p-1 bg-red-100 rounded-full">
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                          </div>
-                          <div className="flex-1 space-y-2">
-                            <div>
-                              <p className="text-sm font-semibold text-red-900">Sync Issue</p>
-                              <p className="text-sm text-red-700 mt-1 leading-relaxed">{syncError}</p>
-                            </div>
-                            <div className="flex gap-2 pt-1">
-                              {syncError.includes('expired') && syncError.includes('session') ? (
-                                <Button
-                                  onClick={() => window.location.reload()}
-                                  size="sm"
-                                  variant="default"
-                                  className="bg-red-600 hover:bg-red-700 text-white"
-                                >
-                                  <RefreshCw className="w-3 h-3 mr-1.5" />
-                                  Refresh Page
-                                </Button>
-                              ) : syncError.includes('expired') || syncError.includes('reconnect') ? (
-                                <Button
-                                  onClick={() => {
-                                    setSyncError?.(null);
-                                    window.location.href = '/connect-sources';
-                                  }}
-                                  size="sm"
-                                  variant="default"
-                                  className="bg-red-600 hover:bg-red-700 text-white"
-                                >
-                                  <ExternalLink className="w-3 h-3 mr-1.5" />
-                                  Reconnect
-                                </Button>
-                              ) : (
-                                <Button
-                                  onClick={() => handleSyncDocuments?.()}
-                                  size="sm"
-                                  variant="default"
-                                  className="bg-red-600 hover:bg-red-700 text-white"
-                                >
-                                  <RefreshCw className="w-3 h-3 mr-1.5" />
-                                  Try Again
-                                </Button>
-                              )}
-                              <Button
-                                onClick={() => setSyncError?.(null)}
-                                size="sm"
-                                variant="outline"
-                                className="border-red-200 hover:bg-red-50"
-                              >
-                                <X className="w-3 h-3 mr-1.5" />
-                                Dismiss
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex justify-between">
-                          <span>Message Chunks:</span>
-                          <span className="font-medium">{syncStatus?.[connection.source_type]?.totalChunks ?? 0}</span>
-                        </div>
-                        {connection.source_type === 'slack' && syncStatus?.[connection.source_type]?.statistics && (
-                          <>
-                            <div className="flex justify-between">
-                              <span>Total Messages:</span>
-                              <span className="font-medium">{syncStatus[connection.source_type].statistics.totalMessages ?? 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Conversations:</span>
-                              <span className="font-medium">{syncStatus[connection.source_type].statistics.processedConversations ?? 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>DMs:</span>
-                              <span className="font-medium">{syncStatus[connection.source_type].statistics.dms ?? 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Channels:</span>
-                              <span className="font-medium">{syncStatus[connection.source_type].statistics.channels ?? 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>With Threads:</span>
-                              <span className="font-medium">{syncStatus[connection.source_type].statistics.conversationsWithThreads ?? 0}</span>
-                            </div>
-                          </>
-                        )}
-                        {connection.source_type !== 'slack' && (
-                          <div className="flex justify-between">
-                            <span>Documents:</span>
-                            <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span>Last Sync:</span>
-                          <span className="font-medium">
-                            {syncStatus?.[connection.source_type]?.lastSyncTime 
-                              ? new Date(syncStatus[connection.source_type].lastSyncTime).toLocaleString()
-                              : 'Never'
-                            }
-                          </span>
-                        </div>
-                      </>
-                    )}
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-4 h-4 mr-2" />
+                    {(syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 ? 'Re-sync Documents' : 'Sync Documents'}
                   </>
                 )}
-              </div>
+              </Button>
+              
+              {(syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onClearData}
+                  className="w-full text-xs text-red-600 hover:text-white hover:bg-red-600"
+                >
+                  Clear All Data
+                </Button>
+              )}
             </div>
           )}
-        
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            className="flex-1"
-          >
-            {isRefreshing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Refresh
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDisconnect}
-            className="flex-1 text-destructive hover:text-white hover:bg-destructive"
-          >
-            <X className="w-4 h-4 mr-2" />
-            Disconnect
-          </Button>
+      </div>
+
+      {/* Stats Section */}
+      <div className="flex-1 mb-3">
+        {/* Sync Status Info */}
+        <div className="text-xs text-muted-foreground space-y-1">
+          {!isSyncing && (
+            <>
+              {syncError ? (
+                <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg shadow-sm animate-in fade-in-50 slide-in-from-top-2 duration-300">
+                  <div className="flex items-start gap-3">
+                    <div className="p-1 bg-red-100 rounded-full">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div>
+                        <p className="text-sm font-semibold text-red-900">Sync Issue</p>
+                        <p className="text-sm text-red-700 mt-1 leading-relaxed">{syncError}</p>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        {syncError.includes('expired') && syncError.includes('session') ? (
+                          <Button
+                            onClick={() => window.location.reload()}
+                            size="sm"
+                            variant="default"
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1.5" />
+                            Refresh Page
+                          </Button>
+                        ) : syncError.includes('expired') || syncError.includes('reconnect') ? (
+                          <Button
+                            onClick={() => {
+                              setSyncError?.(null);
+                              window.location.href = '/connect-sources';
+                            }}
+                            size="sm"
+                            variant="default"
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            <ExternalLink className="w-3 h-3 mr-1.5" />
+                            Reconnect
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleSyncDocuments?.()}
+                            size="sm"
+                            variant="default"
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1.5" />
+                            Try Again
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => setSyncError?.(null)}
+                          size="sm"
+                          variant="outline"
+                          className="border-red-200 hover:bg-red-50"
+                        >
+                          <X className="w-3 h-3 mr-1.5" />
+                          Dismiss
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span>Message Chunks:</span>
+                    <span className="font-medium">{syncStatus?.[connection.source_type]?.totalChunks ?? 0}</span>
+                  </div>
+                  {connection.source_type === 'slack' && syncStatus?.[connection.source_type]?.statistics && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Total Messages:</span>
+                        <span className="font-medium">{syncStatus[connection.source_type].statistics.totalMessages ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Conversations:</span>
+                        <span className="font-medium">{syncStatus[connection.source_type].statistics.processedConversations ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>DMs:</span>
+                        <span className="font-medium">{syncStatus[connection.source_type].statistics.dms ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Channels:</span>
+                        <span className="font-medium">{syncStatus[connection.source_type].statistics.channels ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>With Threads:</span>
+                        <span className="font-medium">{syncStatus[connection.source_type].statistics.conversationsWithThreads ?? 0}</span>
+                      </div>
+                    </>
+                  )}
+                  {connection.source_type !== 'slack' && (
+                    <div className="flex justify-between">
+                      <span>Documents:</span>
+                      <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Last Sync:</span>
+                    <span className="font-medium">
+                      {syncStatus?.[connection.source_type]?.lastSyncTime 
+                        ? new Date(syncStatus[connection.source_type].lastSyncTime).toLocaleString()
+                        : 'Never'
+                      }
+                    </span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
+
+        {/* Incremental Sync Feedback - Now properly positioned */}
+        {incrementalSyncResults && incrementalSyncResults[connection.source_type] && (
+          <IncrementalSyncFeedback
+            sourceType={connection.source_type}
+            stats={incrementalSyncResults[connection.source_type]}
+            isVisible={true}
+          />
+        )}
+      </div>
+        
+      {/* Bottom Actions */}
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="flex-1"
+        >
+          {isRefreshing ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Refresh
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDisconnect}
+          className="flex-1 text-destructive hover:text-white hover:bg-destructive"
+        >
+          <X className="w-4 h-4 mr-2" />
+          Disconnect
+        </Button>
       </div>
     </div>
   );
@@ -537,6 +550,7 @@ const ConnectedSources = () => {
   const [syncStatus, setSyncStatus] = useState<Record<string, any>>({});
   const [syncStatusLoading, setSyncStatusLoading] = useState(false);
   const [syncError, setSyncError] = useState<Record<string, string | null>>({});
+  const [incrementalSyncResults, setIncrementalSyncResults] = useState<Record<string, any>>({});
 
   // Mock data for demonstration - in real app this would come from API
   const availableSources = [
@@ -898,6 +912,18 @@ const ConnectedSources = () => {
         setSyncError(prev => ({ ...prev, [sourceType]: `No documents were synced from ${sourceName}. Make sure you have accessible content.` }));
       }
       
+      // Store incremental sync results for UI feedback
+      if (data.incrementalStats) {
+        setIncrementalSyncResults(prev => ({
+          ...prev,
+          [sourceType]: {
+            ...data.incrementalStats,
+            timestamp: new Date().toISOString(),
+            sourceName: sourceName
+          }
+        }));
+      }
+      
       // Store sync statistics for this source
       setSyncStatus(prev => ({
         ...prev,
@@ -1070,6 +1096,7 @@ const ConnectedSources = () => {
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleClearData(dbSourceType);
           }}
+          incrementalSyncResults={incrementalSyncResults}
         />
                     ) : (
                       <div className="mt-auto space-y-3">
