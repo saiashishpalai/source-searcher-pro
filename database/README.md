@@ -31,6 +31,7 @@ database/
 - `profile-fields-migration.sql` - User profile fields updates
 - `database-search-threads.sql` - Search threads feature migration
 - `rag-vector-search.sql` - RAG vector search implementation
+- `version-linking-schema.sql` - TF-IDF content fingerprinting and version linking
 
 **When to use**: Updating existing databases with new features
 
@@ -101,10 +102,10 @@ database/
 ## 📊 File Count
 
 - **Schema**: 2 files
-- **Migrations**: 4 files
+- **Migrations**: 5 files
 - **Fixes**: 10 files
 - **Debug**: 2 files
-- **Total**: 18 SQL files
+- **Total**: 19 SQL files
 
 Last updated: October 12, 2025
 

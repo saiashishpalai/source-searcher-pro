@@ -44,6 +44,13 @@ Ask follow-up questions to refine your search. Haven7 maintains context and sear
 ### 📚 **Smart Document Sync & Embeddings**
 Automatically syncs and indexes your documents with vector embeddings for semantic search capabilities. Features intelligent incremental sync that only processes changed content for faster, more efficient updates.
 
+### 🔍 **TF-IDF Content Fingerprinting & Duplicate Detection**
+- **Cross-Source Duplicate Detection**: Automatically detects similar documents across Slack, Notion, and Google Drive
+- **Manual Override UI**: Users can confirm or dismiss detected duplicates with intuitive controls
+- **Version Linking**: Link documents as versions of the same content for better organization
+- **Smart Deduplication**: Search results show only the latest version of linked documents
+- **Pure JavaScript Implementation**: No external dependencies, fast and reliable
+
 ### ⚡ **Incremental Sync & Recency Ranking**
 - **Smart Sync**: Only processes changed files, pages, and messages since last sync
 - **Recency Boost**: Recent documents automatically rank higher in search results
@@ -185,6 +192,8 @@ source-searcher-pro/
 │   └── integrations/         # Supabase client
 ├── server/                   # Backend Express server
 │   ├── index.js              # Main server file
+│   ├── utils/                # Utility functions
+│   │   └── document-similarity.js # TF-IDF implementation
 │   └── services/             # Business logic services
 │       ├── search-service.js # Search & AI logic
 │       ├── document-sync.js  # Document syncing
@@ -320,6 +329,9 @@ Please ensure your code:
 - ✅ **Enhanced Error Handling** - Per-source error states with beautiful UI
 - ✅ **OAuth 2.0** - Secure authentication for all platforms
 - ✅ **Unified HTTPS Architecture** - All OAuth flows use https://localhost:3000
+- ✅ **TF-IDF Content Fingerprinting** - Cross-source duplicate detection with manual override UI
+- ✅ **Version Linking System** - Link documents as versions with smart deduplication
+- ✅ **Enhanced UI/UX** - Loading states, animations, and visual feedback for duplicate management
 
 ### Roadmap
 - 🔄 Microsoft Teams integration

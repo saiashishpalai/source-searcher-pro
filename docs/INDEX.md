@@ -45,6 +45,7 @@ Feature-specific documentation.
 - **NOTION_INTEGRATION_COMPLETE.md** - Notion integration guide
 - **SEARCH_IMPROVEMENTS_README.md** - Search feature improvements
 - **SEARCH_RESULTS_README.md** - Search results implementation
+- **TF_IDF_CONTENT_FINGERPRINTING.md** - Content fingerprinting and duplicate detection
 
 ### ⚙️ [setup/](./setup/)
 Initial setup and getting started guides.
