@@ -41,8 +41,14 @@ Get instant AI-generated summaries of your search results, highlighting the most
 ### 💬 **Conversational Search**
 Ask follow-up questions to refine your search. Haven7 maintains context and searches within your initial results.
 
-### 📚 **Document Sync & Embeddings**
-Automatically syncs and indexes your documents with vector embeddings for semantic search capabilities.
+### 📚 **Smart Document Sync & Embeddings**
+Automatically syncs and indexes your documents with vector embeddings for semantic search capabilities. Features intelligent incremental sync that only processes changed content for faster, more efficient updates.
+
+### ⚡ **Incremental Sync & Recency Ranking**
+- **Smart Sync**: Only processes changed files, pages, and messages since last sync
+- **Recency Boost**: Recent documents automatically rank higher in search results
+- **Efficiency Metrics**: See exactly how much processing time was saved
+- **Performance Optimization**: Reduced API calls and bandwidth usage
 
 ### 🔐 **Secure OAuth Integration**
 Connect your accounts securely using OAuth 2.0. We never store your passwords.
