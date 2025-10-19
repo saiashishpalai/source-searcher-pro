@@ -57,11 +57,11 @@ app.get('/api/test/slack-file-access', async (req, res) => {
 
     // Get user's Slack access token
     const { data: userSource, error: sourceError } = await supabaseAdmin
-      .from('user_sources')
+      .from('user_connections')
       .select('access_token')
       .eq('user_id', userId)
       .eq('source_type', 'slack')
-      .eq('is_connected', true)
+      .eq('is_active', true)
       .single();
 
     if (sourceError || !userSource) {
@@ -71,10 +71,36 @@ app.get('/api/test/slack-file-access', async (req, res) => {
       });
     }
 
-    // Test file access
-    const fileAccessResult = await slackSync.testRemoteFileAccess(
-      new (await import('@slack/web-api')).WebClient(userSource.access_token)
-    );
+    // Test file access with more detailed debugging
+    const slack = new (await import('@slack/web-api')).WebClient(userSource.access_token);
+    
+    // Get files with more detailed info
+    let allFiles = [];
+    try {
+      const filesResult = await slack.files.list({
+        count: 50,
+        types: 'all',
+        ts_from: Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60) // Last 30 days
+      });
+      allFiles = filesResult.files || [];
+      console.log(`🔍 Found ${allFiles.length} files in last 30 days`);
+    } catch (error) {
+      console.log('Error getting files:', error.message);
+    }
+    
+    const fileAccessResult = await slackSync.testRemoteFileAccess(slack);
+
+    // Get additional debugging info (reuse existing slack client)
+    let channels = [];
+    try {
+      const channelsResult = await slack.conversations.list({
+        types: 'public_channel,private_channel,im,mpim',
+        limit: 10
+      });
+      channels = channelsResult.channels || [];
+    } catch (error) {
+      console.log('Error getting channels:', error.message);
+    }
 
     res.json({
       success: fileAccessResult.success,
@@ -83,6 +109,19 @@ app.get('/api/test/slack-file-access', async (req, res) => {
         : `Remote files access failed: ${fileAccessResult.error}`,
       fileCount: fileAccessResult.fileCount,
       files: fileAccessResult.files,
+      debug: {
+        channelsCount: channels.length,
+        channelNames: channels.map(c => c.name).slice(0, 5),
+        botHasAccess: channels.length > 0,
+        allFilesCount: allFiles.length,
+        recentFiles: allFiles.slice(0, 3).map(f => ({
+          name: f.name,
+          type: f.filetype,
+          size: f.size,
+          created: new Date(f.created * 1000).toISOString(),
+          channels: f.channels
+        }))
+      },
       timestamp: new Date().toISOString()
     });
 
@@ -982,6 +1021,222 @@ app.post('/api/search/followup', async (req, res) => {
       error: 'Follow-up search failed: Internal Server Error',
       code: 'SEARCH_ERROR'
     });
+  }
+});
+
+// LINK DOCUMENT VERSIONS ENDPOINT
+app.post('/api/documents/link-versions', async (req, res) => {
+  try {
+    const { newerDocId, olderDocId } = req.body;
+    
+    if (!newerDocId || !olderDocId) {
+      return res.status(400).json({ error: 'newerDocId and olderDocId are required' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Verify both documents belong to user
+    const { data: docs, error: docsError } = await supabaseAdmin
+      .from('documents')
+      .select('id, source_id, synced_at, version_group_id, metadata')
+      .in('id', [newerDocId, olderDocId])
+      .eq('user_id', user.id);
+    
+    if (docsError || docs.length !== 2) {
+      return res.status(404).json({ error: 'Documents not found or access denied' });
+    }
+    
+    // Determine which is actually newer
+    const [doc1, doc2] = docs;
+    const newerDoc = new Date(doc1.synced_at) > new Date(doc2.synced_at) ? doc1 : doc2;
+    const olderDoc = newerDoc.id === doc1.id ? doc2 : doc1;
+    
+    // Create or use existing version group
+    const versionGroupId = olderDoc.version_group_id || olderDoc.id;
+    
+    // Update older document
+    await supabaseAdmin
+      .from('documents')
+      .update({
+        version_group_id: versionGroupId,
+        version_number: 1,
+        is_latest: false
+      })
+      .eq('id', olderDoc.id);
+    
+    // Update newer document
+    await supabaseAdmin
+      .from('documents')
+      .update({
+        version_group_id: versionGroupId,
+        version_number: 2,
+        is_latest: true,
+        metadata: {
+          ...newerDoc.metadata,
+          previous_version_id: olderDoc.id,
+          user_confirmed_version: true
+        }
+      })
+      .eq('id', newerDoc.id);
+    
+    res.json({ 
+      success: true, 
+      message: 'Documents linked as versions',
+      version_group_id: versionGroupId
+    });
+    
+  } catch (error) {
+    console.error('Link versions error:', error);
+    res.status(500).json({ error: 'Failed to link versions' });
+  }
+});
+
+// DISMISS DUPLICATE ENDPOINT
+app.post('/api/documents/dismiss-duplicate', async (req, res) => {
+  try {
+    const { documentId, duplicateId } = req.body;
+    
+    if (!documentId || !duplicateId) {
+      return res.status(400).json({ error: 'documentId and duplicateId are required' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Get document
+    const { data: doc, error: docError } = await supabaseAdmin
+      .from('documents')
+      .select('metadata')
+      .eq('id', documentId)
+      .eq('user_id', user.id)
+      .single();
+    
+    if (docError || !doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    // Remove from potential_duplicates, add to dismissed_duplicates
+    const potentialDuplicates = doc.metadata?.potential_duplicates || [];
+    const dismissedDuplicates = doc.metadata?.dismissed_duplicates || [];
+    
+    await supabaseAdmin
+      .from('documents')
+      .update({
+        metadata: {
+          ...doc.metadata,
+          potential_duplicates: potentialDuplicates.filter(d => d.document_id !== duplicateId),
+          dismissed_duplicates: [...dismissedDuplicates, duplicateId]
+        }
+      })
+      .eq('id', documentId);
+    
+    res.json({ success: true, message: 'Duplicate dismissed' });
+    
+  } catch (error) {
+    console.error('Dismiss duplicate error:', error);
+    res.status(500).json({ error: 'Failed to dismiss duplicate' });
+  }
+});
+
+// DEBUG ENDPOINT: Check if documents have potential_duplicates in metadata
+app.get('/api/debug/check-duplicates', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId required' });
+    }
+
+    const { data: documents, error } = await supabaseAdmin
+      .from('documents')
+      .select('id, title, source_type, metadata')
+      .eq('user_id', userId)
+      .order('synced_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    const analysis = documents.map(doc => ({
+      id: doc.id,
+      title: doc.title,
+      source: doc.source_type,
+      has_content_vector: !!doc.metadata?.content_vector,
+      has_potential_duplicates: !!doc.metadata?.potential_duplicates,
+      potential_duplicates_count: doc.metadata?.potential_duplicates?.length || 0,
+      potential_duplicates: doc.metadata?.potential_duplicates || null
+    }));
+
+    res.json({
+      total_documents: documents.length,
+      with_duplicates: analysis.filter(a => a.has_potential_duplicates).length,
+      documents: analysis
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// DEBUG ENDPOINT: Reset dismissed duplicates for testing
+app.post('/api/debug/reset-dismissed-duplicates', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId required' });
+    }
+
+    // Remove potential_duplicates from all documents to reset the state
+    const { data: documents, error } = await supabaseAdmin
+      .from('documents')
+      .select('id, metadata')
+      .eq('user_id', userId);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    // Reset metadata to remove potential_duplicates
+    for (const doc of documents) {
+      if (doc.metadata?.potential_duplicates) {
+        const updatedMetadata = { ...doc.metadata };
+        delete updatedMetadata.potential_duplicates;
+        
+        await supabaseAdmin
+          .from('documents')
+          .update({ metadata: updatedMetadata })
+          .eq('id', doc.id);
+      }
+    }
+
+    res.json({
+      message: 'Reset completed - potential_duplicates removed from all documents',
+      documents_updated: documents.length
+    });
+  } catch (error) {
+    console.error('Reset endpoint error:', error);
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 

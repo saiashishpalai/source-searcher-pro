@@ -8,10 +8,13 @@ import AISummary from './AISummary';
 import SourceSection from './SourceSection';
 import ResultCard from './ResultCard';
 import LoadingSkeleton from './LoadingSkeleton';
+import { ApiClient } from '@/lib/api-client';
+import { toast } from 'sonner';
 
 // Types
 export interface SearchResult {
   id: string;
+  document_id?: string;
   title: string;
   content: string;
   snippet: string;
@@ -25,6 +28,19 @@ export interface SearchResult {
   filename?: string;
   page?: string;
   metadata?: Record<string, any>;
+  // TF-IDF duplicate detection
+  potential_duplicates?: Array<{
+    document_id: string;
+    title: string;
+    source_type: string;
+    similarity_score: string;
+    synced_at: string;
+  }>;
+  // Version linking metadata
+  has_older_versions?: boolean;
+  alternate_versions_count?: number;
+  version_group_id?: string;
+  is_latest?: boolean;
 }
 
 export interface SearchResultsData {
@@ -70,6 +86,35 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   parentFilters
 }) => {
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set(['Slack', 'Google Drive', 'Notion']));
+  
+  // Handlers for duplicate management
+  const handleLinkVersions = async (newerDocId: string, olderDocId: string) => {
+    try {
+      await ApiClient.linkDocumentVersions(newerDocId, olderDocId);
+      toast.success('✅ Documents linked as versions! Search will now show only the latest version.');
+      // Refresh search results
+      if (onRetry) {
+        await onRetry();
+      }
+    } catch (error) {
+      console.error('Link versions error:', error);
+      toast.error('❌ Failed to link documents. Please try again.');
+    }
+  };
+
+  const handleDismissDuplicate = async (documentId: string, duplicateId: string) => {
+    try {
+      await ApiClient.dismissDuplicateDocument(documentId, duplicateId);
+      toast.success('✅ Duplicate dismissed! This alert will no longer appear.');
+      // Refresh search results
+      if (onRetry) {
+        await onRetry();
+      }
+    } catch (error) {
+      console.error('Dismiss duplicate error:', error);
+      toast.error('❌ Failed to dismiss duplicate. Please try again.');
+    }
+  };
   
   // Get filters from parent
   const sourceFilter = parentFilters?.applications || [];
@@ -197,6 +242,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
             isExpanded={expandedSources.has(source)}
             onToggleExpansion={() => toggleSourceExpansion(source)}
             onResultClick={onResultClick}
+            onLinkVersions={handleLinkVersions}
+            onDismissDuplicate={handleDismissDuplicate}
             animationDelay={index * 100}
           />
         ))}

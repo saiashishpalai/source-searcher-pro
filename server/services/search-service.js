@@ -130,21 +130,55 @@ export class SearchService {
       const sources = [...new Set(chunks.map(c => c.metadata?.source_type))];
       console.log(`📁 Results from sources: ${sources.join(', ')}`);
 
+      // Fetch document metadata for potential_duplicates
+      const documentIds = [...new Set(chunks.map(c => c.document_id).filter(Boolean))];
+      const documentMetadataMap = {};
+      
+      if (documentIds.length > 0) {
+        const { data: documents } = await supabaseAdmin
+          .from('documents')
+          .select('id, metadata')
+          .in('id', documentIds);
+        
+        if (documents) {
+          documents.forEach(doc => {
+            documentMetadataMap[doc.id] = doc.metadata;
+            // Debug: Check if potential_duplicates exists
+            if (doc.metadata?.potential_duplicates) {
+              console.log(`🔍 Document ${doc.id} has ${doc.metadata.potential_duplicates.length} potential duplicates`);
+            }
+          });
+          console.log(`📋 Fetched metadata for ${documents.length} documents`);
+        }
+      }
+
+      // Merge document metadata (including potential_duplicates) with chunks
+      chunks = chunks.map(chunk => ({
+        ...chunk,
+        document_metadata: documentMetadataMap[chunk.document_id] || {},
+      }));
+
       // Apply recency boost to search results
       const boostedChunks = this.applyRecencyBoost(chunks);
       console.log(`📈 Applied recency boost to ${boostedChunks.length} chunks`);
 
+      // Deduplicate versions - show only latest version of each document group
+      const deduplicatedChunks = this.deduplicateVersions(boostedChunks);
+      console.log(`🔄 Deduplicated versions: ${boostedChunks.length} → ${deduplicatedChunks.length} chunks`);
+
       // 3. Generate AI summary using RAG
-      const aiSummary = await this.generateSummary(query, boostedChunks);
+      const aiSummary = await this.generateSummary(query, deduplicatedChunks);
 
       // 4. Format results
-      const results = boostedChunks.map(chunk => {
+      const results = deduplicatedChunks.map(chunk => {
         const metadata = chunk.metadata || {};
+        const documentMetadata = chunk.document_metadata || {};
         const sourceType = metadata.source_type || 'google_drive';
         
         // Format result based on source type
         let result = {
           id: chunk.id,
+          document_id: chunk.document_id,
           title: metadata.title || 'Unknown Document',
           content: chunk.content,
           snippet: this.createSnippet(chunk.content, query),
@@ -155,6 +189,13 @@ export class SearchService {
           relevanceScore: chunk.final_score || chunk.similarity || 0.8,
           url: metadata.url || '',
           metadata: metadata,
+          // TF-IDF duplicate detection
+          potential_duplicates: documentMetadata.potential_duplicates || null,
+          // Version deduplication metadata
+          alternate_versions_count: chunk.alternate_versions_count || 0,
+          has_older_versions: chunk.has_older_versions || false,
+          version_group_id: chunk.version_group_id,
+          is_latest: chunk.is_latest,
         };
 
         // Source-specific formatting
@@ -191,6 +232,16 @@ export class SearchService {
       });
 
       const searchTime = Math.floor(Math.random() * 500 + 200); // Simulate search time
+
+      // Debug: Check if any results have potential_duplicates
+      const resultsWithDuplicates = results.filter(r => r.potential_duplicates && r.potential_duplicates.length > 0);
+      if (resultsWithDuplicates.length > 0) {
+        console.log(`🎯 Found ${resultsWithDuplicates.length} results with potential duplicates`);
+        resultsWithDuplicates.forEach(r => {
+          console.log(`  📄 "${r.title}" has ${r.potential_duplicates.length} potential duplicates`);
+          console.log(`  🔍 Full result:`, JSON.stringify(r, null, 2));
+        });
+      }
 
       console.log(`✅ Search complete: ${results.length} results, ${searchTime}ms`);
 
@@ -667,6 +718,51 @@ Please provide a clear, concise summary that directly addresses the user's quest
     
     const snippet = words.slice(startIndex, startIndex + 30).join(' '); // 30 words
     return snippet + (words.length > startIndex + 30 ? '...' : '');
+  }
+
+  /**
+   * Deduplicate versions - show only latest version of each document group
+   */
+  deduplicateVersions(chunks) {
+    const groups = new Map();
+    
+    // Group by version_group_id (or document_id if none)
+    chunks.forEach(chunk => {
+      const groupId = chunk.version_group_id || chunk.document_id;
+      
+      if (!groups.has(groupId)) {
+        groups.set(groupId, []);
+      }
+      groups.get(groupId).push(chunk);
+    });
+    
+    // From each group, return only the latest version
+    const deduplicated = [];
+    
+    groups.forEach(group => {
+      if (group.length === 1) {
+        // Single document, no duplicates
+        deduplicated.push(group[0]);
+        return;
+      }
+      
+      // Find the latest version
+      const latest = group.find(chunk => chunk.is_latest === true) || 
+                     group.reduce((newest, current) => 
+                       new Date(current.synced_at || current.metadata?.timestamp || 0) > 
+                       new Date(newest.synced_at || newest.metadata?.timestamp || 0) 
+                         ? current 
+                         : newest
+                     );
+      
+      // Add version metadata
+      latest.alternate_versions_count = group.length - 1;
+      latest.has_older_versions = group.length > 1;
+      
+      deduplicated.push(latest);
+    });
+    
+    return deduplicated;
   }
 
   /**

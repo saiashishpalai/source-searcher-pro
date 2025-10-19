@@ -12,6 +12,8 @@ interface SourceSectionProps {
   isExpanded: boolean;
   onToggleExpansion: () => void;
   onResultClick?: (result: SearchResult) => void;
+  onLinkVersions?: (newerDocId: string, olderDocId: string) => void;
+  onDismissDuplicate?: (documentId: string, duplicateId: string) => void;
   animationDelay?: number;
 }
 
@@ -21,6 +23,8 @@ const SourceSection: React.FC<SourceSectionProps> = ({
   isExpanded,
   onToggleExpansion,
   onResultClick,
+  onLinkVersions,
+  onDismissDuplicate,
   animationDelay = 0
 }) => {
   // Helper function to normalize source names for display
@@ -148,6 +152,8 @@ const SourceSection: React.FC<SourceSectionProps> = ({
               key={result.id}
               result={result}
               onClick={onResultClick}
+              onLinkVersions={onLinkVersions}
+              onDismissDuplicate={onDismissDuplicate}
               index={index}
             />
           ))}

@@ -1,5 +1,6 @@
 import { WebClient } from '@slack/web-api';
 import OpenAI from 'openai';
+import { computeTfIdf, cosineSimilarity } from '../utils/document-similarity.js';
 
 /**
  * SlackSync - Handles Slack message/file processing and embedding generation
@@ -20,6 +21,68 @@ export class SlackSync {
       CHUNK_SIZE: 1500,              // ~400 tokens
       CHUNK_OVERLAP: 200,            // Prevent sentence splitting
     };
+  }
+
+  /**
+   * Generate TF-IDF content vector for document similarity
+   */
+  generateContentVector(content) {
+    if (!content || typeof content !== 'string') {
+      return {};
+    }
+    // Use first 10k chars for comparison
+    const normalized = content.substring(0, 10000);
+    return computeTfIdf(normalized);
+  }
+
+  /**
+   * Find similar documents using TF-IDF cosine similarity
+   */
+  async findSimilarDocuments(contentVector, userId, currentSourceType) {
+    // Query documents from OTHER sources (not current)
+    const { data: allDocs } = await this.supabaseAdmin
+      .from('documents')
+      .select('id, title, source_type, metadata, synced_at')
+      .eq('user_id', userId)
+      .neq('source_type', currentSourceType);
+    
+    console.log(`🔍 TF-IDF: Checking ${allDocs?.length || 0} documents from other sources`);
+    
+    if (!allDocs || allDocs.length === 0) return [];
+    
+    const similar = [];
+    
+    for (const doc of allDocs) {
+      const storedVector = doc.metadata?.content_vector;
+      if (!storedVector) {
+        console.log(`  ⚠️ Document "${doc.title}" has no content_vector`);
+        continue;
+      }
+      
+      // Calculate similarity (0 to 1 scale)
+      const similarity = cosineSimilarity(contentVector, storedVector);
+      console.log(`  📊 "${doc.title}" (${doc.source_type}): ${(similarity * 100).toFixed(1)}% similar`);
+      
+      // Threshold: 90% similarity = likely same document
+      if (similarity >= 0.90) {
+        console.log(`  ✅ MATCH FOUND: ${(similarity * 100).toFixed(1)}% similar!`);
+        similar.push({
+          document_id: doc.id,
+          title: doc.title,
+          source_type: doc.source_type,
+          similarity_score: (similarity * 100).toFixed(1), // Percentage
+          synced_at: doc.synced_at
+        });
+      }
+    }
+    
+    if (similar.length > 0) {
+      console.log(`🎯 Found ${similar.length} similar document(s)!`);
+    } else {
+      console.log(`❌ No similar documents found (threshold: 90%)`);
+    }
+    
+    return similar;
   }
 
   /**
@@ -278,6 +341,11 @@ export class SlackSync {
       } else {
         console.log(`⚠️ Remote files access test failed: ${fileAccessTest.error}`);
       }
+
+      // Process files
+      console.log('📁 Processing Slack files...');
+      const fileStats = await this.processSlackFiles(slack, userId, lastSyncTimestamp);
+      console.log(`📊 Files processed: ${fileStats.processed}/${fileStats.total}`);
       
       console.log('📱 Fetching conversations...');
 
@@ -711,6 +779,10 @@ export class SlackSync {
    * Store a message chunk as a document
    */
   async storeMessageChunk(userId, chunk) {
+    // Generate TF-IDF content vector for similarity detection
+    const contentVector = this.generateContentVector(chunk.content);
+    const similar = await this.findSimilarDocuments(contentVector, userId, 'slack');
+    
     // Store as document
     const { data: doc, error: docError } = await this.supabaseAdmin
       .from('documents')
@@ -722,7 +794,13 @@ export class SlackSync {
         content: chunk.content,
         url: chunk.metadata.url,
         author: chunk.metadata.author,
-        metadata: chunk.metadata,
+        metadata: {
+          ...chunk.metadata,
+          // TF-IDF similarity detection
+          content_vector: contentVector,
+          similarity_method: 'tfidf-cosine',
+          potential_duplicates: similar.length > 0 ? similar : null
+        },
         last_modified_at: chunk.metadata.timestamp,
         synced_at: new Date().toISOString(),
       }, { onConflict: 'user_id,source_type,source_id' })
@@ -936,6 +1014,140 @@ export class SlackSync {
     } catch (error) {
       console.error('  ❌ Error processing document:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Process Slack files (documents, images, etc.)
+   */
+  async processSlackFiles(slack, userId, lastSyncTimestamp) {
+    try {
+      console.log('📁 Fetching Slack files...');
+      
+      // Get files from the last 30 days
+      const daysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+      const filesResult = await slack.files.list({
+        count: 100, // Get up to 100 files
+        types: 'all', // Include all file types
+        ts_from: lastSyncTimestamp ? Math.floor(new Date(lastSyncTimestamp).getTime() / 1000) : daysAgo
+      });
+
+      const files = filesResult.files || [];
+      console.log(`📁 Found ${files.length} files to process`);
+
+      let processed = 0;
+      let total = files.length;
+
+      for (const file of files) {
+        try {
+          // Skip files that are too old or not accessible
+          if (file.size > 50 * 1024 * 1024) { // Skip files larger than 50MB
+            console.log(`  ⊘ Skipped ${file.name} (too large: ${Math.round(file.size / 1024 / 1024)}MB)`);
+            continue;
+          }
+
+          // Get file info
+          const fileInfo = await slack.files.info({ file: file.id });
+          const fileData = fileInfo.file;
+
+          // Skip if file is not accessible
+          if (!fileData.url_private) {
+            console.log(`  ⊘ Skipped ${file.name} (not accessible)`);
+            continue;
+          }
+
+          // Download file content
+          const fileContent = await this.downloadSlackFile(slack, fileData);
+          if (!fileContent) {
+            console.log(`  ⊘ Skipped ${file.name} (could not download)`);
+            continue;
+          }
+
+          // Generate content vector for similarity detection
+          const contentVector = this.generateContentVector(fileContent);
+          const similar = await this.findSimilarDocuments(contentVector, userId, 'slack');
+
+          // Create document record
+          const document = {
+            user_id: userId,
+            source_id: fileData.id,
+            source_type: 'slack',
+            title: fileData.name || 'Untitled File',
+            content: fileContent,
+            url: fileData.url_private,
+            author: fileData.user || 'Unknown',
+            synced_at: new Date().toISOString(),
+            metadata: {
+              file_id: fileData.id,
+              file_type: fileData.filetype,
+              file_size: fileData.size,
+              created: fileData.created,
+              timestamp: fileData.timestamp,
+              channel_name: fileData.channels?.[0] || 'Direct Message',
+              channel_type: fileData.channels ? 'channel' : 'dm',
+              // TF-IDF similarity detection
+              content_vector: contentVector,
+              similarity_method: 'tfidf-cosine',
+              potential_duplicates: similar.length > 0 ? similar : null
+            }
+          };
+
+          // Upsert document
+          const { data: doc, error } = await this.supabaseAdmin
+            .from('documents')
+            .upsert(document, { 
+              onConflict: 'user_id,source_id,source_type',
+              ignoreDuplicates: false 
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error(`  ❌ Error saving file ${file.name}:`, error);
+            continue;
+          }
+
+          // Process into embeddings
+          await this.processMessageChunk(doc);
+          
+          processed++;
+          console.log(`  ✓ Processed ${file.name} (${fileData.filetype})`);
+
+        } catch (error) {
+          console.error(`  ❌ Error processing file ${file.name}:`, error.message);
+          continue;
+        }
+      }
+
+      return { processed, total };
+
+    } catch (error) {
+      console.error('❌ Error processing Slack files:', error);
+      return { processed: 0, total: 0 };
+    }
+  }
+
+  /**
+   * Download Slack file content
+   */
+  async downloadSlackFile(slack, fileData) {
+    try {
+      // For text files, we can get the content directly
+      if (fileData.filetype === 'text' || fileData.filetype === 'javascript' || fileData.filetype === 'json') {
+        const response = await slack.files.sharedPublicURL({ file: fileData.id });
+        if (response.file?.permalink_public) {
+          // For now, we'll skip downloading and just return a placeholder
+          // In a real implementation, you'd fetch the file content
+          return `File: ${fileData.name}\nType: ${fileData.filetype}\nSize: ${fileData.size} bytes`;
+        }
+      }
+
+      // For other file types, return metadata
+      return `File: ${fileData.name}\nType: ${fileData.filetype}\nSize: ${fileData.size} bytes\nCreated: ${new Date(fileData.created * 1000).toISOString()}`;
+
+    } catch (error) {
+      console.error(`Error downloading file ${fileData.name}:`, error);
+      return null;
     }
   }
 }

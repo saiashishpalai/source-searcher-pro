@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import * as pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import OpenAI from 'openai';
+import { computeTfIdf, cosineSimilarity } from '../utils/document-similarity.js';
 
 /**
  * GoogleDriveSync - Handles Google Drive document processing with incremental sync
@@ -22,6 +23,55 @@ export class GoogleDriveSync {
       CHUNK_OVERLAP: 200,          // Prevent sentence splitting
       STOP_AT_COST: 0.50           // Stop if cost exceeds $0.50
     };
+  }
+
+  /**
+   * Generate TF-IDF content vector for document similarity
+   */
+  generateContentVector(content) {
+    if (!content || typeof content !== 'string') {
+      return {};
+    }
+    // Use first 10k chars for comparison
+    const normalized = content.substring(0, 10000);
+    return computeTfIdf(normalized);
+  }
+
+  /**
+   * Find similar documents using TF-IDF cosine similarity
+   */
+  async findSimilarDocuments(contentVector, userId, currentSourceType) {
+    // Query documents from OTHER sources (not current)
+    const { data: allDocs } = await this.supabaseAdmin
+      .from('documents')
+      .select('id, title, source_type, metadata, synced_at')
+      .eq('user_id', userId)
+      .neq('source_type', currentSourceType);
+    
+    if (!allDocs || allDocs.length === 0) return [];
+    
+    const similar = [];
+    
+    for (const doc of allDocs) {
+      const storedVector = doc.metadata?.content_vector;
+      if (!storedVector) continue;
+      
+      // Calculate similarity (0 to 1 scale)
+      const similarity = cosineSimilarity(contentVector, storedVector);
+      
+      // Threshold: 90% similarity = likely same document
+      if (similarity >= 0.90) {
+        similar.push({
+          document_id: doc.id,
+          title: doc.title,
+          source_type: doc.source_type,
+          similarity_score: (similarity * 100).toFixed(1), // Percentage
+          synced_at: doc.synced_at
+        });
+      }
+    }
+    
+    return similar;
   }
 
   /**
@@ -197,7 +247,11 @@ export class GoogleDriveSync {
           // Get current revision info
           const revisionInfo = await this.getCurrentRevisionInfo(drive, file.id);
 
-          // Store document with revision metadata
+          // Generate TF-IDF content vector for similarity detection
+          const contentVector = this.generateContentVector(content);
+          const similar = await this.findSimilarDocuments(contentVector, userId, 'google_drive');
+
+          // Store document with revision metadata and similarity info
           const { data: doc, error: docError } = await this.supabaseAdmin
             .from('documents')
             .upsert({
@@ -215,7 +269,11 @@ export class GoogleDriveSync {
                 owners: file.owners,
                 revision_id: revisionInfo?.revision_id,
                 modified_time: revisionInfo?.modified_time,
-                revision_count: revisionInfo?.revision_count
+                revision_count: revisionInfo?.revision_count,
+                // TF-IDF similarity detection
+                content_vector: contentVector,
+                similarity_method: 'tfidf-cosine',
+                potential_duplicates: similar.length > 0 ? similar : null
               },
               synced_at: new Date().toISOString(),
             }, { onConflict: 'user_id,source_type,source_id' })

@@ -68,4 +68,13 @@ export class ApiClient {
 
     return response.json();
   }
+
+  // Document version management
+  static async linkDocumentVersions(newerDocId: string, olderDocId: string): Promise<{ success: boolean; message: string; version_group_id: string }> {
+    return this.post('/api/documents/link-versions', { newerDocId, olderDocId });
+  }
+
+  static async dismissDuplicateDocument(documentId: string, duplicateId: string): Promise<{ success: boolean; message: string }> {
+    return this.post('/api/documents/dismiss-duplicate', { documentId, duplicateId });
+  }
 }

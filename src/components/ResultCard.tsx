@@ -1,17 +1,26 @@
 
 import React from 'react';
-import { ExternalLink, Calendar, User, MessageSquare, File, FileText, Table, Globe, ArrowUpRight } from 'lucide-react';
+import { ExternalLink, Calendar, User, MessageSquare, File, FileText, Table, Globe, ArrowUpRight, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SearchResult } from './SearchResults';
+import DuplicateAlert from './DuplicateAlert';
 
 interface ResultCardProps {
   result: SearchResult;
   onClick?: (result: SearchResult) => void;
+  onLinkVersions?: (newerDocId: string, olderDocId: string) => void;
+  onDismissDuplicate?: (documentId: string, duplicateId: string) => void;
   index?: number;
 }
 
-const ResultCard: React.FC<ResultCardProps> = ({ result, onClick, index = 0 }) => {
+const ResultCard: React.FC<ResultCardProps> = ({ 
+  result, 
+  onClick, 
+  onLinkVersions, 
+  onDismissDuplicate, 
+  index = 0 
+}) => {
   // Helper function to normalize source names for display
   const normalizeSourceName = (source: string): string => {
     return source
@@ -153,6 +162,25 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onClick, index = 0 }) =
       <p className="text-sm text-muted-foreground/90 mb-3 line-clamp-3 leading-relaxed">
         {result.snippet}
       </p>
+
+      {/* Duplicate Alert */}
+      {onLinkVersions && onDismissDuplicate && (
+        <div className="mb-3">
+          <DuplicateAlert
+            document={result}
+            onLinkVersions={onLinkVersions}
+            onDismiss={onDismissDuplicate}
+          />
+        </div>
+      )}
+
+      {/* Version indicator */}
+      {result.has_older_versions && result.alternate_versions_count > 0 && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <BookOpen className="w-3 h-3" />
+          <span>{result.alternate_versions_count} older version(s) available</span>
+        </div>
+      )}
 
       {/* Footer with author and actions */}
       <div className="flex items-center justify-between">

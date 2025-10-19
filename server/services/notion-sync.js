@@ -1,5 +1,6 @@
 import { Client } from '@notionhq/client';
 import OpenAI from 'openai';
+import { computeTfIdf, cosineSimilarity } from '../utils/document-similarity.js';
 
 /**
  * NotionSync - Handles Notion document processing and embedding generation
@@ -18,6 +19,68 @@ export class NotionSync {
       CHUNK_SIZE: 1500,            // ~400 tokens
       CHUNK_OVERLAP: 200,          // Prevent sentence splitting
     };
+  }
+
+  /**
+   * Generate TF-IDF content vector for document similarity
+   */
+  generateContentVector(content) {
+    if (!content || typeof content !== 'string') {
+      return {};
+    }
+    // Use first 10k chars for comparison
+    const normalized = content.substring(0, 10000);
+    return computeTfIdf(normalized);
+  }
+
+  /**
+   * Find similar documents using TF-IDF cosine similarity
+   */
+  async findSimilarDocuments(contentVector, userId, currentSourceType) {
+    // Query documents from OTHER sources (not current)
+    const { data: allDocs } = await this.supabaseAdmin
+      .from('documents')
+      .select('id, title, source_type, metadata, synced_at')
+      .eq('user_id', userId)
+      .neq('source_type', currentSourceType);
+    
+    console.log(`🔍 TF-IDF: Checking ${allDocs?.length || 0} documents from other sources`);
+    
+    if (!allDocs || allDocs.length === 0) return [];
+    
+    const similar = [];
+    
+    for (const doc of allDocs) {
+      const storedVector = doc.metadata?.content_vector;
+      if (!storedVector) {
+        console.log(`  ⚠️ Document "${doc.title}" has no content_vector`);
+        continue;
+      }
+      
+      // Calculate similarity (0 to 1 scale)
+      const similarity = cosineSimilarity(contentVector, storedVector);
+      console.log(`  📊 "${doc.title}" (${doc.source_type}): ${(similarity * 100).toFixed(1)}% similar`);
+      
+      // Threshold: 90% similarity = likely same document
+      if (similarity >= 0.90) {
+        console.log(`  ✅ MATCH FOUND: ${(similarity * 100).toFixed(1)}% similar!`);
+        similar.push({
+          document_id: doc.id,
+          title: doc.title,
+          source_type: doc.source_type,
+          similarity_score: (similarity * 100).toFixed(1), // Percentage
+          synced_at: doc.synced_at
+        });
+      }
+    }
+    
+    if (similar.length > 0) {
+      console.log(`🎯 Found ${similar.length} similar document(s)!`);
+    } else {
+      console.log(`❌ No similar documents found (threshold: 90%)`);
+    }
+    
+    return similar;
   }
 
   /**
@@ -470,6 +533,10 @@ export class NotionSync {
           
           console.log(`  → Extracted ${text.length} characters from ${structuredBlocks.length} blocks`);
           
+          // Generate TF-IDF content vector for similarity detection
+          const contentVector = this.generateContentVector(text);
+          const similar = await this.findSimilarDocuments(contentVector, userId, 'notion');
+          
           // Store document
           const { data: doc, error: docError } = await this.supabaseAdmin
             .from('documents')
@@ -486,6 +553,10 @@ export class NotionSync {
                 last_edited_time: page.last_edited_time,
                 icon: page.icon,
                 cover: page.cover,
+                // TF-IDF similarity detection
+                content_vector: contentVector,
+                similarity_method: 'tfidf-cosine',
+                potential_duplicates: similar.length > 0 ? similar : null
               },
               last_modified_at: page.last_edited_time,
               synced_at: new Date().toISOString(),
