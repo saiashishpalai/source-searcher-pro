@@ -13,11 +13,11 @@ export class SlackSync {
     
     // SAFETY LIMITS (matching Google Drive and Notion)
     this.SYNC_LIMITS = {
-      MAX_CHANNELS: 20,              // Process max 20 conversations
-      MAX_MESSAGES_PER_CHANNEL: 100, // 100 messages per channel
+      MAX_CHANNELS: parseInt(process.env.MAX_SLACK_CHANNELS) || 100,  // Production limit
+      MAX_MESSAGES_PER_CHANNEL: parseInt(process.env.MAX_SLACK_MESSAGES_PER_CHANNEL) || 1000,  // Production limit
       MESSAGE_DAYS_BACK: 30,         // Last 30 days only
       MAX_TEXT_LENGTH: 15000,        // ~4000 tokens max
-      MAX_CHUNKS_PER_DOC: 5,         // 5 chunks max
+      MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
       CHUNK_SIZE: 1500,              // ~400 tokens
       CHUNK_OVERLAP: 200,            // Prevent sentence splitting
     };

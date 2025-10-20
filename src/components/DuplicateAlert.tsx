@@ -32,9 +32,27 @@ const DuplicateAlert: React.FC<DuplicateAlertProps> = ({
   // Check both top-level and metadata for potential_duplicates
   const duplicates = document.potential_duplicates || document.metadata?.potential_duplicates || [];
   const [loadingStates, setLoadingStates] = useState<Record<string, 'idle' | 'linking' | 'dismissing' | 'success' | 'error'>>({});
-  const [completedActions, setCompletedActions] = useState<Set<string>>(new Set());
+  
+  // Simple localStorage persistence for user selections
+  const getStoredSelections = (): Record<string, 'linked' | 'dismissed'> => {
+    try {
+      const stored = localStorage.getItem('duplicate-selections');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  };
+  
+  const [userSelections, setUserSelections] = useState<Record<string, 'linked' | 'dismissed'>>(getStoredSelections());
+  
+  // Debug logging
+  console.log('🔍 DuplicateAlert received document:', document);
+  console.log('🔍 potential_duplicates from document:', document.potential_duplicates);
+  console.log('🔍 potential_duplicates from metadata:', document.metadata?.potential_duplicates);
+  console.log('🔍 final duplicates array:', duplicates);
   
   if (duplicates.length === 0) {
+    console.log('❌ No duplicates found, returning null');
     return null;
   }
 
@@ -45,16 +63,12 @@ const DuplicateAlert: React.FC<DuplicateAlertProps> = ({
     try {
       await onLinkVersions(document.document_id || document.id, duplicateId);
       setLoadingStates(prev => ({ ...prev, [actionKey]: 'success' }));
-      setCompletedActions(prev => new Set([...prev, actionKey]));
       
-      // Auto-hide after 2 seconds
-      setTimeout(() => {
-        setCompletedActions(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(actionKey);
-          return newSet;
-        });
-      }, 2000);
+      // Save user selection permanently
+      const newSelections = { ...userSelections, [actionKey]: 'linked' as const };
+      setUserSelections(newSelections);
+      localStorage.setItem('duplicate-selections', JSON.stringify(newSelections));
+      
     } catch (error) {
       setLoadingStates(prev => ({ ...prev, [actionKey]: 'error' }));
       // Reset error state after 3 seconds
@@ -71,16 +85,12 @@ const DuplicateAlert: React.FC<DuplicateAlertProps> = ({
     try {
       await onDismiss(document.document_id || document.id, duplicateId);
       setLoadingStates(prev => ({ ...prev, [actionKey]: 'success' }));
-      setCompletedActions(prev => new Set([...prev, actionKey]));
       
-      // Auto-hide after 2 seconds
-      setTimeout(() => {
-        setCompletedActions(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(actionKey);
-          return newSet;
-        });
-      }, 2000);
+      // Save user selection permanently
+      const newSelections = { ...userSelections, [actionKey]: 'dismissed' as const };
+      setUserSelections(newSelections);
+      localStorage.setItem('duplicate-selections', JSON.stringify(newSelections));
+      
     } catch (error) {
       setLoadingStates(prev => ({ ...prev, [actionKey]: 'error' }));
       // Reset error state after 3 seconds
@@ -102,11 +112,37 @@ const DuplicateAlert: React.FC<DuplicateAlertProps> = ({
           {duplicates.map((duplicate, index) => {
             const actionKey = `${document.document_id || document.id}-${duplicate.document_id}`;
             const loadingState = loadingStates[actionKey] || 'idle';
-            const isCompleted = completedActions.has(actionKey);
+            const userSelection = userSelections[actionKey];
             
-            // Hide the entire duplicate if action is completed
-            if (isCompleted) {
-              return null;
+            // Show what user already selected
+            if (userSelection === 'linked') {
+              return (
+                <div key={duplicate.document_id} className="space-y-2">
+                  <div className="text-sm text-green-700 dark:text-green-300">
+                    <p className="font-medium">
+                      ✅ {duplicate.title} - Already linked as same document
+                    </p>
+                    <p className="text-xs opacity-75">
+                      {duplicate.source_type} • {duplicate.similarity_score}% similar
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            
+            if (userSelection === 'dismissed') {
+              return (
+                <div key={duplicate.document_id} className="space-y-2">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="font-medium">
+                      ❌ {duplicate.title} - Dismissed as different document
+                    </p>
+                    <p className="text-xs opacity-75">
+                      {duplicate.source_type} • {duplicate.similarity_score}% similar
+                    </p>
+                  </div>
+                </div>
+              );
             }
             
             return (
@@ -134,7 +170,11 @@ const DuplicateAlert: React.FC<DuplicateAlertProps> = ({
                         ? 'bg-red-600 hover:bg-red-700'
                         : 'bg-yellow-600 hover:bg-yellow-700'
                     }`}
-                    onClick={() => handleLinkVersions(duplicate.document_id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleLinkVersions(duplicate.document_id);
+                    }}
                   >
                     {loadingState === 'linking' && (
                       <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -164,7 +204,11 @@ const DuplicateAlert: React.FC<DuplicateAlertProps> = ({
                         ? 'border-red-500 text-red-700 bg-red-50'
                         : 'border-yellow-300 text-yellow-700 hover:bg-yellow-100'
                     }`}
-                    onClick={() => handleDismiss(duplicate.document_id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDismiss(duplicate.document_id);
+                    }}
                   >
                     {loadingState === 'dismissing' && (
                       <Loader2 className="w-3 h-3 mr-1 animate-spin" />

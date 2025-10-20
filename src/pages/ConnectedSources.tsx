@@ -267,7 +267,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => handleSyncDocuments?.()}
+                            onClick={() => onSyncDocuments?.()}
                             size="sm"
                             variant="default"
                             className="bg-red-600 hover:bg-red-700 text-white"
@@ -678,7 +678,7 @@ const ConnectedSources = () => {
         
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           timestamp: Date.now(),
           source: 'google'
         }));
@@ -704,7 +704,7 @@ const ConnectedSources = () => {
         
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           timestamp: Date.now(),
           source: 'slack'
         }));
@@ -727,7 +727,7 @@ const ConnectedSources = () => {
         
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           timestamp: Date.now(),
           source: 'notion'
         }));
@@ -952,7 +952,7 @@ const ConnectedSources = () => {
   const getConnectedSources = () => {
     return availableSources.map(source => {
       // Map frontend source IDs to database source_types
-      const sourceTypeMap = {
+      const sourceTypeMap: Record<string, string> = {
         'googleDrive': 'google_drive',
         'notion': 'notion',
         'slack': 'slack'
@@ -1070,18 +1070,18 @@ const ConnectedSources = () => {
           <ConnectionStatus
           connection={source.connection}
           onRefresh={() => {
-            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleRefreshConnection(dbSourceType);
           }}
           onDisconnect={() => {
-            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleDisconnect(dbSourceType);
           }}
           isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
           onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion' || source.id === 'slack') ? () => {
-            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleSyncDocuments(dbSourceType);
           } : undefined}
@@ -1091,7 +1091,7 @@ const ConnectedSources = () => {
           syncError={syncError[source.id === 'googleDrive' ? 'google_drive' : source.id] || null}
           setSyncError={(error: string | null) => setSyncError(prev => ({ ...prev, [source.id === 'googleDrive' ? 'google_drive' : source.id]: error }))}
           onClearData={() => {
-            const sourceTypeMap = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleClearData(dbSourceType);
           }}

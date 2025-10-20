@@ -137,12 +137,16 @@ export class SearchService {
       if (documentIds.length > 0) {
         const { data: documents } = await supabaseAdmin
           .from('documents')
-          .select('id, metadata')
+          .select('id, metadata, version_group_id, is_latest')
           .in('id', documentIds);
         
         if (documents) {
           documents.forEach(doc => {
-            documentMetadataMap[doc.id] = doc.metadata;
+            documentMetadataMap[doc.id] = {
+              ...doc.metadata,
+              version_group_id: doc.version_group_id,
+              is_latest: doc.is_latest
+            };
             // Debug: Check if potential_duplicates exists
             if (doc.metadata?.potential_duplicates) {
               console.log(`🔍 Document ${doc.id} has ${doc.metadata.potential_duplicates.length} potential duplicates`);
@@ -153,10 +157,88 @@ export class SearchService {
       }
 
       // Merge document metadata (including potential_duplicates) with chunks
-      chunks = chunks.map(chunk => ({
-        ...chunk,
-        document_metadata: documentMetadataMap[chunk.document_id] || {},
-      }));
+      chunks = chunks.map(chunk => {
+        const docMetadata = documentMetadataMap[chunk.document_id] || {};
+        return {
+          ...chunk,
+          document_metadata: docMetadata,
+          version_group_id: docMetadata.version_group_id,
+          is_latest: docMetadata.is_latest,
+        };
+      });
+
+      // Perform real-time duplicate detection for documents that don't have stored duplicates
+      console.log(`🔍 Performing real-time duplicate detection for ${chunks.length} chunks`);
+      const chunksWithDuplicates = [];
+      
+      for (const chunk of chunks) {
+        const docMetadata = documentMetadataMap[chunk.document_id] || {};
+        
+        // If no stored duplicates, perform real-time detection
+        if (!docMetadata.potential_duplicates || docMetadata.potential_duplicates.length === 0) {
+          try {
+            // Import the document similarity utility
+            const similarityUtils = await import('../utils/document-similarity.js');
+            const { computeTfIdf, cosineSimilarity } = similarityUtils;
+            
+            // Generate TF-IDF vector for current document
+            const currentVector = computeTfIdf(chunk.content);
+            
+            // Find similar documents from other sources
+            const { data: otherDocs } = await supabaseAdmin
+              .from('documents')
+              .select('id, title, content, source_type, synced_at')
+              .eq('user_id', userId)
+              .neq('source_type', chunk.metadata?.source_type)
+              .neq('id', chunk.document_id);
+            
+            if (otherDocs && otherDocs.length > 0) {
+              const similarDocs = [];
+              
+              for (const otherDoc of otherDocs) {
+                if (otherDoc.content) {
+                  const otherVector = computeTfIdf(otherDoc.content);
+                  const similarity = cosineSimilarity(currentVector, otherVector);
+                  
+                  // Threshold for similarity (adjust as needed)
+                  if (similarity > 0.85) {
+                    similarDocs.push({
+                      document_id: otherDoc.id,
+                      title: otherDoc.title,
+                      source_type: otherDoc.source_type,
+                      similarity_score: (similarity * 100).toFixed(1),
+                      synced_at: otherDoc.synced_at
+                    });
+                  }
+                }
+              }
+              
+              if (similarDocs.length > 0) {
+                console.log(`🔍 Document ${chunk.document_id} has ${similarDocs.length} potential duplicates (real-time detection)`);
+                chunksWithDuplicates.push({
+                  ...chunk,
+                  document_metadata: {
+                    ...docMetadata,
+                    potential_duplicates: similarDocs
+                  }
+                });
+              } else {
+                chunksWithDuplicates.push(chunk);
+              }
+            } else {
+              chunksWithDuplicates.push(chunk);
+            }
+          } catch (error) {
+            console.error(`❌ Error in real-time duplicate detection for chunk ${chunk.id}:`, error);
+            chunksWithDuplicates.push(chunk);
+          }
+        } else {
+          // Use stored duplicates
+          chunksWithDuplicates.push(chunk);
+        }
+      }
+      
+      chunks = chunksWithDuplicates;
 
       // Apply recency boost to search results
       const boostedChunks = this.applyRecencyBoost(chunks);
@@ -241,6 +323,9 @@ export class SearchService {
           console.log(`  📄 "${r.title}" has ${r.potential_duplicates.length} potential duplicates`);
           console.log(`  🔍 Full result:`, JSON.stringify(r, null, 2));
         });
+      } else {
+        console.log(`❌ No results with potential_duplicates found`);
+        console.log(`🔍 Sample result structure:`, JSON.stringify(results[0], null, 2));
       }
 
       console.log(`✅ Search complete: ${results.length} results, ${searchTime}ms`);

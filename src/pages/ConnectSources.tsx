@@ -235,7 +235,7 @@ const PermissionModal = ({
 
 const ConnectSources = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [connections, setConnections] = useState({
     slack: false,
     googleDrive: false,
@@ -380,7 +380,7 @@ const ConnectSources = () => {
         
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           timestamp: Date.now(),
           source: 'google'
         }));
@@ -406,7 +406,7 @@ const ConnectSources = () => {
         
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           timestamp: Date.now(),
           source: 'slack'
         }));
@@ -431,7 +431,7 @@ const ConnectSources = () => {
         
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           timestamp: Date.now(),
           source: 'notion'
         }));

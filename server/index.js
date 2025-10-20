@@ -1088,17 +1088,29 @@ app.post('/api/documents/link-versions', async (req, res) => {
     // Create or use existing version group
     const versionGroupId = olderDoc.version_group_id || olderDoc.id;
     
-    // Update older document
+    // Update older document - remove potential_duplicates since they're now linked
+    const olderUpdatedMetadata = { ...olderDoc.metadata };
+    delete olderUpdatedMetadata.potential_duplicates;
+    
+    console.log(`🔗 Linking documents: ${olderDoc.id} (older) -> ${newerDoc.id} (newer)`);
+    console.log(`🔗 Removing potential_duplicates from older document: ${olderDoc.id}`);
+    
     await supabaseAdmin
       .from('documents')
       .update({
         version_group_id: versionGroupId,
         version_number: 1,
-        is_latest: false
+        is_latest: false,
+        metadata: olderUpdatedMetadata
       })
       .eq('id', olderDoc.id);
     
-    // Update newer document
+    // Update newer document - remove potential_duplicates since they're now linked
+    const updatedMetadata = { ...newerDoc.metadata };
+    delete updatedMetadata.potential_duplicates;
+    
+    console.log(`🔗 Removing potential_duplicates from newer document: ${newerDoc.id}`);
+    
     await supabaseAdmin
       .from('documents')
       .update({
@@ -1106,7 +1118,7 @@ app.post('/api/documents/link-versions', async (req, res) => {
         version_number: 2,
         is_latest: true,
         metadata: {
-          ...newerDoc.metadata,
+          ...updatedMetadata,
           previous_version_id: olderDoc.id,
           user_confirmed_version: true
         }

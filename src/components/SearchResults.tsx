@@ -91,7 +91,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const handleLinkVersions = async (newerDocId: string, olderDocId: string) => {
     try {
       await ApiClient.linkDocumentVersions(newerDocId, olderDocId);
-      toast.success('✅ Documents linked as versions! Search will now show only the latest version.');
+      toast.success('✅ Documents linked as versions! Refreshing search results...');
       // Refresh search results
       if (onRetry) {
         await onRetry();

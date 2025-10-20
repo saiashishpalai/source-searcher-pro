@@ -15,9 +15,9 @@ export class GoogleDriveSync {
     
     // SAFETY LIMITS
     this.SYNC_LIMITS = {
-      MAX_DOCUMENTS: 5,           // Only 5 docs for testing
+      MAX_DOCUMENTS: parseInt(process.env.MAX_GOOGLE_DRIVE_FILES) || 1000,  // Production limit
       MAX_FILE_SIZE: 1000000,     // 1MB max per file
-      MAX_CHUNKS_PER_DOC: 10,      // 10 chunks max
+      MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
       MAX_TEXT_LENGTH: 15000,      // ~4000 tokens max
       CHUNK_SIZE: 1500,            // ~400 tokens
       CHUNK_OVERLAP: 200,          // Prevent sentence splitting
@@ -103,6 +103,12 @@ export class GoogleDriveSync {
    */
   async hasFileChanged(drive, fileId, storedRevisionId) {
     try {
+      // Check if drive.files.revisions exists
+      if (!drive.files || !drive.files.revisions || !drive.files.revisions.list) {
+        console.log(`  ⚠️ Revisions API not available for file ${fileId}`);
+        return true; // Assume changed if revisions API not available
+      }
+      
       const revisions = await drive.files.revisions.list({ fileId });
       const latestRevision = revisions.data.revisions[revisions.data.revisions.length - 1];
       
@@ -127,6 +133,12 @@ export class GoogleDriveSync {
    */
   async getCurrentRevisionInfo(drive, fileId) {
     try {
+      // Check if drive.files.revisions exists
+      if (!drive.files || !drive.files.revisions || !drive.files.revisions.list) {
+        console.log(`  ⚠️ Revisions API not available for file ${fileId}`);
+        return null;
+      }
+      
       const revisions = await drive.files.revisions.list({ fileId });
       const latestRevision = revisions.data.revisions[revisions.data.revisions.length - 1];
       
@@ -340,35 +352,53 @@ export class GoogleDriveSync {
     try {
       // Google Docs
       if (file.mimeType === 'application/vnd.google-apps.document') {
-        const response = await drive.files.export({
-          fileId: file.id,
-          mimeType: 'text/plain',
-        });
-        return response.data;
+        try {
+          const response = await drive.files.export({
+            fileId: file.id,
+            mimeType: 'text/plain',
+          });
+          return response.data;
+        } catch (exportError) {
+          if (exportError.code === 403) {
+            console.log(`  ⚠️ Cannot export ${file.name} - permission denied`);
+            return null;
+          }
+          throw exportError;
+        }
       }
 
       // PDF
       if (file.mimeType === 'application/pdf') {
-        const response = await drive.files.get({
-          fileId: file.id,
-          alt: 'media',
-        }, { responseType: 'arraybuffer' });
-        
-        const buffer = Buffer.from(response.data);
-        const data = await pdfParse.default(buffer);
-        return data.text;
+        try {
+          const response = await drive.files.get({
+            fileId: file.id,
+            alt: 'media',
+          }, { responseType: 'arraybuffer' });
+          
+          const buffer = Buffer.from(response.data);
+          const data = await pdfParse(buffer);
+          return data.text;
+        } catch (pdfError) {
+          console.log(`  ⚠️ Cannot parse PDF ${file.name}: ${pdfError.message}`);
+          return null;
+        }
       }
 
       // Word documents
       if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        const response = await drive.files.get({
-          fileId: file.id,
-          alt: 'media',
-        }, { responseType: 'arraybuffer' });
-        
-        const buffer = Buffer.from(response.data);
-        const result = await mammoth.extractRawText({ buffer });
-        return result.value;
+        try {
+          const response = await drive.files.get({
+            fileId: file.id,
+            alt: 'media',
+          }, { responseType: 'arraybuffer' });
+          
+          const buffer = Buffer.from(response.data);
+          const result = await mammoth.extractRawText({ buffer });
+          return result.value;
+        } catch (wordError) {
+          console.log(`  ⚠️ Cannot parse Word document ${file.name}: ${wordError.message}`);
+          return null;
+        }
       }
 
       // Plain text

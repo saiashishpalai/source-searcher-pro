@@ -2,19 +2,19 @@ import { isDev } from './env';
 
 export const logger = {
   oauth(message: string, data?: any) {
-    if (isDev) {
+    if (isDev()) {
       console.log(`[OAuth] ${message}`, data || '');
     }
   },
   
   auth(message: string, data?: any) {
-    if (isDev) {
+    if (isDev()) {
       console.log(`[Auth] ${message}`, data || '');
     }
   },
   
   api(message: string, data?: any) {
-    if (isDev) {
+    if (isDev()) {
       console.log(`[API] ${message}`, data || '');
     }
   },

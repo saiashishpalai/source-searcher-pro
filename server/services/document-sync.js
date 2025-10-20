@@ -13,9 +13,9 @@ export class DocumentSync {
     
     // CRITICAL SAFETY LIMITS
     this.SYNC_LIMITS = {
-      MAX_DOCUMENTS: 5,           // Only 5 docs for testing
+      MAX_DOCUMENTS: parseInt(process.env.MAX_GOOGLE_DRIVE_FILES) || 1000,  // Production limit
       MAX_FILE_SIZE: 1000000,     // 1MB max per file
-      MAX_CHUNKS_PER_DOC: 10,     // 10 chunks max
+      MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
       MAX_TEXT_LENGTH: 15000,     // ~4000 tokens max
       CHUNK_SIZE: 1500,           // ~400 tokens
       CHUNK_OVERLAP: 200,         // Prevent sentence splitting

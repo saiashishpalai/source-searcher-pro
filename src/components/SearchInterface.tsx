@@ -656,7 +656,7 @@ const SearchInterface = () => {
     }
   };
 
-  const handleThreadClick = (threadId: string) => {
+  const handleThreadClick = async (threadId: string) => {
     setSelectedThread(threadId);
     setShowMobileSidebar(false); // Close mobile sidebar when selecting a thread
     
@@ -682,6 +682,17 @@ const SearchInterface = () => {
           if (firstItem.results && Array.isArray(firstItem.results)) {
             const docIds = firstItem.results.map((r: any) => r.id);
             setCurrentSearchDocumentIds(docIds);
+          }
+          
+          // Check if any results have potential_duplicates and refresh if needed
+          const hasDuplicates = thread.results.some((result: any) => 
+            result.results && result.results.some((r: any) => r.potential_duplicates && r.potential_duplicates.length > 0)
+          );
+          
+          if (hasDuplicates) {
+            console.log('🔄 Thread has potential duplicates, refreshing search results...');
+            // Refresh the search results to get updated duplicate status
+            await handleSearchRetry();
           }
         }
       }
@@ -1853,7 +1864,7 @@ const SearchInterface = () => {
                   data={qa}
                   isLoading={false}
                   onResultClick={handleSearchResultClick}
-                  onRetry={undefined}
+                  onRetry={handleSearchRetry}
                   hasMore={false}
                   summaryVersions={summaryVersions[index]}
                   isClosedThread={true}

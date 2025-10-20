@@ -175,7 +175,7 @@ const ResultCard: React.FC<ResultCardProps> = ({
       )}
 
       {/* Version indicator */}
-      {result.has_older_versions && result.alternate_versions_count > 0 && (
+      {result.has_older_versions && (result.alternate_versions_count ?? 0) > 0 && (
         <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <BookOpen className="w-3 h-3" />
           <span>{result.alternate_versions_count} older version(s) available</span>
