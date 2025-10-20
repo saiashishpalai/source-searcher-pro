@@ -66,183 +66,183 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Enhanced Background elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-primary/5 to-accent/3 rounded-full blur-2xl animate-background-drift" style={{ animationDelay: '5s' }} />
-      </div>
-
-      <div className="w-full max-w-md relative z-10">
-        {/* Back to Landing Link */}
-        <div className="mb-6">
-            <Link 
-              to="/" 
-              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group animate-fade-in"
-            >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Haven7
-          </Link>
+    <div className="flex h-screen bg-black">
+      {/* Left side - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
+        {/* Radial gradient overlay from center */}
+        <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
+        
+        {/* Soft purple glow accents */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
+          <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-fuchsia-600/15 rounded-full blur-[128px]" />
         </div>
 
-        {/* Haven7 Logo with Animation */}
-        <div className="text-center mb-8 animate-fade-in-up">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center animate-pulse">
-              <span className="text-white font-bold text-lg">H7</span>
-            </div>
-            <span className="text-2xl font-semibold text-foreground">Haven7</span>
+        <div className="w-full max-w-md relative z-20">
+          {/* Logo */}
+          <div className="mb-8">
+            <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Haven7
+            </Link>
           </div>
-          <p className="text-muted-foreground animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            Create your account to get started
-          </p>
-        </div>
 
-        <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-2xl animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-          <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-semibold text-foreground animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-              Create Account
-            </CardTitle>
-            <CardDescription className="text-muted-foreground animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
-              Join Haven7 and connect your work sources
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {message && (
-              <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>{message.text}</AlertDescription>
-              </Alert>
-            )}
+          {/* Heading */}
+          <div className="mb-8">
+            <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+              Create your account
+            </h1>
+            <p className="text-gray-400 text-base">
+              Welcome! Please fill in the details to get started.
+            </p>
+          </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: '1s' }}>
-                <Label htmlFor="email" className="text-sm font-medium text-foreground">
-                  Email Address
-                </Label>
-                <div className="relative group">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="Enter your email"
-                    className="pl-10 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                    required
-                  />
-                </div>
+          {/* Google OAuth Button (UI placeholder) */}
+          <button
+            type="button"
+            onClick={() => console.log('Google sign-in coming soon')}
+            className="w-full flex items-center justify-center gap-3 bg-white/95 backdrop-blur-sm text-gray-900 rounded-xl py-3.5 mb-6 hover:bg-white transition-all duration-200 shadow-lg shadow-white/10 hover:shadow-white/20 font-medium"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C33.6 6.1 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.9z"/>
+              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.9 16.1 19.1 14 24 14c3.1 0 5.9 1.2 8 3.1l5.7-5.7C33.6 6.1 29 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/>
+              <path fill="#4CAF50" d="M24 44c5 0 9.6-1.9 13-5.1l-6-4.9c-2 1.5-4.6 2.4-7 2.4-5.3 0-9.7-3.4-11.3-8l-6.6 5.1C9.6 39.7 16.3 44 24 44z"/>
+              <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.3 3.7-4.3 6.6-8.3 7.6l6 4.9C36.4 39.9 40 34.5 40 28c0-1.3-.1-2.7-.4-3.9z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-800/50"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-black text-gray-500">or</span>
+            </div>
+          </div>
+
+          {/* Form fields */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label className="block text-sm text-gray-300 mb-2" htmlFor="email">Email address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="Enter your email address"
+                  className="pl-10 pr-4 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  required
+                />
               </div>
+            </div>
 
-              <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: '1.2s' }}>
-                <Label htmlFor="password" className="text-sm font-medium text-foreground">
-                  Password
-                </Label>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    placeholder="Create a password"
-                    className="pl-10 pr-10 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 8 characters long
-                </p>
-              </div>
-
-              <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: '1.4s' }}>
-                <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
-                  Confirm Password
-                </Label>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    placeholder="Confirm your password"
-                    className="pl-10 pr-10 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent transition-colors"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="animate-fade-in-up" style={{ animationDelay: '1.6s' }}>
+            <div>
+              <Label className="block text-sm text-gray-300 mb-2" htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="Enter your password"
+                  className="pl-10 pr-12 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  required
+                />
                 <Button
-                  type="submit"
-                  className="group relative w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
-                  disabled={isLoading}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label="Toggle password visibility"
                 >
-                  {/* Animated background shimmer */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-                  
-                  {/* Button content */}
-                  <span className="relative flex items-center justify-center gap-2">
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Creating Account...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        Create Account
-                      </>
-                    )}
-                  </span>
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </Button>
               </div>
-            </form>
-
-            <div className="text-center animate-fade-in-up" style={{ animationDelay: '1.8s' }}>
-              <p className="text-sm text-muted-foreground">
-                Already have an account?{' '}
-                <Link
-                  to="/login"
-                  className="text-primary hover:text-primary/80 font-medium transition-colors hover:underline"
-                >
-                  Sign in
-                </Link>
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters long</p>
             </div>
-          </CardContent>
-        </Card>
 
-        <div className="mt-6 text-center animate-fade-in-up" style={{ animationDelay: '2s' }}>
-          <p className="text-xs text-muted-foreground/60">
-            By creating an account, you agree to our Terms of Service and Privacy Policy
+            <div>
+              <Label className="block text-sm text-gray-300 mb-2" htmlFor="confirmPassword">Confirm Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  placeholder="Confirm your password"
+                  className="pl-10 pr-12 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  aria-label="Toggle confirm password visibility"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </Button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating Account...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Continue →
+                </span>
+              )}
+            </Button>
+          </form>
+
+          {/* Sign in link */}
+          <p className="text-center text-gray-400 mt-6">
+            Already have an account?{' '}
+            <Link to="/login" className="text-[#A855F7] hover:text-purple-400">
+              Sign in
+            </Link>
+          </p>
+
+          {/* Terms footer */}
+          <p className="text-xs text-gray-600 mt-8 text-center">
+            By signing up, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>
       </div>
 
+      {/* Right side - Visual */}
+      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+        {/* Background image - first abstract purple gradient */}
+        <img 
+          src="/src/assets/auth-bg-1.jpg" 
+          alt="Abstract purple gradient background" 
+          className="absolute inset-0 w-full h-full object-cover scale-105"
+        />
+        {/* Wide soft gradient blend from left */}
+        <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
+        {/* Subtle vignette for depth */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
+      </div>
     </div>
   );
 };
