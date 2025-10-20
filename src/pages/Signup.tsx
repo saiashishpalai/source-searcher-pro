@@ -80,7 +80,7 @@ const Signup = () => {
 
         <div className="w-full max-w-md relative z-20">
           {/* Logo */}
-          <div className="mb-8">
+          <div className="mb-8 animate-fade-in">
             <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
               <ArrowLeft className="w-4 h-4" />
               Back to Haven7
@@ -88,7 +88,7 @@ const Signup = () => {
           </div>
 
           {/* Heading */}
-          <div className="mb-8">
+          <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Create your account
             </h1>
@@ -101,7 +101,8 @@ const Signup = () => {
           <button
             type="button"
             onClick={() => console.log('Google sign-in coming soon')}
-            className="w-full flex items-center justify-center gap-3 bg-white/95 backdrop-blur-sm text-gray-900 rounded-xl py-3.5 mb-6 hover:bg-white transition-all duration-200 shadow-lg shadow-white/10 hover:shadow-white/20 font-medium"
+            className="w-full flex items-center justify-center gap-3 bg-white/95 backdrop-blur-sm text-gray-900 rounded-xl py-3.5 mb-6 hover:bg-white transition-all duration-200 shadow-lg shadow-white/10 hover:shadow-white/20 font-medium animate-fade-in-up"
+            style={{ animationDelay: '0.4s' }}
           >
             <svg className="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">
               <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C33.6 6.1 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.9z"/>
@@ -113,7 +114,7 @@ const Signup = () => {
           </button>
 
           {/* Divider */}
-          <div className="relative mb-6">
+          <div className="relative mb-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-800/50"></div>
             </div>
@@ -124,7 +125,7 @@ const Signup = () => {
 
           {/* Form fields */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
               <Label className="block text-sm text-gray-300 mb-2" htmlFor="email">Email address</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
@@ -141,7 +142,7 @@ const Signup = () => {
               </div>
             </div>
 
-            <div>
+            <div className="animate-fade-in-up" style={{ animationDelay: '1.0s' }}>
               <Label className="block text-sm text-gray-300 mb-2" htmlFor="password">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
@@ -169,7 +170,7 @@ const Signup = () => {
               <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters long</p>
             </div>
 
-            <div>
+            <div className="animate-fade-in-up" style={{ animationDelay: '1.2s' }}>
               <Label className="block text-sm text-gray-300 mb-2" htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
@@ -196,11 +197,12 @@ const Signup = () => {
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
-              disabled={isLoading}
-            >
+            <div className="animate-fade-in-up" style={{ animationDelay: '1.4s' }}>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
+                disabled={isLoading}
+              >
               {isLoading ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -213,10 +215,11 @@ const Signup = () => {
                 </span>
               )}
             </Button>
+            </div>
           </form>
 
           {/* Sign in link */}
-          <p className="text-center text-gray-400 mt-6">
+          <p className="text-center text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '1.6s' }}>
             Already have an account?{' '}
             <Link to="/login" className="text-[#A855F7] hover:text-purple-400">
               Sign in
@@ -224,7 +227,7 @@ const Signup = () => {
           </p>
 
           {/* Terms footer */}
-          <p className="text-xs text-gray-600 mt-8 text-center">
+          <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.8s' }}>
             By signing up, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>

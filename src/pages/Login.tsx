@@ -65,7 +65,7 @@ const Login = () => {
 
         <div className="w-full max-w-md relative z-20">
           {/* Back to Haven7 */}
-          <div className="mb-8">
+          <div className="mb-8 animate-fade-in">
             <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
               <ArrowLeft className="w-4 h-4" />
               Back to Haven7
@@ -73,7 +73,7 @@ const Login = () => {
           </div>
 
           {/* Heading */}
-          <div className="mb-8">
+          <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Sign In
             </h1>
@@ -84,7 +84,7 @@ const Login = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
               <Label className="block text-sm text-gray-300 mb-2" htmlFor="email">Email Address</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
@@ -101,7 +101,7 @@ const Login = () => {
               </div>
             </div>
 
-            <div>
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
               <Label className="block text-sm text-gray-300 mb-2" htmlFor="password">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
@@ -129,7 +129,7 @@ const Login = () => {
             </div>
 
             {/* Remember me + Forgot password */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in" style={{ animationDelay: '0.8s' }}>
               <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
                 <input type="checkbox" className="rounded border-gray-700" />
                 Remember me
@@ -139,11 +139,12 @@ const Login = () => {
               </Link>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
-              disabled={isLoading}
-            >
+            <div className="animate-fade-in-up" style={{ animationDelay: '1.0s' }}>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
+                disabled={isLoading}
+              >
               {isLoading ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -156,10 +157,11 @@ const Login = () => {
                 </span>
               )}
             </Button>
+            </div>
           </form>
 
           {/* Sign up link */}
-          <p className="text-center text-gray-400 mt-6">
+          <p className="text-center text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '1.2s' }}>
             Don't have an account?{' '}
             <Link to="/signup" className="text-[#A855F7] hover:text-purple-400">
               Create one
@@ -167,7 +169,7 @@ const Login = () => {
           </p>
 
           {/* Footer text */}
-          <p className="text-xs text-gray-600 mt-8 text-center">
+          <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.4s' }}>
             Secure authentication powered by Haven7
           </p>
         </div>
