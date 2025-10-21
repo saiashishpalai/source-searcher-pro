@@ -37,6 +37,28 @@ Each Teams message is tagged with:
 - Work or school accounts with Teams access
 - Any account with a valid Office 365 license that includes Teams
 
+## 🔐 Enterprise Account Permissions
+
+**For enterprise accounts, you need to ensure the following permissions are granted:**
+
+### Required Delegated Permissions:
+- `Team.ReadBasic.All` - Read basic team information
+- `Channel.ReadBasic.All` - Read channel information  
+- `ChannelMessage.Read.All` - Read messages from channels
+- `offline_access` - Refresh tokens for long-term access
+
+### Admin Consent Required:
+Enterprise accounts may require **admin consent** for these permissions. If you get permission errors:
+1. Contact your IT administrator to grant consent for the Haven7 application
+2. Or ask them to add these permissions to your Azure AD app registration
+3. Ensure the user has a valid Office 365 license with Teams access
+
+### Permission Scope Explanation:
+We use **Delegated Permissions** (not Application Permissions) because:
+- We need to access user-specific data (`/me/joinedTeams`)
+- Application Permissions would require admin consent and access to ALL users
+- Delegated Permissions only access data for the authenticated user
+
 ## Architecture
 
 ### Permission Model
@@ -129,7 +151,7 @@ const TeamsIcon = ({ className = "" }: { className?: string }) => (
 const teamsAuthUrl = new URL(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`);
 teamsAuthUrl.searchParams.set('client_id', clientId);
 teamsAuthUrl.searchParams.set('redirect_uri', `${apiUrl}/api/auth/teams/callback`);
-teamsAuthUrl.searchParams.set('scope', 'https://graph.microsoft.com/.default offline_access');
+teamsAuthUrl.searchParams.set('scope', 'https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/ChannelMessage.Read.All offline_access');
 ```
 
 #### 4. Permission Modal
@@ -166,21 +188,21 @@ VITE_MICROSOFT_TENANT_ID=your-tenant-id-here
 3. **Note credentials**: Application (client) ID and Directory (tenant) ID
 4. **Create client secret**: Certificates & secrets → New client secret (24 months max)
 5. **Configure API permissions**:
-   - Add `ChannelMessage.Read.All` (Application)
-   - Add `Team.ReadBasic.All` (Application) 
-   - Add `Channel.ReadBasic.All` (Application)
-   - **CRITICAL**: Click "Grant admin consent for [Your Org]"
+   - Add `ChannelMessage.Read.All` (Delegated)
+   - Add `Team.ReadBasic.All` (Delegated) 
+   - Add `Channel.ReadBasic.All` (Delegated)
+   - **For Enterprise**: Admin consent may be required (contact IT admin)
 
 ## Key Differences from Slack Integration
 
 | Aspect | Slack | Teams |
 |--------|-------|-------|
-| **Permission Model** | Bot user with scopes | Application permissions (admin consent) |
+| **Permission Model** | Bot user with scopes | Delegated permissions (user consent) |
 | **Content Format** | Markdown | HTML (requires stripping) |
 | **Token Expiration** | Never expires | Expires (needs refresh logic) |
 | **Rate Limits** | Generous | Aggressive (requires delays) |
 | **Message Types** | All messages | Filter system messages |
-| **Admin Consent** | Not required | Required for tenant-wide access |
+| **Admin Consent** | Not required | May be required for enterprise accounts |
 
 ## Sync Process Flow
 

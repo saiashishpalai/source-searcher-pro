@@ -585,7 +585,7 @@ app.get('/api/auth/teams/callback', async (req, res) => {
           code,
           redirect_uri: process.env.MICROSOFT_REDIRECT_URI,
           grant_type: 'authorization_code',
-          scope: 'https://graph.microsoft.com/.default offline_access'
+          scope: 'https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/ChannelMessage.Read.All offline_access'
         })
       }
     );

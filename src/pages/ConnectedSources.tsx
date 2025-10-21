@@ -825,7 +825,7 @@ const ConnectedSources = () => {
         teamsAuthUrl.searchParams.set('client_id', clientId);
         teamsAuthUrl.searchParams.set('redirect_uri', `${apiUrl}/api/auth/teams/callback`);
         teamsAuthUrl.searchParams.set('response_type', 'code');
-        teamsAuthUrl.searchParams.set('scope', 'https://graph.microsoft.com/.default offline_access');
+        teamsAuthUrl.searchParams.set('scope', 'https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/ChannelMessage.Read.All offline_access');
         teamsAuthUrl.searchParams.set('state', state);
         
         console.log('🔗 Teams OAuth URL constructed:');
