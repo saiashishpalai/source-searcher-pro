@@ -177,7 +177,7 @@ cp env.example .env.local
 npm run dev
 
 # 4. Test OAuth flows
-# Visit http://localhost:5173/connect-sources
+# Visit http://localhost:5173/connected-sources
 # Click on Google Drive, Slack, or Notion connect buttons
 ```
 

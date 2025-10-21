@@ -8,7 +8,7 @@ DROP TABLE IF EXISTS user_connections CASCADE;
 CREATE TABLE user_connections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive')),
+  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive', 'teams')),
   source_user_id TEXT,
   workspace_id TEXT,
   workspace_name TEXT,

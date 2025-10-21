@@ -7,7 +7,6 @@ import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
-import ConnectSources from "./pages/ConnectSources";
 import ConnectedSources from "./pages/ConnectedSources";
 import ProfileSettings from "./pages/ProfileSettings";
 import Documentation from "./pages/Documentation";
@@ -30,11 +29,6 @@ const App = () => {
       <Route path="/dashboard" element={
         <ProtectedRoute>
           <Index />
-        </ProtectedRoute>
-      } />
-      <Route path="/connect-sources" element={
-        <ProtectedRoute requireVerification={true}>
-          <ConnectSources />
         </ProtectedRoute>
       } />
       <Route path="/connected-sources" element={

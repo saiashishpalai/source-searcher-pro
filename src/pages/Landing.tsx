@@ -49,12 +49,12 @@ const Landing = () => {
         <div className="text-center max-w-2xl mx-auto">
           {/* Headline */}
           <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight animate-fade-in-up">
-            Search Your Work Knowledge in Seconds
+            Stop Juggling Multiple Workspaces
           </h1>
           
           {/* Subheadline */}
           <p className="text-xl md:text-2xl text-gray-300 mb-12 leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            AI-powered search across Slack, Notion, and Google Drive. Find what you need without switching apps.
+            Search across ALL your clients' Slack, Notion, Google Drive, and Teams in one place.
           </p>
           
           {/* CTA Button with Enhanced Animations */}
@@ -80,7 +80,7 @@ const Landing = () => {
           
           {/* Additional CTA hint */}
           <p className="text-sm text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            Join 500+ product managers already using Haven7
+            Join 500+ multi-client professionals already using Haven7
           </p>
         </div>
       </main>
@@ -88,7 +88,7 @@ const Landing = () => {
       {/* Footer */}
       <footer className="p-6 relative z-10">
         <div className="text-center text-gray-400 animate-fade-in" style={{ animationDelay: '0.8s' }}>
-          Built for Product Managers
+          Built for Multi-Client Professionals
         </div>
       </footer>
 

@@ -16,6 +16,7 @@ import { GoogleDriveSync } from './services/google-drive-sync.js';
 import { SearchService } from './services/search-service.js';
 import { NotionSync } from './services/notion-sync.js';
 import { SlackSync } from './services/slack-sync.js';
+import { TeamsSync } from './services/teams-sync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +42,7 @@ const googleDriveSync = new GoogleDriveSync(process.env.OPENAI_API_KEY, supabase
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
+const teamsSync = new TeamsSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -176,6 +178,49 @@ app.get('/api/test/notion-connection', async (req, res) => {
   }
 });
 
+// Test endpoint to check Teams configuration
+app.get('/api/test/teams-config', async (req, res) => {
+  try {
+    console.log('🔍 Teams configuration check:');
+    console.log('   MICROSOFT_TENANT_ID:', process.env.MICROSOFT_TENANT_ID ? 'Present' : 'Missing');
+    console.log('   MICROSOFT_CLIENT_ID:', process.env.MICROSOFT_CLIENT_ID ? 'Present' : 'Missing');
+    console.log('   MICROSOFT_CLIENT_SECRET:', process.env.MICROSOFT_CLIENT_SECRET ? 'Present' : 'Missing');
+    console.log('   MICROSOFT_REDIRECT_URI:', process.env.MICROSOFT_REDIRECT_URI);
+    
+    // Detailed debugging
+    console.log('📊 Detailed environment variable analysis:');
+    console.log('   Tenant ID value:', process.env.MICROSOFT_TENANT_ID);
+    console.log('   Tenant ID length:', process.env.MICROSOFT_TENANT_ID?.length);
+    console.log('   Client ID value:', process.env.MICROSOFT_CLIENT_ID);
+    console.log('   Client ID length:', process.env.MICROSOFT_CLIENT_ID?.length);
+    console.log('   Client Secret length:', process.env.MICROSOFT_CLIENT_SECRET?.length);
+    console.log('   Client Secret first 10:', process.env.MICROSOFT_CLIENT_SECRET?.substring(0, 10));
+    console.log('   Client Secret last 10:', process.env.MICROSOFT_CLIENT_SECRET?.substring(process.env.MICROSOFT_CLIENT_SECRET?.length - 10));
+    console.log('   Redirect URI value:', process.env.MICROSOFT_REDIRECT_URI);
+    
+    res.json({
+      tenantId: process.env.MICROSOFT_TENANT_ID ? 'Present' : 'Missing',
+      clientId: process.env.MICROSOFT_CLIENT_ID ? 'Present' : 'Missing',
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET ? 'Present' : 'Missing',
+      redirectUri: process.env.MICROSOFT_REDIRECT_URI,
+      allConfigured: !!(process.env.MICROSOFT_TENANT_ID && process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_REDIRECT_URI),
+      // Detailed values for debugging
+      detailedValues: {
+        tenantId: process.env.MICROSOFT_TENANT_ID,
+        clientId: process.env.MICROSOFT_CLIENT_ID,
+        clientSecretLength: process.env.MICROSOFT_CLIENT_SECRET?.length,
+        clientSecretFirst10: process.env.MICROSOFT_CLIENT_SECRET?.substring(0, 10),
+        clientSecretLast10: process.env.MICROSOFT_CLIENT_SECRET?.substring(process.env.MICROSOFT_CLIENT_SECRET?.length - 10),
+        redirectUri: process.env.MICROSOFT_REDIRECT_URI
+      }
+    });
+    
+  } catch (error) {
+    console.error('Teams config check error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET USER CONNECTIONS
 app.get('/api/connections/get', async (req, res) => {
   try {
@@ -219,12 +264,12 @@ app.get('/api/auth/google/callback', async (req, res) => {
     const { code, state } = req.query;
     
     if (!code || !state) {
-      return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
+      return res.redirect(`${APP_URL}/connected-sources?error=missing_params`);
     }
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     
     if (Date.now() - stateData.timestamp > 600000) {
-      return res.redirect(`${APP_URL}/connect-sources?error=expired`);
+      return res.redirect(`${APP_URL}/connected-sources?error=expired`);
     }
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -242,7 +287,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.json();
       console.error('Token exchange failed:', error);
-      return res.redirect(`${APP_URL}/connect-sources?error=token_failed`);
+      return res.redirect(`${APP_URL}/connected-sources?error=token_failed`);
     }
 
     const tokens = await tokenResponse.json();
@@ -287,7 +332,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
 
     if (dbError) {
       console.error('❌ Database error:', dbError);
-      return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
+      return res.redirect(`${APP_URL}/connected-sources?error=db_failed`);
     }
     
     console.log('✓ Google Drive connection saved to database');
@@ -295,7 +340,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     return res.redirect(`${APP_URL}/connected-sources?connected=google`);
   } catch (error) {
     console.error('OAuth callback error:', error);
-    return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+    return res.redirect(`${APP_URL}/connected-sources?error=failed`);
   }
 });
 
@@ -307,14 +352,14 @@ app.get('/api/auth/slack/callback', async (req, res) => {
   
   if (!code || !state) {
     console.error('❌ Missing code or state in callback');
-    return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
+    return res.redirect(`${APP_URL}/connected-sources?error=missing_params`);
   }
 
   try {
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     
     if (Date.now() - stateData.timestamp > 600000) {
-      return res.redirect(`${APP_URL}/connect-sources?error=expired`);
+      return res.redirect(`${APP_URL}/connected-sources?error=expired`);
     }
 
     console.log('🔄 Attempting Slack token exchange...');
@@ -339,7 +384,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
     if (!tokens.ok) {
       console.error('❌ Slack token exchange failed!');
       console.error('   Full error response:', JSON.stringify(tokens, null, 2));
-      return res.redirect(`${APP_URL}/connect-sources?error=token_failed`);
+      return res.redirect(`${APP_URL}/connected-sources?error=token_failed`);
     }
     
     // Extract Slack team and user info
@@ -378,7 +423,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
 
     if (dbError) {
       console.error('❌ Database error:', dbError);
-      return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
+      return res.redirect(`${APP_URL}/connected-sources?error=db_failed`);
     }
     
     console.log('✓ Slack connection saved to database');
@@ -386,7 +431,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
     return res.redirect(`${APP_URL}/connected-sources?connected=slack`);
   } catch (error) {
     console.error('Slack OAuth callback error:', error);
-    return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+    return res.redirect(`${APP_URL}/connected-sources?error=failed`);
   }
 });
 
@@ -395,14 +440,14 @@ app.get('/api/auth/notion/callback', async (req, res) => {
   const { code, state } = req.query;
   
   if (!code || !state) {
-    return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
+    return res.redirect(`${APP_URL}/connected-sources?error=missing_params`);
   }
 
   try {
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     
     if (Date.now() - stateData.timestamp > 600000) {
-      return res.redirect(`${APP_URL}/connect-sources?error=expired`);
+      return res.redirect(`${APP_URL}/connected-sources?error=expired`);
     }
 
     // Notion uses Basic Auth with base64 encoded client_id:client_secret
@@ -424,7 +469,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.json();
       console.error('Notion token exchange failed:', error);
-      return res.redirect(`${APP_URL}/connect-sources?error=token_failed`);
+      return res.redirect(`${APP_URL}/connected-sources?error=token_failed`);
     }
 
     const tokens = await tokenResponse.json();
@@ -465,7 +510,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
 
     if (dbError) {
       console.error('❌ Database error:', dbError);
-      return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
+      return res.redirect(`${APP_URL}/connected-sources?error=db_failed`);
     }
     
     console.log('✓ Notion connection saved to database');
@@ -473,7 +518,153 @@ app.get('/api/auth/notion/callback', async (req, res) => {
     return res.redirect(`${APP_URL}/connected-sources?connected=notion`);
   } catch (error) {
     console.error('Notion OAuth callback error:', error);
-    return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+    return res.redirect(`${APP_URL}/connected-sources?error=failed`);
+  }
+});
+
+// TEAMS OAUTH CALLBACK
+app.get('/api/auth/teams/callback', async (req, res) => {
+  console.log('🎯 TEAMS CALLBACK RECEIVED!', req.query);
+  
+  const { code, state } = req.query;
+  
+  if (!code || !state) {
+    console.error('❌ Missing code or state in Teams callback');
+    return res.redirect(`${APP_URL}/connected-sources?error=missing_params`);
+  }
+
+  try {
+    console.log('🔄 Parsing state data...');
+    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    console.log('📊 State data:', { userId: stateData.userId, source: stateData.source, timestamp: stateData.timestamp });
+    
+    if (Date.now() - stateData.timestamp > 600000) {
+      console.error('❌ State expired');
+      return res.redirect(`${APP_URL}/connected-sources?error=expired`);
+    }
+
+    console.log('🔄 Attempting Teams token exchange...');
+    console.log('   Code:', code.substring(0, 20) + '...');
+    console.log('   Tenant ID:', process.env.MICROSOFT_TENANT_ID);
+    console.log('   Client ID:', process.env.MICROSOFT_CLIENT_ID);
+    console.log('   Client Secret:', process.env.MICROSOFT_CLIENT_SECRET ? 'Present' : 'Missing');
+    console.log('   Client Secret Length:', process.env.MICROSOFT_CLIENT_SECRET ? process.env.MICROSOFT_CLIENT_SECRET.length : 'N/A');
+    console.log('   Client Secret First 10 chars:', process.env.MICROSOFT_CLIENT_SECRET ? process.env.MICROSOFT_CLIENT_SECRET.substring(0, 10) : 'N/A');
+    console.log('   Client Secret Last 10 chars:', process.env.MICROSOFT_CLIENT_SECRET ? process.env.MICROSOFT_CLIENT_SECRET.substring(process.env.MICROSOFT_CLIENT_SECRET.length - 10) : 'N/A');
+    console.log('   Redirect URI:', process.env.MICROSOFT_REDIRECT_URI);
+    
+    // Debug the actual request body
+    const requestBody = new URLSearchParams({
+      client_id: process.env.MICROSOFT_CLIENT_ID,
+      client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+      code,
+      redirect_uri: process.env.MICROSOFT_REDIRECT_URI,
+      grant_type: 'authorization_code',
+      scope: 'https://graph.microsoft.com/.default offline_access'
+    });
+    
+    console.log('📊 Request body being sent:');
+    console.log('   client_id:', requestBody.get('client_id'));
+    console.log('   client_secret length:', requestBody.get('client_secret')?.length);
+    console.log('   client_secret first 10:', requestBody.get('client_secret')?.substring(0, 10));
+    console.log('   client_secret last 10:', requestBody.get('client_secret')?.substring(requestBody.get('client_secret')?.length - 10));
+    console.log('   code length:', requestBody.get('code')?.length);
+    console.log('   redirect_uri:', requestBody.get('redirect_uri'));
+    console.log('   grant_type:', requestBody.get('grant_type'));
+    console.log('   scope:', requestBody.get('scope'));
+
+    // Exchange code for token
+    const tokenResponse = await fetch(
+      `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID}/oauth2/v2.0/token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: process.env.MICROSOFT_CLIENT_ID,
+          client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+          code,
+          redirect_uri: process.env.MICROSOFT_REDIRECT_URI,
+          grant_type: 'authorization_code',
+          scope: 'https://graph.microsoft.com/.default offline_access'
+        })
+      }
+    );
+
+    console.log(`📊 Token response status: ${tokenResponse.status} ${tokenResponse.ok ? 'OK' : 'FAILED'}`);
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.json();
+      console.error('❌ Teams token exchange failed!');
+      console.error('   Full error response:', JSON.stringify(error, null, 2));
+      return res.redirect(`${APP_URL}/connected-sources?error=token_failed`);
+    }
+
+    const tokens = await tokenResponse.json();
+    console.log('📥 Teams API response:', JSON.stringify(tokens, null, 2));
+    
+    // Get user info to determine tenant
+    console.log('🔄 Fetching user info from Microsoft Graph...');
+    const userInfoResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` }
+    });
+
+    console.log(`📊 User info response status: ${userInfoResponse.status} ${userInfoResponse.ok ? 'OK' : 'FAILED'}`);
+
+    if (!userInfoResponse.ok) {
+      const errorText = await userInfoResponse.text();
+      console.error('❌ Failed to get user info from Microsoft Graph:', errorText);
+      return res.redirect(`${APP_URL}/connected-sources?error=user_info_failed`);
+    }
+
+    const userInfo = await userInfoResponse.json();
+    console.log('📊 User info received:', userInfo);
+    
+    console.log('✓ Teams tokens received:', { 
+      userId: userInfo.id, 
+      userPrincipalName: userInfo.userPrincipalName,
+      displayName: userInfo.displayName,
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      expiresIn: tokens.expires_in
+    });
+
+    console.log('🔄 Storing Teams connection in database...');
+    const { error: dbError } = await supabaseAdmin
+      .from('user_connections')
+      .upsert({
+        user_id: stateData.userId,
+        source_type: 'teams',
+        source_user_id: userInfo.id,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_expires_at: tokens.expires_in 
+          ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+          : null,
+        is_active: true,
+        metadata: {
+          tenant_id: process.env.MICROSOFT_TENANT_ID,
+          user_principal_name: userInfo.userPrincipalName,
+          display_name: userInfo.displayName,
+          scope: tokens.scope,
+        },
+        updated_at: new Date().toISOString(),
+      }, { 
+        onConflict: 'user_id,source_type' 
+      });
+
+    if (dbError) {
+      console.error('❌ Database error:', dbError);
+      return res.redirect(`${APP_URL}/connected-sources?error=db_failed`);
+    }
+    
+    console.log('✓ Teams connection saved to database');
+
+    return res.redirect(`${APP_URL}/connected-sources?connected=teams`);
+  } catch (error) {
+    console.error('❌ Teams OAuth callback error:', error);
+    console.error('   Error details:', error.message);
+    console.error('   Stack trace:', error.stack);
+    return res.redirect(`${APP_URL}/connected-sources?error=failed`);
   }
 });
 
@@ -676,6 +867,69 @@ app.post('/api/sync/slack', async (req, res) => {
   }
 });
 
+// SYNC TEAMS ENDPOINT
+app.post('/api/sync/teams', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Get Teams connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('source_type', 'teams')
+      .single();
+    
+    if (connError || !connection) {
+      return res.status(400).json({ 
+        error: 'Teams not connected',
+        code: 'NOT_CONNECTED'
+      });
+    }
+    
+    console.log('✓ Starting Teams sync for user:', user.id);
+    
+    // Call sync service
+    const result = await teamsSync.syncTeams(user.id);
+    
+    console.log(`✓ Teams sync complete: ${result.synced} messages`);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('✗ Teams sync error:', error.message);
+    
+    if (error.message.includes('token expired') || error.message.includes('Teams token')) {
+      return res.status(401).json({ 
+        error: 'Teams token expired. Please reconnect Teams.',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    if (error.message.includes('quota') || error.message.includes('rate limit')) {
+      return res.status(429).json({ 
+        error: 'API quota exceeded. Please try again later.',
+        code: 'QUOTA_EXCEEDED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message,
+      code: 'SYNC_FAILED'
+    });
+  }
+});
+
 // SYNC STATUS ENDPOINT
 app.get('/api/sync/status', async (req, res) => {
   try {
@@ -692,7 +946,7 @@ app.get('/api/sync/status', async (req, res) => {
     }
 
     // Get stats for all sources
-    const sources = ['google_drive', 'notion', 'slack'];
+    const sources = ['google_drive', 'notion', 'slack', 'teams'];
     const statsBySource = {};
 
     for (const sourceType of sources) {

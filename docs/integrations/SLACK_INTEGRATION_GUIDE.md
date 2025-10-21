@@ -246,7 +246,7 @@ Stores in user_connections table:
   - access_token: Bot token
   - metadata: { team_id, team_name, scope }
   ↓
-Redirects to frontend: /connect-sources?connected=slack
+Redirects to frontend: /connected-sources?connected=slack
   ↓
 Frontend detects success and refetches connections
 ```

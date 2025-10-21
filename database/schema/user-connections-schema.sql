@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS user_connections (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive')),
+  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive', 'teams')),
   source_user_id TEXT NOT NULL, -- The user ID from the external service (e.g., Google user ID)
   access_token TEXT NOT NULL,
   refresh_token TEXT,

@@ -51,7 +51,7 @@ src/
 
 ### 1. User Registration
 ```
-/signup → Email verification → /verify-email → /connect-sources → /
+/signup → Email verification → /verify-email → /connected-sources → /
 ```
 
 ### 2. User Login

@@ -66,19 +66,19 @@ const Documentation = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-gray-300 text-sm">
-                  Haven7 is an AI-powered search platform that unifies your workplace knowledge across multiple tools. 
-                  Instead of searching through Slack messages, Notion pages, and Google Drive files separately, 
-                  Haven7 provides a single, intelligent search interface.
+                  Haven7 is a cross-workspace knowledge aggregation platform for multi-client professionals. 
+                  Instead of juggling between different Slack workspaces, Notion workspaces, Google Drive accounts, and Microsoft Teams tenants, 
+                  Haven7 provides a single, intelligent search interface across ALL your clients and projects.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-300">
-                    AI-Powered Search
+                    Cross-Workspace Search
                   </Badge>
                   <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-300">
-                    Unified Interface
+                    Multi-Client Support
                   </Badge>
                   <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-300">
-                    Real-time Sync
+                    AI-Powered Summaries
                   </Badge>
                 </div>
               </CardContent>
@@ -94,7 +94,7 @@ const Documentation = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-gray-300 text-sm">
-                  Connect your work tools to start searching across all your content:
+                  Connect your work tools across multiple clients to start searching across all your workspaces:
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
@@ -122,6 +122,15 @@ const Documentation = () => {
                     <div>
                       <h4 className="text-white font-medium">Notion</h4>
                       <p className="text-gray-400 text-xs">Pages, databases, and knowledge base</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                    <div className="w-8 h-8 bg-[#5059C9] rounded-lg flex items-center justify-center">
+                      <Users className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-white font-medium">Microsoft Teams</h4>
+                      <p className="text-gray-400 text-xs">Messages, channels, and team discussions</p>
                     </div>
                   </div>
                 </div>

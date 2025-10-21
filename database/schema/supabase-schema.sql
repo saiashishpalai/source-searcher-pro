@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS user_sources (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive')),
+  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive', 'teams')),
   source_name TEXT NOT NULL,
   is_connected BOOLEAN DEFAULT false,
   access_token TEXT,

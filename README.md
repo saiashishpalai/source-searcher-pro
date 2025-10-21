@@ -6,7 +6,7 @@
 ![Status](https://img.shields.io/badge/Status-Active-success?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-**Search your work knowledge in seconds. All your scattered information from Slack, Notion, and Google Drive in one place.**
+**Search across ALL your workspaces in seconds. Unify scattered information from Slack, Notion, Google Drive, and Microsoft Teams across multiple clients and projects.**
 
 [Features](#key-features) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Tech Stack](#tech-stack)
 
@@ -16,15 +16,39 @@
 
 ## 🎯 What is Haven7?
 
-Haven7 is an AI-powered search platform that unifies your workplace knowledge across multiple tools. Instead of searching through Slack messages, Notion pages, and Google Drive files separately, Haven7 provides a single, intelligent search interface that:
+Haven7 is a **cross-workspace knowledge aggregation platform** that unifies information across multiple clients, projects, and workspaces. Instead of juggling between different Slack workspaces, Notion workspaces, Google Drive accounts, and Microsoft Teams tenants, Haven7 provides a single, intelligent search interface that:
 
-- **Searches across all your connected platforms** simultaneously
+- **Searches across ALL your workspaces** simultaneously (multiple clients, projects, teams)
 - **Generates AI summaries** of search results using OpenAI's GPT models
 - **Enables conversational follow-ups** to dig deeper into your findings
 - **Maintains search history** with persistent conversation threads
 - **Provides contextual answers** using Retrieval Augmented Generation (RAG)
 
-**Built for Product Managers** and teams who need to quickly access distributed information without context switching.
+**Built for multi-client professionals** - founders, agency PMs, freelancers, and consultants who manage multiple workspaces and need to find information across all their clients without context switching.
+
+## 🎯 Real Use Cases
+
+### The Multi-Client Professional Problem
+You're managing multiple clients, each with their own:
+- **Slack workspaces** (Client A, Client B, Client C...)
+- **Notion workspaces** (different project documentation)
+- **Google Drive accounts** (client-specific files)
+- **Microsoft Teams tenants** (client meetings and discussions)
+
+### The Information Chaos
+- Client A discussed pricing in Teams channel last month
+- Client B's decision about feature X was in a Slack DM
+- Client C's meeting had critical feedback in a transcript
+- You can't remember which workspace, which channel, which conversation
+
+### The Haven7 Solution
+**"Show me all conversations about 'pricing model' across ALL my clients"**
+
+Instead of searching 5+ different workspaces individually, Haven7 searches everything at once and shows you:
+- Client A's Teams discussion about pricing
+- Client B's Slack conversation about the same topic
+- Client C's Notion document with pricing strategy
+- All in one unified search result
 
 ---
 
@@ -32,8 +56,8 @@ Haven7 is an AI-powered search platform that unifies your workplace knowledge ac
 
 ## ✨ Key Features
 
-### 🔍 **Unified Search**
-Search across Slack messages, Notion pages, and Google Drive documents with a single query. No more app switching.
+### 🔍 **Cross-Workspace Search**
+Search across ALL your workspaces simultaneously - multiple Slack workspaces, Notion workspaces, Google Drive accounts, and Microsoft Teams tenants. Find information from Client A's Teams channel and Client B's Slack workspace in one search.
 
 ### 🤖 **AI-Powered Summaries**
 Get instant AI-generated summaries of your search results, highlighting the most relevant information.
@@ -45,7 +69,7 @@ Ask follow-up questions to refine your search. Haven7 maintains context and sear
 Automatically syncs and indexes your documents with vector embeddings for semantic search capabilities. Features intelligent incremental sync that only processes changed content for faster, more efficient updates.
 
 ### 🔍 **TF-IDF Content Fingerprinting & Duplicate Detection**
-- **Cross-Source Duplicate Detection**: Automatically detects similar documents across Slack, Notion, and Google Drive
+- **Cross-Source Duplicate Detection**: Automatically detects similar documents across Slack, Notion, Google Drive, and Microsoft Teams
 - **Manual Override UI**: Users can confirm or dismiss detected duplicates with intuitive controls
 - **Version Linking**: Link documents as versions of the same content for better organization
 - **Smart Deduplication**: Search results show only the latest version of linked documents
@@ -238,6 +262,7 @@ source-searcher-pro/
 - **Slack API** - Message search
 - **Google Drive API** - Document search
 - **Notion API** - Page search
+- **Microsoft Graph API** - Teams message search (requires Office 365 license)
 
 ---
 
@@ -319,7 +344,7 @@ Please ensure your code:
 **Active Development:** Yes
 
 ### ✅ Production Ready Features
-- ✅ **Complete OAuth Integration** - Slack, Google Drive, and Notion with secure authentication
+- ✅ **Complete OAuth Integration** - Slack, Google Drive, Notion, and Microsoft Teams with secure authentication
 - ✅ **AI-Powered Search** - GPT-4 powered summaries and conversational follow-ups
 - ✅ **Smart Document Sync** - Incremental sync with 70-90% efficiency gains
 - ✅ **Advanced Search** - TF-IDF content fingerprinting and duplicate detection
@@ -327,9 +352,9 @@ Please ensure your code:
 - ✅ **Profile Management** - Complete user profile settings with photo upload
 - ✅ **Security** - OAuth 2.0, encrypted tokens, and comprehensive security measures
 - ✅ **Performance** - Optimized sync, recency ranking, and efficient API usage
+- ✅ **Microsoft Teams Integration** - Complete Teams message sync with Office 365 license requirements
 
 ### 🚀 Future Enhancements
-- 🔄 Microsoft Teams integration
 - 🔄 Advanced filtering and search options
 - 🔄 Team collaboration features
 - 🔄 Analytics dashboard
@@ -366,7 +391,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 <div align="center">
 
-**Built for Product Managers**
+**Built for Multi-Client Professionals**
 
 Made with ❤️ by the Haven7 team
 

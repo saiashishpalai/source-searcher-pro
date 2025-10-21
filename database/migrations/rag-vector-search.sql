@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS documents (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive')),
+  source_type TEXT NOT NULL CHECK (source_type IN ('slack', 'notion', 'google_drive', 'teams')),
   source_id TEXT NOT NULL,
   title TEXT NOT NULL,
   content TEXT,
