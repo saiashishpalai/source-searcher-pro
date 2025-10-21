@@ -341,8 +341,8 @@ const ProfileSettings = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-4 sm:p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex-1">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-6">
             {/* Profile Photo Section */}
             <Card className="bg-card/60 backdrop-blur-sm border-border/50 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
               <CardHeader>
