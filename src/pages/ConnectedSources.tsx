@@ -187,8 +187,8 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 
       {/* Action Buttons */}
       <div className="space-y-2 mb-3">
-          {/* Sync Documents Button for Google Drive, Notion, and Slack */}
-          {(connection.source_type === 'google_drive' || connection.source_type === 'notion' || connection.source_type === 'slack') && onSyncDocuments && (
+          {/* Sync Documents Button for Google Drive, Notion, Slack, and Zoho Cliq */}
+          {(connection.source_type === 'google_drive' || connection.source_type === 'notion' || connection.source_type === 'slack' || connection.source_type === 'cliq') && onSyncDocuments && (
             <div className="space-y-2">
               <Button
                 variant="default"
@@ -295,7 +295,8 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                     <span>
                       {connection.source_type === 'slack' ? 'Message Chunks:' : 
                        connection.source_type === 'google_drive' ? 'Document Chunks:' :
-                       connection.source_type === 'notion' ? 'Page Chunks:' : 'Chunks:'}
+                       connection.source_type === 'notion' ? 'Page Chunks:' :
+                       connection.source_type === 'cliq' ? 'Message Chunks:' : 'Chunks:'}
                     </span>
                     <span className="font-medium">{syncStatus?.[connection.source_type]?.totalChunks ?? 0}</span>
                   </div>
@@ -313,7 +314,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                       )}
                     </>
                   )}
-                  {connection.source_type !== 'slack' && (
+                  {connection.source_type !== 'slack' && connection.source_type !== 'cliq' && (
                     <div className="flex justify-between">
                       <span>
                         {connection.source_type === 'google_drive' ? 'Files:' :
@@ -437,6 +438,22 @@ const PermissionModal = ({
             'Cannot modify database structures',
             'Cannot create new pages or databases',
             'Cannot change workspace settings'
+          ]
+        };
+      case 'cliq':
+        return {
+          willAccess: [
+            'Read messages in channels you\'re in',
+            'View channel names and team members',
+            'Access message history and threads',
+            'Read conversation content',
+            'Search through team communications'
+          ],
+          wontAccess: [
+            'Cannot send messages on your behalf',
+            'Cannot modify channels or settings',
+            'Cannot create new channels',
+            'Cannot invite or remove team members'
           ]
         };
       default:
@@ -588,6 +605,19 @@ const ConnectedSources = () => {
         'Pages you have access to',
         'Database content',
         'Page comments'
+      ]
+    },
+    {
+      id: 'cliq',
+      name: 'Zoho Cliq',
+      description: 'Connect your Zoho Cliq workspace to search team messages and conversations',
+      icon: MessageSquare,
+      color: 'bg-blue-500',
+      available: true,
+      permissions: [
+        'Channels you have access to',
+        'Messages and conversations',
+        'Team member names'
       ]
     }
   ];
@@ -741,6 +771,31 @@ const ConnectedSources = () => {
         
         console.log('🔗 Redirecting to Notion OAuth:', notionAuthUrl.toString());
         window.location.href = notionAuthUrl.toString();
+        
+      } else if (sourceId === 'cliq') {
+        const clientId = getEnvVar('VITE_ZOHO_CLIQ_CLIENT_ID');
+        if (!clientId) {
+          console.error('Zoho Cliq Client ID not configured');
+          return;
+        }
+        
+        // Create state parameter with userId
+        const state = btoa(JSON.stringify({
+          userId: user?.id,
+          timestamp: Date.now(),
+          source: 'cliq'
+        }));
+        
+        const cliqAuthUrl = new URL('https://accounts.zoho.com/oauth/v2/auth');
+        cliqAuthUrl.searchParams.set('client_id', clientId);
+        cliqAuthUrl.searchParams.set('redirect_uri', redirectUri);
+        cliqAuthUrl.searchParams.set('response_type', 'code');
+        cliqAuthUrl.searchParams.set('scope', 'ZohoCliq.Channels.READ,ZohoCliq.Messages.READ');
+        cliqAuthUrl.searchParams.set('access_type', 'offline');
+        cliqAuthUrl.searchParams.set('state', state);
+        
+        console.log('🔗 Redirecting to Zoho Cliq OAuth:', cliqAuthUrl.toString());
+        window.location.href = cliqAuthUrl.toString();
       }
     } catch (error) {
       console.error('OAuth connection error:', error);
@@ -870,6 +925,8 @@ const ConnectedSources = () => {
         ? '/api/sync/notion'
         : sourceType === 'slack'
         ? '/api/sync/slack'
+        : sourceType === 'cliq'
+        ? '/api/sync/cliq'
         : null;
       
       if (!endpoint) {
@@ -879,6 +936,7 @@ const ConnectedSources = () => {
       const sourceName = sourceType === 'google_drive' ? 'Google Drive' 
         : sourceType === 'notion' ? 'Notion'
         : sourceType === 'slack' ? 'Slack'
+        : sourceType === 'cliq' ? 'Zoho Cliq'
         : sourceType;
       console.log(`🔄 Calling endpoint: ${endpoint}`);
       
@@ -955,7 +1013,8 @@ const ConnectedSources = () => {
       const sourceTypeMap: Record<string, string> = {
         'googleDrive': 'google_drive',
         'notion': 'notion',
-        'slack': 'slack'
+        'slack': 'slack',
+        'cliq': 'cliq'
       };
       const dbSourceType = sourceTypeMap[source.id] || source.id;
       
@@ -1080,8 +1139,8 @@ const ConnectedSources = () => {
             handleDisconnect(dbSourceType);
           }}
           isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
-          onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion' || source.id === 'slack') ? () => {
-            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+          onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion' || source.id === 'slack' || source.id === 'cliq') ? () => {
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack', 'cliq': 'cliq' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleSyncDocuments(dbSourceType);
           } : undefined}
@@ -1091,7 +1150,7 @@ const ConnectedSources = () => {
           syncError={syncError[source.id === 'googleDrive' ? 'google_drive' : source.id] || null}
           setSyncError={(error: string | null) => setSyncError(prev => ({ ...prev, [source.id === 'googleDrive' ? 'google_drive' : source.id]: error }))}
           onClearData={() => {
-            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack', 'cliq': 'cliq' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleClearData(dbSourceType);
           }}

@@ -16,11 +16,19 @@ import { GoogleDriveSync } from './services/google-drive-sync.js';
 import { SearchService } from './services/search-service.js';
 import { NotionSync } from './services/notion-sync.js';
 import { SlackSync } from './services/slack-sync.js';
+import { CliqSync } from './services/cliq-sync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'https://localhost:8081';
 const API_BASE_URL = process.env.API_BASE_URL || `https://localhost:${PORT}`;
+
+// Debug environment variables
+console.log('🔍 Environment check:', {
+  ZOHO_CLIQ_CLIENT_ID: process.env.ZOHO_CLIQ_CLIENT_ID,
+  ZOHO_CLIQ_CLIENT_SECRET: process.env.ZOHO_CLIQ_CLIENT_SECRET ? 'SET' : 'NOT SET',
+  ZOHO_CLIQ_REDIRECT_URI: process.env.ZOHO_CLIQ_REDIRECT_URI
+});
 
 
 app.use(cors({ 
@@ -41,6 +49,7 @@ const googleDriveSync = new GoogleDriveSync(process.env.OPENAI_API_KEY, supabase
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
+const cliqSync = new CliqSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -477,6 +486,134 @@ app.get('/api/auth/notion/callback', async (req, res) => {
   }
 });
 
+// ZOHO CLIQ OAUTH CALLBACK
+app.get('/api/auth/cliq/callback', async (req, res) => {
+  console.log('🎯 Zoho Cliq OAuth callback received!');
+  console.log('   Query params:', req.query);
+  
+  const { code, state, location } = req.query;
+  
+  if (!code || !state) {
+    console.error('❌ Missing code or state in callback');
+    return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
+  }
+
+  try {
+    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    console.log('   State data:', stateData);
+    console.log('   Location param:', location);
+    
+    if (Date.now() - stateData.timestamp > 600000) {
+      console.error('❌ State expired');
+      return res.redirect(`${APP_URL}/connect-sources?error=expired`);
+    }
+
+    console.log('🔄 Attempting Zoho Cliq token exchange...');
+    console.log('   Code:', code.substring(0, 20) + '...');
+    console.log('   Client ID:', process.env.ZOHO_CLIQ_CLIENT_ID);
+    console.log('   Client Secret:', process.env.ZOHO_CLIQ_CLIENT_SECRET ? `${process.env.ZOHO_CLIQ_CLIENT_SECRET.substring(0, 10)}...` : 'NOT SET');
+    console.log('   Redirect URI:', `${API_BASE_URL}/api/auth/cliq/callback`);
+    
+    // Prepare form data
+    const formData = new URLSearchParams({
+      code,
+      client_id: process.env.ZOHO_CLIQ_CLIENT_ID,
+      client_secret: process.env.ZOHO_CLIQ_CLIENT_SECRET,
+      redirect_uri: `${API_BASE_URL}/api/auth/cliq/callback`,
+      grant_type: 'authorization_code',
+    });
+    
+    console.log('📤 Token exchange request body:', {
+      code: code.substring(0, 20) + '...',
+      client_id: process.env.ZOHO_CLIQ_CLIENT_ID,
+      client_secret: process.env.ZOHO_CLIQ_CLIENT_SECRET ? `${process.env.ZOHO_CLIQ_CLIENT_SECRET.substring(0, 10)}...` : 'NOT SET',
+      redirect_uri: `${API_BASE_URL}/api/auth/cliq/callback`,
+      grant_type: 'authorization_code',
+    });
+    
+    // Determine the correct token endpoint based on location parameter
+    // Zoho returns 'location' param in callback to indicate data center
+    const tokenEndpoint = location === 'in' 
+      ? 'https://accounts.zoho.in/oauth/v2/token'
+      : 'https://accounts.zoho.com/oauth/v2/token';
+    
+    console.log('🌍 Using token endpoint:', tokenEndpoint);
+    
+    const tokenResponse = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData,
+    });
+
+    console.log('📥 Token response status:', tokenResponse.status);
+    console.log('📥 Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
+    
+    const tokens = await tokenResponse.json();
+    console.log('📥 Zoho Cliq API response:', JSON.stringify(tokens, null, 2));
+
+    if (!tokens.access_token) {
+      console.error('❌ Zoho Cliq token exchange failed!');
+      console.error('   Full error response:', JSON.stringify(tokens, null, 2));
+      console.error('   Response status:', tokenResponse.status);
+      
+      // Check if there's a location-specific error
+      if (tokens.error === 'invalid_code' && location) {
+        console.error('   Detected location parameter:', location);
+        console.error('   This might be a data center mismatch issue');
+      }
+      
+      return res.redirect(`${APP_URL}/connect-sources?error=token_failed`);
+    }
+    
+    // Extract Zoho user info
+    const cliqUserId = tokens.user_id || 'cliq_user';
+    const organizationId = tokens.org_id || 'unknown';
+    const organizationName = tokens.org_name || 'Zoho Cliq Organization';
+    
+    console.log('✓ Zoho Cliq tokens received:', { 
+      organizationId, 
+      organizationName, 
+      userId: cliqUserId,
+      hasAccessToken: !!tokens.access_token 
+    });
+
+    const { error: dbError } = await supabaseAdmin
+      .from('user_connections')
+      .upsert({
+        user_id: stateData.userId,
+        source_type: 'cliq',
+        source_user_id: cliqUserId, // Required by schema
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token || null,
+        token_expires_at: tokens.expires_in 
+          ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+          : null,
+        is_active: true,
+        metadata: {
+          organization_id: organizationId,
+          organization_name: organizationName,
+          scope: tokens.scope,
+          user_id: cliqUserId,
+        },
+        updated_at: new Date().toISOString(),
+      }, { 
+        onConflict: 'user_id,source_type' 
+      });
+
+    if (dbError) {
+      console.error('❌ Database error:', dbError);
+      return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
+    }
+    
+    console.log('✓ Zoho Cliq connection saved to database');
+
+    return res.redirect(`${APP_URL}/connected-sources?connected=cliq`);
+  } catch (error) {
+    console.error('Zoho Cliq OAuth callback error:', error);
+    return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+  }
+});
+
 // SYNC DOCUMENTS ENDPOINT
 app.post('/api/sync/google-drive', async (req, res) => {
   try {
@@ -676,6 +813,62 @@ app.post('/api/sync/slack', async (req, res) => {
   }
 });
 
+// SYNC ZOHO CLIQ ENDPOINT
+app.post('/api/sync/cliq', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Get Zoho Cliq connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('source_type', 'cliq')
+      .single();
+    
+    if (connError || !connection) {
+      return res.status(400).json({ 
+        error: 'Zoho Cliq not connected',
+        code: 'NOT_CONNECTED'
+      });
+    }
+    
+    console.log('✓ Starting Zoho Cliq sync for user:', user.id);
+    
+    // Call sync service
+    const result = await cliqSync.syncCliq(user.id, connection.access_token);
+    
+    console.log(`✓ Zoho Cliq sync complete: ${result.synced} channels`);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('✗ Zoho Cliq sync error:', error.message);
+    
+    if (error.code === 'cliq_api_error' || error.message.includes('Zoho Cliq')) {
+      return res.status(401).json({ 
+        error: 'Zoho Cliq API error. Token may have expired.',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message,
+      code: 'SYNC_FAILED'
+    });
+  }
+});
+
 // SYNC STATUS ENDPOINT
 app.get('/api/sync/status', async (req, res) => {
   try {
@@ -692,7 +885,7 @@ app.get('/api/sync/status', async (req, res) => {
     }
 
     // Get stats for all sources
-    const sources = ['google_drive', 'notion', 'slack'];
+    const sources = ['google_drive', 'notion', 'slack', 'cliq'];
     const statsBySource = {};
 
     for (const sourceType of sources) {

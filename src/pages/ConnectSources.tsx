@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink, Shield, Eye, Lock, X } from 'lucide-react';
+import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink, Shield, Eye, Lock, X, MessageSquare } from 'lucide-react';
 import { getEnvVar } from '@/lib/env';
 import { ApiClient } from '@/lib/api-client';
 
@@ -76,6 +76,10 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+const CliqIcon = ({ className = "" }: { className?: string }) => (
+  <MessageSquare className={className} />
+);
+
 // Permission Modal Component
 const PermissionModal = ({ 
   isOpen, 
@@ -136,6 +140,22 @@ const PermissionModal = ({
             'Cannot modify database structures',
             'Cannot create new pages or databases',
             'Cannot change workspace settings'
+          ]
+        };
+      case 'cliq':
+        return {
+          willAccess: [
+            'Read messages in channels you\'re in',
+            'View channel names and team members',
+            'Access message history and threads',
+            'Read conversation content',
+            'Search through team communications'
+          ],
+          wontAccess: [
+            'Cannot send messages on your behalf',
+            'Cannot modify channels or settings',
+            'Cannot create new channels',
+            'Cannot invite or remove team members'
           ]
         };
       default:
@@ -239,7 +259,8 @@ const ConnectSources = () => {
   const [connections, setConnections] = useState({
     slack: false,
     googleDrive: false,
-    notion: false
+    notion: false,
+    cliq: false
   });
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
   const [isIndexing, setIsIndexing] = useState(false);
@@ -261,7 +282,8 @@ const ConnectSources = () => {
         const connectionStatus = {
           slack: data.connections.some((conn: any) => conn.source_type === 'slack' && conn.is_active),
           googleDrive: data.connections.some((conn: any) => conn.source_type === 'google_drive' && conn.is_active),
-          notion: data.connections.some((conn: any) => conn.source_type === 'notion' && conn.is_active)
+          notion: data.connections.some((conn: any) => conn.source_type === 'notion' && conn.is_active),
+          cliq: data.connections.some((conn: any) => conn.source_type === 'cliq' && conn.is_active)
         };
         
         console.log('📊 Connection status:', connectionStatus);
@@ -352,6 +374,20 @@ const ConnectSources = () => {
         'Pages you have access to',
         'Database content',
         'Page comments'
+      ]
+    },
+    {
+      id: 'cliq',
+      name: 'Zoho Cliq',
+      description: 'Connect your Zoho Cliq workspace to search team messages and conversations',
+      icon: CliqIcon,
+      connected: connections.cliq,
+      color: 'bg-blue-500',
+      available: true,
+      permissions: [
+        'Channels you have access to',
+        'Messages and conversations',
+        'Team member names'
       ]
     }
   ];
@@ -445,6 +481,31 @@ const ConnectSources = () => {
         
         console.log('🔗 Redirecting to Notion OAuth:', notionAuthUrl.toString());
         window.location.href = notionAuthUrl.toString();
+        
+      } else if (sourceId === 'cliq') {
+        const clientId = getEnvVar('VITE_ZOHO_CLIQ_CLIENT_ID');
+        if (!clientId) {
+          console.error('Zoho Cliq Client ID not configured');
+          return;
+        }
+        
+        // Create state parameter with userId
+        const state = btoa(JSON.stringify({
+          userId: user?.id,
+          timestamp: Date.now(),
+          source: 'cliq'
+        }));
+        
+        const cliqAuthUrl = new URL('https://accounts.zoho.com/oauth/v2/auth');
+        cliqAuthUrl.searchParams.set('client_id', clientId);
+        cliqAuthUrl.searchParams.set('redirect_uri', redirectUri);
+        cliqAuthUrl.searchParams.set('response_type', 'code');
+        cliqAuthUrl.searchParams.set('scope', 'ZohoCliq.Channels.READ,ZohoCliq.Messages.READ');
+        cliqAuthUrl.searchParams.set('access_type', 'offline');
+        cliqAuthUrl.searchParams.set('state', state);
+        
+        console.log('🔗 Redirecting to Zoho Cliq OAuth:', cliqAuthUrl.toString());
+        window.location.href = cliqAuthUrl.toString();
       }
     } catch (error) {
       console.error('OAuth connection error:', error);
@@ -463,7 +524,10 @@ const ConnectSources = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ sourceType: sourceId === 'googleDrive' ? 'google_drive' : sourceId }),
+        body: JSON.stringify({ 
+          sourceType: sourceId === 'googleDrive' ? 'google_drive' : 
+                     sourceId === 'cliq' ? 'cliq' : sourceId 
+        }),
       });
       
       const data = await response.json();
