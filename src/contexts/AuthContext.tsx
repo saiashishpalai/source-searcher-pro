@@ -57,6 +57,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signup = async (email: string, password: string) => {
     try {
+      console.log('🔍 Step 1: Checking if user exists for email:', email);
+      
+      // First, check if user already exists by calling a custom function
+      // This bypasses RLS and checks the auth.users table directly
+      const { data: userExists, error: checkError } = await supabase.rpc('check_user_exists', {
+        user_email: email
+      });
+
+      console.log('🔍 Step 2: RPC check_user_exists result:', { userExists, checkError });
+
+      // If there's an error calling the function, log it but continue
+      if (checkError) {
+        console.warn('⚠️ RPC function error (continuing anyway):', checkError);
+      }
+
+      // If user exists, return error message
+      if (userExists === true) {
+        console.log('❌ User already exists! Returning error message.');
+        return {
+          success: false,
+          message: 'You already have an account! Please sign in instead.',
+          isExistingUser: true,
+        };
+      }
+
+      console.log('✅ User does not exist. Proceeding with signup...');
+
+      // If we get here, user doesn't exist, proceed with signup
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -65,13 +93,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         },
       });
 
-      if (error) throw error;
+      console.log('🔍 Step 3: SignUp result:', { data: data?.user?.id, error });
 
+      if (error) {
+        console.error('❌ SignUp error:', error);
+        // Check if user already exists (fallback check)
+        if (error.message.includes('already registered') || 
+            error.message.includes('User already registered') ||
+            error.message.includes('already been registered') ||
+            error.message.includes('already exists')) {
+          console.log('❌ Error indicates user already exists');
+          return {
+            success: false,
+            message: 'You already have an account! Please sign in instead.',
+            isExistingUser: true,
+          };
+        }
+        throw error;
+      }
+
+      console.log('✅ Signup successful!');
       return {
         success: true,
         message: 'Account created! Please check your email to verify your account.',
       };
     } catch (error: any) {
+      console.error('❌ Signup exception:', error);
       return {
         success: false,
         message: error.message || 'Failed to create account',

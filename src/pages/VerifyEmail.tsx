@@ -68,135 +68,185 @@ const VerifyEmail = () => {
 
   if (isVerified) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        {/* Background elements */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
+      <div className="flex h-screen bg-black">
+        {/* Left side - Content */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
+          {/* Radial gradient overlay from center */}
+          <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
+          
+          {/* Soft purple glow accents */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
+            <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-fuchsia-600/15 rounded-full blur-[128px]" />
+          </div>
+
+          <div className="w-full max-w-md relative z-20">
+            {/* Back to Haven7 */}
+            <div className="mb-8 animate-fade-in">
+              <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
+                <ArrowLeft className="w-4 h-4" />
+                Back to Haven7
+              </Link>
+            </div>
+
+            {/* Success Content */}
+            <div className="text-center animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-10 h-10 text-green-400" />
+              </div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                Email Verified!
+              </h1>
+              <p className="text-gray-400 text-base mb-8">
+                Your account has been successfully verified. Redirecting you to connect your sources...
+              </p>
+              
+              <Link to="/connect-sources">
+                <Button className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50">
+                  <span className="inline-flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Continue to Haven7 →
+                  </span>
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
 
-        <div className="w-full max-w-md relative z-10">
-          <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-2xl">
-            <CardHeader className="space-y-2 text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-primary" />
-              </div>
-              <CardTitle className="text-2xl font-semibold text-foreground">Email Verified!</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Your account has been successfully verified
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  You can now access all features of Haven7. Redirecting you to connect your sources...
-                </p>
-              </div>
-
-              <div className="text-center">
-                <Link to="/connect-sources">
-                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
-                    Continue to Haven7
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Right side - Visual */}
+        <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+          {/* Background image - auth-bg-4 */}
+          <img 
+            src="/src/assets/auth-bg-4.jpg" 
+            alt="Abstract purple gradient background" 
+            className="absolute inset-0 w-full h-full object-cover scale-105"
+          />
+          {/* Wide soft gradient blend from left */}
+          <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
+          {/* Subtle vignette for depth */}
+          <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Background elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-tl from-accent/8 to-primary/5 rounded-full blur-3xl animate-background-drift" style={{ animationDelay: '10s' }} />
-      </div>
-
-      <div className="w-full max-w-md relative z-10">
-        {/* Haven7 Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">H7</span>
-            </div>
-            <span className="text-2xl font-semibold text-foreground">Haven7</span>
-          </div>
-          <p className="text-muted-foreground">Verify your email address</p>
+    <div className="flex h-screen bg-black">
+      {/* Left side - Content */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
+        {/* Radial gradient overlay from center */}
+        <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
+        
+        {/* Soft purple glow accents */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
+          <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-fuchsia-600/15 rounded-full blur-[128px]" />
         </div>
 
-        <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-2xl">
-          <CardHeader className="space-y-2 text-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-primary" />
+        <div className="w-full max-w-md relative z-20">
+          {/* Back to Haven7 */}
+          <div className="mb-8 animate-fade-in">
+            <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Haven7
+            </Link>
+          </div>
+
+          {/* Heading */}
+          <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+            <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Mail className="w-10 h-10 text-purple-400" />
             </div>
-            <CardTitle className="text-2xl font-semibold text-foreground">Check Your Email</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              We've sent a verification link to <strong>{email}</strong>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {message && (
-              <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
+            <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+              Check Your Email
+            </h1>
+            <p className="text-gray-400 text-base">
+              We've sent a verification link to <strong className="text-white">{email}</strong>
+            </p>
+          </div>
+
+          {/* Message Alert */}
+          {message && (
+            <div className={`mb-6 p-4 rounded-xl border animate-fade-in-up ${
+              message.type === 'error' 
+                ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                : 'bg-green-500/10 border-green-500/20 text-green-400'
+            }`} style={{ animationDelay: '0.4s' }}>
+              <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" />
-                <AlertDescription>{message.text}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Click the verification link in your email to activate your account and start using Haven7.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Didn't receive the email? Check your spam folder or{' '}
-                <button
-                  onClick={resendVerification}
-                  disabled={isLoading}
-                  className="text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-50"
-                >
-                  {isLoading ? 'Sending...' : 'resend it'}
-                </button>
-              </p>
+                <span className="text-sm">{message.text}</span>
+              </div>
             </div>
+          )}
 
-            <div className="flex flex-col gap-3">
-              <Button
+          {/* Instructions */}
+          <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+            <p className="text-gray-400 text-sm mb-4">
+              Click the verification link in your email to activate your account and start using Haven7.
+            </p>
+            <p className="text-xs text-gray-500">
+              Didn't receive the email? Check your spam folder or{' '}
+              <button
                 onClick={resendVerification}
                 disabled={isLoading}
-                variant="outline"
-                className="w-full"
+                className="text-[#A855F7] hover:text-purple-400 font-medium transition-colors disabled:opacity-50"
               >
-                {isLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="w-4 h-4 mr-2" />
-                    Resend Verification Email
-                  </>
-                )}
-              </Button>
+                {isLoading ? 'Sending...' : 'resend it'}
+              </button>
+            </p>
+          </div>
 
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center gap-2 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Sign In
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Resend Button */}
+          <div className="animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
+            <Button
+              onClick={resendVerification}
+              disabled={isLoading}
+              className="w-full bg-white/5 border border-gray-800/50 text-white rounded-xl py-3.5 font-medium hover:bg-white/10 transition-all duration-200 mb-4"
+            >
+              {isLoading ? (
+                <span className="inline-flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Sending...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  Resend Verification Email
+                </span>
+              )}
+            </Button>
+          </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-xs text-muted-foreground/60">
+          {/* Back to Sign In */}
+          <div className="animate-fade-in-up" style={{ animationDelay: '1.0s' }}>
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-white font-medium transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Sign In
+            </Link>
+          </div>
+
+          {/* Footer text */}
+          <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.2s' }}>
             Verification link expires in 24 hours
           </p>
         </div>
+      </div>
+
+      {/* Right side - Visual */}
+      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+        {/* Background image - auth-bg-4 */}
+        <img 
+          src="/src/assets/auth-bg-4.jpg" 
+          alt="Abstract purple gradient background" 
+          className="absolute inset-0 w-full h-full object-cover scale-105"
+        />
+        {/* Wide soft gradient blend from left */}
+        <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
+        {/* Subtle vignette for depth */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
       </div>
     </div>
   );

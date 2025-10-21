@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,14 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; isExistingUser?: boolean } | null>(null);
+
+  // Debug: Log whenever message changes
+  useEffect(() => {
+    if (message) {
+      console.log('💬 Message state updated:', message);
+    }
+  }, [message]);
   
   const { signup } = useAuth();
 
@@ -41,20 +48,32 @@ const Signup = () => {
     }
 
     try {
+      console.log('📝 Signup page: Calling signup function...');
       const result = await signup(formData.email, formData.password);
+      console.log('📝 Signup page: Result received:', result);
+      
       if (result.success) {
+        console.log('✅ Signup page: Success - redirecting to verify-email');
         setMessage({ type: 'success', text: result.message });
         // Redirect to email verification page or show success message
         setTimeout(() => {
           window.location.href = '/verify-email';
         }, 2000);
       } else {
-        setMessage({ type: 'error', text: result.message });
+        console.log('❌ Signup page: Error -', result.message);
+        console.log('❌ Is existing user?', (result as any).isExistingUser);
+        setMessage({ 
+          type: 'error', 
+          text: result.message,
+          isExistingUser: (result as any).isExistingUser 
+        });
       }
     } catch (error) {
+      console.error('❌ Signup page: Exception:', error);
       setMessage({ type: 'error', text: 'An unexpected error occurred' });
     } finally {
       setIsLoading(false);
+      console.log('🏁 Signup page: Process complete');
     }
   };
 
@@ -97,7 +116,8 @@ const Signup = () => {
             </p>
           </div>
 
-          {/* Google OAuth Button (UI placeholder) */}
+          {/* Google OAuth Button - Commented out for now */}
+          {/* 
           <button
             type="button"
             onClick={() => console.log('Google sign-in coming soon')}
@@ -113,7 +133,6 @@ const Signup = () => {
             <span>Continue with Google</span>
           </button>
 
-          {/* Divider */}
           <div className="relative mb-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-800/50"></div>
@@ -122,6 +141,7 @@ const Signup = () => {
               <span className="px-4 bg-black text-gray-500">or</span>
             </div>
           </div>
+          */}
 
           {/* Form fields */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -197,16 +217,85 @@ const Signup = () => {
               </div>
             </div>
 
+            {/* Message Display */}
+            {message && (
+              <div className={`p-4 rounded-lg border animate-fade-in-up ${
+                message.type === 'error' 
+                  ? 'bg-red-50/5 border-red-200/20 text-red-300' 
+                  : 'bg-green-50/5 border-green-200/20 text-green-300'
+              }`} style={{ animationDelay: '1.2s' }}>
+                {message.isExistingUser ? (
+                  <div className="space-y-3">
+                    {/* Clean minimal header */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-red-200">
+                          Account already exists
+                        </p>
+                        <p className="text-xs text-red-300/70 mt-1">
+                          Please sign in to continue
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Subtle action link */}
+                    <div className="flex justify-end">
+                      <Link 
+                        to="/login" 
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#A855F7] hover:text-purple-400 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                        </svg>
+                        Sign in instead
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                      message.type === 'error' ? 'bg-red-500/10' : 'bg-green-500/10'
+                    }`}>
+                      {message.type === 'error' ? (
+                        <svg className="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <CheckCircle className="w-3 h-3 text-green-400" />
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-300">{message.text}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="animate-fade-in-up" style={{ animationDelay: '1.4s' }}>
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
-                disabled={isLoading}
+                className={`w-full rounded-xl py-3.5 font-semibold transition-all duration-200 ${
+                  message?.isExistingUser 
+                    ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed border border-gray-700/50' 
+                    : 'bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50'
+                }`}
+                disabled={isLoading || message?.isExistingUser}
               >
               {isLoading ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Creating Account...
+                </span>
+              ) : message?.isExistingUser ? (
+                <span className="inline-flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Account Exists
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-2">
@@ -218,13 +307,15 @@ const Signup = () => {
             </div>
           </form>
 
-          {/* Sign in link */}
-          <p className="text-center text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '1.6s' }}>
-            Already have an account?{' '}
-            <Link to="/login" className="text-[#A855F7] hover:text-purple-400">
-              Sign in
-            </Link>
-          </p>
+          {/* Sign in link - only show when no account exists error */}
+          {!message?.isExistingUser && (
+            <p className="text-center text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '1.6s' }}>
+              Already have an account?{' '}
+              <Link to="/login" className="text-[#A855F7] hover:text-purple-400">
+                Sign in
+              </Link>
+            </p>
+          )}
 
           {/* Terms footer */}
           <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.8s' }}>
