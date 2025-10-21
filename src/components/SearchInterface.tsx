@@ -24,7 +24,7 @@ const Haven7Icon = ({ className = "" }: { className?: string }) => (
     width="32"
     height="32"
     viewBox="0 0 32 32"
-    className={className}
+    className={`group hover:scale-110 transition-all duration-500 ${className}`}
   >
     <defs>
       <linearGradient id="haven7Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -35,31 +35,52 @@ const Haven7Icon = ({ className = "" }: { className?: string }) => (
         <stop offset="0%" stopColor="#A855F7" />
         <stop offset="100%" stopColor="#8B5CF6" />
       </linearGradient>
+      <linearGradient id="hoverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#A855F7" />
+        <stop offset="50%" stopColor="#8B5CF6" />
+        <stop offset="100%" stopColor="#3B82F6" />
+      </linearGradient>
+      <animateTransform
+        attributeName="transform"
+        attributeType="XML"
+        type="rotate"
+        from="0 16 16"
+        to="360 16 16"
+        dur="20s"
+        repeatCount="indefinite"
+        id="slowRotate"
+      />
     </defs>
     
-    {/* Central hub circle */}
-    <circle cx="16" cy="16" r="12" fill="url(#haven7Gradient)" />
+    {/* Animated glow effect on hover */}
+    <circle cx="16" cy="16" r="16" fill="url(#hoverGradient)" opacity="0" className="group-hover:opacity-20 transition-opacity duration-500 blur-sm" />
     
-    {/* Connection lines radiating outward */}
+    {/* Central hub circle */}
+    <circle cx="16" cy="16" r="12" fill="url(#haven7Gradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    
+    {/* Connection lines with flowing animation */}
     <path
       stroke="url(#accentGradient)"
       strokeWidth="2"
       strokeLinecap="round"
       d="M16 4L16 8M16 24L16 28M4 16L8 16M24 16L28 16M6.34 6.34L9.17 9.17M22.83 22.83L25.66 25.66M6.34 25.66L9.17 22.83M22.83 9.17L25.66 6.34"
-    />
+      className="group-hover:stroke-[url(#hoverGradient)] transition-all duration-500"
+    >
+      <animate attributeName="stroke-width" values="2;3;2" dur="2s" repeatCount="indefinite" />
+    </path>
     
-    {/* Central dot */}
-    <circle cx="16" cy="16" r="3" fill="white" />
+    {/* Central dot with pulse effect */}
+    <circle cx="16" cy="16" r="3" fill="white" className="group-hover:animate-pulse" />
     
-    {/* Small connection dots */}
-    <circle cx="16" cy="6" r="1.5" fill="url(#accentGradient)" />
-    <circle cx="16" cy="26" r="1.5" fill="url(#accentGradient)" />
-    <circle cx="6" cy="16" r="1.5" fill="url(#accentGradient)" />
-    <circle cx="26" cy="16" r="1.5" fill="url(#accentGradient)" />
-    <circle cx="9.17" cy="9.17" r="1.5" fill="url(#accentGradient)" />
-    <circle cx="22.83" cy="22.83" r="1.5" fill="url(#accentGradient)" />
-    <circle cx="9.17" cy="22.83" r="1.5" fill="url(#accentGradient)" />
-    <circle cx="22.83" cy="9.17" r="1.5" fill="url(#accentGradient)" />
+    {/* Small connection dots with flowing colors */}
+    <circle cx="16" cy="6" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    <circle cx="16" cy="26" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    <circle cx="6" cy="16" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    <circle cx="26" cy="16" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    <circle cx="9.17" cy="9.17" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    <circle cx="22.83" cy="22.83" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    <circle cx="9.17" cy="22.83" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
+    <circle cx="22.83" cy="9.17" r="1.5" fill="url(#accentGradient)" className="group-hover:fill-[url(#hoverGradient)] transition-all duration-500" />
   </svg>
 );
 
@@ -1217,25 +1238,56 @@ const SearchInterface = () => {
                 <Menu className="w-4 h-4 group-hover:text-primary transition-colors" />
               </Button>
               {/* New conversation icon - centered below */}
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm" 
-                className="h-10 w-10 p-0 rounded-xl border-primary/30 hover:border-primary/60 hover:bg-primary/10 hover:scale-110 transition-all duration-300 group"
+                className="h-10 w-10 p-0 rounded-xl border-primary/30 hover:border-primary/60 hover:bg-gradient-to-br hover:from-primary/20 hover:to-accent/10 hover:scale-110 hover:shadow-lg hover:shadow-primary/25 transition-all duration-500 group relative overflow-hidden"
                 title="New Conversation"
                 onClick={handleNewConversation}
               >
-                <Plus className="w-4 h-4 group-hover:text-primary transition-colors" />
+                {/* Animated background shimmer */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                
+                {/* Plus icon with dynamic effects */}
+                <Plus className="w-4 h-4 group-hover:text-primary transition-all duration-500 group-hover:rotate-90 relative z-10" />
+                
+                {/* Floating particles effect */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="absolute top-1 left-1 w-1 h-1 bg-primary/60 rounded-full animate-ping" style={{ animationDelay: '0s' }} />
+                  <div className="absolute top-2 right-2 w-0.5 h-0.5 bg-accent/60 rounded-full animate-ping" style={{ animationDelay: '0.2s' }} />
+                  <div className="absolute bottom-2 left-2 w-0.5 h-0.5 bg-primary/40 rounded-full animate-ping" style={{ animationDelay: '0.4s' }} />
+                </div>
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25 hover:scale-110 transition-transform duration-300">
-                    <span className="text-white font-bold text-lg">H7</span>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25 hover:scale-110 hover:shadow-xl hover:shadow-primary/40 transition-all duration-500 group relative overflow-hidden">
+                    {/* Animated shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                    
+                    <span className="text-white font-bold text-lg relative z-10 group-hover:scale-110 transition-transform duration-300">
+                      H7
+                    </span>
+                    
+                    {/* Floating particles effect */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                      <div className="absolute top-1 left-1 w-0.5 h-0.5 bg-white/60 rounded-full animate-ping" style={{ animationDelay: '0s' }} />
+                      <div className="absolute top-2 right-1 w-0.5 h-0.5 bg-white/40 rounded-full animate-ping" style={{ animationDelay: '0.3s' }} />
+                      <div className="absolute bottom-1 right-2 w-0.5 h-0.5 bg-white/50 rounded-full animate-ping" style={{ animationDelay: '0.6s' }} />
+                    </div>
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-foreground">Haven7</h2>
+                    <h2 className="text-lg font-semibold text-foreground group hover:cursor-pointer relative animate-subtle-glow">
+                      <span className="relative z-10 hover:bg-gradient-to-r hover:from-primary hover:via-accent hover:to-primary hover:bg-clip-text hover:text-transparent transition-all duration-700">
+                        Haven7
+                      </span>
+                      {/* Flowing color overlay on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/30 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-sm -m-1" />
+                      {/* Animated underline */}
+                      <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-primary to-accent w-0 group-hover:w-full transition-all duration-1000 ease-out" />
+                    </h2>
                     <p className="text-xs text-muted-foreground">AI Search</p>
                   </div>
                 </div>
@@ -1248,14 +1300,27 @@ const SearchInterface = () => {
                   <Menu className="w-4 h-4 group-hover:text-primary transition-colors" />
                 </Button>
               </div>
-              <Button 
+              <Button
                 variant="outline" 
                 size="sm" 
-                className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-primary/10 hover:border-primary/30 hover:scale-[1.02] transition-all duration-300 py-3 rounded-xl border-border/50"
+                className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/10 hover:to-accent/5 hover:border-primary/30 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 transition-all duration-500 py-3 rounded-xl border-border/50 group relative overflow-hidden"
                 onClick={handleNewConversation}
               >
-                <Plus className="w-4 h-4" />
-                New Conversation
+                {/* Animated shimmer effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                
+                {/* Plus icon with rotation */}
+                <Plus className="w-4 h-4 group-hover:text-primary group-hover:rotate-90 transition-all duration-500 relative z-10" />
+                
+                {/* Text with flowing color */}
+                <span className="relative z-10 group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-accent group-hover:bg-clip-text group-hover:text-transparent transition-all duration-500">
+                  New Conversation
+                </span>
+                
+                {/* Floating accent dots */}
+                <div className="absolute right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="w-1 h-1 bg-primary/60 rounded-full animate-ping" />
+                </div>
               </Button>
             </div>
           )}
@@ -1374,7 +1439,15 @@ const SearchInterface = () => {
             </button>
             
             {/* Haven7 logo */}
-            <span className="text-xl font-semibold text-white leading-none">Haven7</span>
+            <span className="text-xl font-semibold text-white leading-none group hover:cursor-pointer relative animate-subtle-glow">
+              <span className="relative z-10 hover:bg-gradient-to-r hover:from-primary hover:via-accent hover:to-primary hover:bg-clip-text hover:text-transparent transition-all duration-700">
+                Haven7
+              </span>
+              {/* Flowing color overlay on hover */}
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/30 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-sm -m-1" />
+              {/* Animated underline */}
+              <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-primary to-accent w-0 group-hover:w-full transition-all duration-1000 ease-out" />
+            </span>
           </div>
           
           {/* Right section: Profile */}
@@ -2285,8 +2358,17 @@ const SearchInterface = () => {
       <div className="w-full max-w-3xl space-y-10 animate-in fade-in-0 slide-in-from-top-4 duration-700 relative z-10">
             {/* Heading and tagline */}
             <div className="text-center space-y-4 animate-fade-in">
-              <h1 className="text-3xl lg:text-5xl font-light text-foreground tracking-tight">
-                Your Work, Connected
+              <h1 className="text-3xl lg:text-5xl font-light text-foreground tracking-tight group hover:cursor-pointer">
+                <span className="relative inline-block">
+                  <span className="relative z-10">Your Work,</span>
+                  <span className="relative z-10 ml-2 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent hover:animate-pulse transition-all duration-500">
+                    Connected
+                  </span>
+                  {/* Flowing color overlay on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/30 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-sm -m-2" />
+                  {/* Animated underline */}
+                  <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-primary to-accent w-0 group-hover:w-full transition-all duration-1000 ease-out" />
+                </span>
               </h1>
               <p className="text-lg lg:text-xl text-muted-foreground/80 font-light max-w-2xl mx-auto leading-relaxed">
                 All your scattered knowledge, one search away.
@@ -2366,8 +2448,8 @@ const SearchInterface = () => {
 
         {/* Connected sources */}
             <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
-              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
-            <span className="font-medium">Connected sources:</span>
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60 group">
+                <span className="font-medium group-hover:text-foreground transition-colors duration-300">Connected sources:</span>
                 <div className="flex items-center gap-2">
               {connectedSources.map((source, index) => (
                     <TooltipProvider key={source.name}>
