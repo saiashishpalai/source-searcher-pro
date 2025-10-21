@@ -1133,8 +1133,9 @@ const ConnectedSources = () => {
             </div>
 
             {/* Additional Features */}
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Bulk Actions */}
+            <div className="grid md:grid-cols-1 gap-6">
+              {/* Commented out Quick Actions for user testing phase */}
+              {/* 
               <Card className="bg-card/60 backdrop-blur-sm border-border/50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1169,6 +1170,7 @@ const ConnectedSources = () => {
                   </Button>
                 </CardContent>
               </Card>
+              */}
 
               {/* Help & Support */}
               <Card className="bg-card/60 backdrop-blur-sm border-border/50">
@@ -1182,16 +1184,24 @@ const ConnectedSources = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      Having trouble connecting? Check our troubleshooting guide or contact support.
-                    </AlertDescription>
-                  </Alert>
-                  <Button variant="outline" className="w-full justify-start">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View Documentation
-                  </Button>
+                  <div className="space-y-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Support%20Request', '_blank')}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Contact Support
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => navigate('/docs')}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Documentation
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </div>

@@ -10,6 +10,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ConnectSources from "./pages/ConnectSources";
 import ConnectedSources from "./pages/ConnectedSources";
 import ProfileSettings from "./pages/ProfileSettings";
+import Documentation from "./pages/Documentation";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
@@ -46,6 +47,7 @@ const App = () => {
           <ProfileSettings />
         </ProtectedRoute>
       } />
+      <Route path="/docs" element={<Documentation />} />
       
       {/* Catch-all route */}
       <Route path="*" element={<NotFound />} />
