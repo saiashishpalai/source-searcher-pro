@@ -1027,8 +1027,8 @@ const ConnectedSources = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex-1">
+          <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
 
             {/* Sources Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
