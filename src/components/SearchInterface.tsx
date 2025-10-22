@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users, HelpCircle } from 'lucide-react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users, HelpCircle, Lightbulb, ChevronUp } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -2494,34 +2494,58 @@ const SearchInterface = () => {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Support%20Request', '_blank')}
-                className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 group"
-                size="icon"
-              >
-                <svg 
-                  className="w-10 h-10 text-white" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  xmlns="http://www.w3.org/2000/svg"
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group relative"
+                    size="icon"
+                  >
+                    <svg 
+                      className="w-10 h-10 text-white" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      {/* Simple chat bubble */}
+                      <path 
+                        d="M20 2H4C2.9 2 2 2.9 2 4V16C2 17.1 2.9 18 4 18H6L8 20L10 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                      {/* Three dots inside */}
+                      <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                      <circle cx="12" cy="8" r="1.2" fill="currentColor" />
+                      <circle cx="16" cy="8" r="1.2" fill="currentColor" />
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  side="top" 
+                  align="end" 
+                  className="w-52 bg-card/95 backdrop-blur-sm border border-border/50 shadow-2xl animate-in slide-in-from-bottom-2 fade-in-0 zoom-in-95 duration-300"
+                  sideOffset={8}
                 >
-                  {/* Simple chat bubble */}
-                  <path 
-                    d="M20 2H4C2.9 2 2 2.9 2 4V16C2 17.1 2.9 18 4 18H6L8 20L10 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  />
-                  {/* Three dots inside */}
-                  <circle cx="8" cy="8" r="1.2" fill="currentColor" />
-                  <circle cx="12" cy="8" r="1.2" fill="currentColor" />
-                  <circle cx="16" cy="8" r="1.2" fill="currentColor" />
-                </svg>
-              </Button>
+                  <DropdownMenuItem 
+                    onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Support%20Request', '_blank')}
+                    className="cursor-pointer hover:bg-accent/50 transition-all duration-200 hover:scale-[1.02] focus:bg-accent/50 focus:scale-[1.02] group"
+                  >
+                    <MessageSquare className="mr-3 h-4 w-4 text-blue-500 group-hover:text-blue-600 transition-colors duration-200" />
+                    <span className="font-medium">Contact Support</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Feature%20Request', '_blank')}
+                    className="cursor-pointer hover:bg-accent/50 transition-all duration-200 hover:scale-[1.02] focus:bg-accent/50 focus:scale-[1.02] group"
+                  >
+                    <Lightbulb className="mr-3 h-4 w-4 text-yellow-500 group-hover:text-yellow-600 transition-colors duration-200" />
+                    <span className="font-medium">Feature Request</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TooltipTrigger>
-            <TooltipContent side="left" className="bg-card/95 backdrop-blur-sm border border-border/50 text-foreground text-sm font-medium px-3 py-2">
-              <p>Contact Support</p>
+            <TooltipContent side="left" className="bg-card/95 backdrop-blur-sm border border-border/50 text-foreground text-sm font-medium px-3 py-2 animate-in fade-in-0 slide-in-from-right-2 duration-200">
+              <p>Get Help</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
