@@ -49,12 +49,12 @@ const Landing = () => {
         <div className="text-center max-w-2xl mx-auto">
           {/* Headline */}
           <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight animate-fade-in-up">
-            Search Your Work Knowledge in Seconds
+            Stop juggling multiple workspaces.
           </h1>
           
           {/* Subheadline */}
           <p className="text-xl md:text-2xl text-gray-300 mb-12 leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            AI-powered search across Slack, Notion, and Google Drive. Find what you need without switching apps.
+            Search, create, and prioritize without context switching.
           </p>
           
           {/* CTA Button with Enhanced Animations */}
