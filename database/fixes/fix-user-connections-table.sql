@@ -52,7 +52,9 @@ CREATE POLICY "Service role can manage all connections" ON user_connections
 CREATE INDEX IF NOT EXISTS idx_user_connections_user_id ON user_connections(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_connections_source_type ON user_connections(source_type);
 CREATE INDEX IF NOT EXISTS idx_user_connections_is_active ON user_connections(is_active);
-CREATE INDEX IF NOT EXISTS idx_user_connections_unique ON user_connections(user_id, source_type);
+
+-- Create unique constraint for (user_id, source_type)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_connections_unique ON user_connections(user_id, source_type);
 
 -- Create updated_at trigger
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -73,15 +75,19 @@ CREATE TRIGGER update_user_connections_updated_at
 GRANT ALL ON user_connections TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON user_connections TO authenticated;
 
--- Insert test data to verify table works
+-- Insert test data to verify table works (only if not exists)
 INSERT INTO user_connections (user_id, source_type, source_user_id, access_token, is_active)
-VALUES (
+SELECT 
   'b7a5b22c-34f5-446a-8627-112f70ba11b2',
   'teams',
   'test-user-id',
   'test-access-token',
   true
-) ON CONFLICT (user_id, source_type) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM user_connections 
+  WHERE user_id = 'b7a5b22c-34f5-446a-8627-112f70ba11b2' 
+  AND source_type = 'teams'
+);
 
 -- Verify table was created successfully
 SELECT 
