@@ -673,6 +673,7 @@ const ConnectedSources = () => {
         const clientId = getEnvVar('VITE_GOOGLE_CLIENT_ID');
         if (!clientId) {
           console.error('Google Client ID not configured');
+          alert('Google Drive integration is not configured. Please contact your administrator to set up Google OAuth credentials.');
           return;
         }
         
