@@ -1,3 +1,4 @@
+// OAuth fixes deployed - trigger Vercel redeploy
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
