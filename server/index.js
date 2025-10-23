@@ -29,6 +29,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Serve static files from the dist directory
+app.use(express.static('dist'));
+
+// Health check endpoint
+app.get('/healthz', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -1274,6 +1282,11 @@ app.post('/api/debug/reset-dismissed-duplicates', async (req, res) => {
     console.error('Reset endpoint error:', error);
     res.status(500).json({ error: 'Internal error' });
   }
+});
+
+// Catch-all handler: send back React's index.html file for client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(join(__dirname, '..', 'dist', 'index.html'));
 });
 
 // Load SSL certificates for HTTPS
