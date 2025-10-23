@@ -11,7 +11,7 @@
     "dev:all": "concurrently \"npm run dev:vite\" \"npm run dev:api\" \"npm run ngrok\"",
     "ngrok": "./ngrok http 3000",
     "setup:slack": "./setup-slack.sh",
-    "build": "node -e \"require('child_process').execSync('npx vite build', {stdio: 'inherit'})\"",
+    "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
