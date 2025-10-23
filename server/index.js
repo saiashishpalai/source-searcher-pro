@@ -446,17 +446,19 @@ app.get('/api/auth/google/callback', async (req, res) => {
     if (!code || !state) {
       return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
     }
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     
-    if (Date.now() - stateData.timestamp > 600000) {
-      return res.redirect(`${APP_URL}/connect-sources?error=expired`);
+    // Parse state format: "randomHex:userId"
+    const [stateHex, userId] = state.split(':');
+    
+    if (!userId) {
+      return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
 
     // Fetch user's OAuth credentials from database
     const { data: credentials, error: credError } = await supabaseAdmin
       .from('user_connections')
       .select('client_id, client_secret_encrypted, redirect_uri')
-      .eq('user_id', stateData.userId)
+      .eq('user_id', userId)
       .eq('source_type', 'google_drive')
       .single();
 
@@ -469,7 +471,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     const { data: clientSecret, error: decryptError } = await supabaseAdmin
       .rpc('decrypt_client_secret', {
         encrypted: credentials.client_secret_encrypted,
-        user_id: stateData.userId
+        user_id: userId
       });
 
     if (decryptError || !clientSecret) {
@@ -517,7 +519,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     const { error: dbError } = await supabaseAdmin
       .from('user_connections')
       .upsert({
-        user_id: stateData.userId,
+        user_id: userId,
         source_type: 'google_drive',
         source_user_id: googleUserId, // Required by schema
         access_token: tokens.access_token,
@@ -593,17 +595,18 @@ app.get('/api/auth/slack/callback', async (req, res) => {
   }
 
   try {
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    // Parse state format: "randomHex:userId"
+    const [stateHex, userId] = state.split(':');
     
-    if (Date.now() - stateData.timestamp > 600000) {
-      return res.redirect(`${APP_URL}/connect-sources?error=expired`);
+    if (!userId) {
+      return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
 
     // Fetch user's OAuth credentials from database
     const { data: credentials, error: credError } = await supabaseAdmin
       .from('user_connections')
       .select('client_id, client_secret_encrypted, redirect_uri')
-      .eq('user_id', stateData.userId)
+      .eq('user_id', userId)
       .eq('source_type', 'slack')
       .single();
 
@@ -616,7 +619,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
     const { data: clientSecret, error: decryptError } = await supabaseAdmin
       .rpc('decrypt_client_secret', {
         encrypted: credentials.client_secret_encrypted,
-        user_id: stateData.userId
+        user_id: userId
       });
 
     if (decryptError || !clientSecret) {
@@ -664,7 +667,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
     const { error: dbError } = await supabaseAdmin
       .from('user_connections')
       .upsert({
-        user_id: stateData.userId,
+        user_id: userId,
         source_type: 'slack',
         source_user_id: slackUserId, // Required by schema
         access_token: tokens.access_token || process.env.SLACK_BOT_TOKEN, // Use bot token if no user token
@@ -739,17 +742,18 @@ app.get('/api/auth/notion/callback', async (req, res) => {
   }
 
   try {
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    // Parse state format: "randomHex:userId"
+    const [stateHex, userId] = state.split(':');
     
-    if (Date.now() - stateData.timestamp > 600000) {
-      return res.redirect(`${APP_URL}/connect-sources?error=expired`);
+    if (!userId) {
+      return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
 
     // Fetch user's OAuth credentials from database
     const { data: credentials, error: credError } = await supabaseAdmin
       .from('user_connections')
       .select('client_id, client_secret_encrypted, redirect_uri')
-      .eq('user_id', stateData.userId)
+      .eq('user_id', userId)
       .eq('source_type', 'notion')
       .single();
 
@@ -762,7 +766,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
     const { data: clientSecret, error: decryptError } = await supabaseAdmin
       .rpc('decrypt_client_secret', {
         encrypted: credentials.client_secret_encrypted,
-        user_id: stateData.userId
+        user_id: userId
       });
 
     if (decryptError || !clientSecret) {
@@ -810,7 +814,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
     const { error: dbError } = await supabaseAdmin
       .from('user_connections')
       .upsert({
-        user_id: stateData.userId,
+        user_id: userId,
         source_type: 'notion',
         source_user_id: ownerId, // Required by schema
         access_token: tokens.access_token,
