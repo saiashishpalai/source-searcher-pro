@@ -460,29 +460,13 @@ app.get('/api/auth/google/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
 
-    // Fetch user's OAuth credentials from database
-    const { data: credentials, error: credError } = await supabaseAdmin
-      .from('user_connections')
-      .select('client_id, client_secret_encrypted, redirect_uri')
-      .eq('user_id', userId)
-      .eq('source_type', 'google_drive')
-      .single();
+    // Use OAuth credentials from environment variables (original architecture)
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-    if (credError || !credentials || !credentials.client_id) {
-      console.error('No OAuth credentials found for user');
+    if (!clientId || !clientSecret) {
+      console.error('Google OAuth credentials not configured');
       return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
-    }
-
-    // Decrypt client_secret
-    const { data: clientSecret, error: decryptError } = await supabaseAdmin
-      .rpc('decrypt_client_secret', {
-        encrypted: credentials.client_secret_encrypted,
-        user_id: userId
-      });
-
-    if (decryptError || !clientSecret) {
-      console.error('Failed to decrypt credentials:', decryptError);
-      return res.redirect(`${APP_URL}/connect-sources?error=decrypt_failed`);
     }
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -490,9 +474,9 @@ app.get('/api/auth/google/callback', async (req, res) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: credentials.client_id,
+        client_id: clientId,
         client_secret: clientSecret,
-        redirect_uri: credentials.redirect_uri || `${API_BASE_URL}/api/auth/googleDrive/callback`,
+        redirect_uri: `${API_BASE_URL}/api/auth/google/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -608,16 +592,12 @@ app.get('/api/auth/slack/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
 
-    // Fetch user's OAuth credentials from database
-    const { data: credentials, error: credError } = await supabaseAdmin
-      .from('user_connections')
-      .select('client_id, client_secret_encrypted, redirect_uri')
-      .eq('user_id', userId)
-      .eq('source_type', 'slack')
-      .single();
+    // Use OAuth credentials from environment variables (original architecture)
+    const clientId = process.env.SLACK_CLIENT_ID;
+    const clientSecret = process.env.SLACK_CLIENT_SECRET;
 
-    if (credError || !credentials || !credentials.client_id) {
-      console.error('No OAuth credentials found for user');
+    if (!clientId || !clientSecret) {
+      console.error('Slack OAuth credentials not configured');
       return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
     }
 
