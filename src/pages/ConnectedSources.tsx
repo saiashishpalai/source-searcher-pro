@@ -667,6 +667,8 @@ const ConnectedSources = () => {
       // Build OAuth URLs - redirect to API server for callback
       // Use VITE_API_URL which can be set to ngrok URL for local dev with HTTPS
       const apiUrl = getEnvVar('VITE_API_URL') || '';
+      console.log('🔍 API URL:', apiUrl);
+      console.log('🔍 Source ID:', sourceId);
       const redirectUri = `${apiUrl}/api/auth/${sourceId === 'googleDrive' ? 'google' : sourceId}/callback`;
       
       if (sourceId === 'googleDrive') {
