@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
-import * as pdfParse from 'pdf-parse';
+// Import pdf-parse only when needed to avoid test file issues
+// import * as pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import OpenAI from 'openai';
 
@@ -55,7 +56,8 @@ export class DocumentSync {
         }, { responseType: 'arraybuffer' });
         
         const buffer = Buffer.from(response.data);
-        const data = await pdfParse.default(buffer);
+        const pdfParse = (await import('pdf-parse')).default;
+        const data = await pdfParse(buffer);
         return data.text;
       }
 
