@@ -1,35 +1,8 @@
-// Debug: Test each dependency import
-console.log('🔍 DocumentSync: Starting dependency debugging...');
-
-let google;
-try {
-  const googleapis = await import('googleapis');
-  google = googleapis.google;
-  console.log('✅ DocumentSync: googleapis imported successfully');
-} catch (error) {
-  console.error('❌ DocumentSync: googleapis import failed:', error.message);
-  throw error;
-}
-
-let mammoth;
-try {
-  mammoth = (await import('mammoth')).default;
-  console.log('✅ DocumentSync: mammoth imported successfully');
-} catch (error) {
-  console.error('❌ DocumentSync: mammoth import failed:', error.message);
-  throw error;
-}
-
-let OpenAI;
-try {
-  OpenAI = (await import('openai')).default;
-  console.log('✅ DocumentSync: openai imported successfully');
-} catch (error) {
-  console.error('❌ DocumentSync: openai import failed:', error.message);
-  throw error;
-}
-
-console.log('🎉 DocumentSync: All dependencies imported successfully!');
+import { google } from 'googleapis';
+// Import pdf-parse only when needed to avoid test file issues
+// import * as pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
+import OpenAI from 'openai';
 
 /**
  * DocumentSync - Handles document processing and embedding generation with SAFETY LIMITS

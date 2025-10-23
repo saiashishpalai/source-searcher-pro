@@ -1,46 +1,9 @@
-// Debug: Test each dependency import
-console.log('🔍 GoogleDriveSync: Starting dependency debugging...');
-
-let google;
-try {
-  const googleapis = await import('googleapis');
-  google = googleapis.google;
-  console.log('✅ GoogleDriveSync: googleapis imported successfully');
-} catch (error) {
-  console.error('❌ GoogleDriveSync: googleapis import failed:', error.message);
-  throw error;
-}
-
-let mammoth;
-try {
-  mammoth = (await import('mammoth')).default;
-  console.log('✅ GoogleDriveSync: mammoth imported successfully');
-} catch (error) {
-  console.error('❌ GoogleDriveSync: mammoth import failed:', error.message);
-  throw error;
-}
-
-let OpenAI;
-try {
-  OpenAI = (await import('openai')).default;
-  console.log('✅ GoogleDriveSync: openai imported successfully');
-} catch (error) {
-  console.error('❌ GoogleDriveSync: openai import failed:', error.message);
-  throw error;
-}
-
-let computeTfIdf, cosineSimilarity;
-try {
-  const docSim = await import('../utils/document-similarity.js');
-  computeTfIdf = docSim.computeTfIdf;
-  cosineSimilarity = docSim.cosineSimilarity;
-  console.log('✅ GoogleDriveSync: document-similarity imported successfully');
-} catch (error) {
-  console.error('❌ GoogleDriveSync: document-similarity import failed:', error.message);
-  throw error;
-}
-
-console.log('🎉 GoogleDriveSync: All dependencies imported successfully!');
+import { google } from 'googleapis';
+// Import pdf-parse only when needed to avoid test file issues
+// import * as pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
+import OpenAI from 'openai';
+import { computeTfIdf, cosineSimilarity } from '../utils/document-similarity.js';
 
 /**
  * GoogleDriveSync - Handles Google Drive document processing with incremental sync
