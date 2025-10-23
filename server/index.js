@@ -100,7 +100,7 @@ app.get('/api/debug/db-test', async (req, res) => {
     
     const testConnection = {
       user_id: 'b7a5b22c-34f5-446a-8627-112f70ba11b2',
-      source_type: 'test',
+      source_type: 'teams', // Use valid source_type
       source_user_id: 'test-user',
       access_token: 'test-token',
       is_active: true
