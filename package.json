@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "_comment": "Force new deployment",
   "scripts": {
     "start": "npm run build && node server/index.js",
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
