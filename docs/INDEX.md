@@ -1,113 +1,49 @@
-# Haven7 Documentation Index
+# Haven7 Documentation
 
-Welcome to the Haven7 AI-Powered Workplace Search documentation. All documentation has been organized by category for easy navigation.
+Welcome to the Haven7 documentation. This guide covers everything you need to know about setting up, deploying, and using the Haven7 platform.
 
-**Project Status:** Production Ready ✅  
-**Last Updated:** January 2025
+## 📋 Table of Contents
 
-## 📁 Documentation Structure
+### Getting Started
+- [Quick Start Guide](setup/QUICK_START.md) - Get up and running in minutes
+- [Environment Setup](setup/ENVIRONMENT_SETUP.md) - Configure your development environment
 
-### 🔐 [authentication/](./authentication/)
-Authentication, OAuth, and security-related documentation.
+### Authentication & OAuth
+- [OAuth Setup Guide](authentication/SUPABASE_AUTH_SETUP_GUIDE.md) - Configure OAuth for Google, Slack, and Notion
+- [Security Best Practices](SECURITY_BEST_PRACTICES.md) - Security guidelines and best practices
 
-- **AUTH_README.md** - Main authentication guide
-- **OAUTH_DEBUG_GUIDE.md** - Debugging OAuth issues
-- **PRODUCTION_OAUTH_GUIDE.md** - Production OAuth setup
-- **SUPABASE_AUTH_SECURITY_GUIDE.md** - Security best practices
-- **SUPABASE_AUTH_SETUP_GUIDE.md** - Initial auth setup
+### Database
+- [Database Schema](database/DATABASE_SCHEMA.md) - Complete database structure
+- [Migrations Guide](database/MIGRATIONS.md) - Database migration instructions
 
-### 👤 [profile-settings/](./profile-settings/)
-User profile and settings documentation.
+### Deployment
+- [Production Deployment](deployment/DEPLOYMENT_GUIDE.md) - Deploy to production
+- [Environment Variables](deployment/DEPLOYMENT_ENV_VARS.md) - Required environment variables
 
-- **PROFILE_SETTINGS_README.md** - Main profile settings guide (start here)
-- **PROFILE_SETTINGS_QUICKSTART.md** - Quick start guide
-- **PROFILE_SETTINGS_SETUP.md** - Setup instructions
-- **PROFILE_SETTINGS_FIXES.md** - Common fixes
+### Features
+- [Search Implementation](features/SEARCH_IMPLEMENTATION.md) - How search works
+- [Sync Implementation](features/SYNC_IMPLEMENTATION.md) - Content synchronization
 
-### 🗄️ [supabase/](./supabase/)
-Supabase database and backend configuration.
+### API Reference
+- [Backend API](api/API_REFERENCE.md) - Complete API documentation
+- [Authentication Endpoints](api/AUTHENTICATION.md) - OAuth and auth endpoints
 
-- **SUPABASE_SETUP.md** - Main Supabase setup guide
-- **SUPABASE_PERFORMANCE_GUIDE.md** - Performance optimization
-- **SUPABASE_FINAL_WARNINGS_GUIDE.md** - Important warnings and considerations
+## 🚀 Quick Links
 
-### 🚀 [implementation/](./implementation/)
-Implementation tracking and migration guides.
+- **Live Application**: [https://source-searcher-pro.vercel.app](https://source-searcher-pro.vercel.app)
+- **Backend API**: [https://source-searcher-pro.onrender.com](https://source-searcher-pro.onrender.com)
+- **GitHub Repository**: [https://github.com/saiashishpalai/source-searcher-pro](https://github.com/saiashishpalai/source-searcher-pro)
 
-- **IMPLEMENTATION_CHECKLIST.md** - Feature checklist
-- **IMPLEMENTATION_SUMMARY.md** - Implementation overview
-- **MIGRATION_INSTRUCTIONS.md** - Database migration steps
+## 📞 Support
 
-### ✨ [features/](./features/)
-Feature-specific documentation.
+If you need help or have questions:
+1. Check the relevant documentation section above
+2. Search existing GitHub issues
+3. Create a new issue with detailed information
 
-- **SLACK_INTEGRATION_GUIDE.md** - Complete Slack integration guide
-- **NOTION_INTEGRATION_COMPLETE.md** - Notion integration guide
-- **SEARCH_IMPROVEMENTS_README.md** - Search feature improvements
-- **SEARCH_RESULTS_README.md** - Search results implementation
-- **TF_IDF_CONTENT_FINGERPRINTING.md** - Content fingerprinting and duplicate detection
-- **INCREMENTAL_SYNC_IMPLEMENTATION.md** - Smart sync and recency ranking
-- **SLACK_FILES_ANALYSIS.md** - Slack file processing and analysis
+## 🔄 Recent Updates
 
-### ⚙️ [setup/](./setup/)
-Initial setup and getting started guides.
-
-- **QUICK_START.md** - Quick start guide for the project
-- **SLACK_QUICKSTART.md** - Fast Slack setup guide
-- **LOVABLE_ENV_SETUP.md** - Environment setup for Lovable
-
-### 📖 [guides/](./guides/)
-Additional guides and utilities.
-
-- **REGENERATE_SUMMARY_GUIDE.md** - Guide for regenerating summaries
-
-### 🛡️ Security & Incidents
-
-- **SECURITY_INCIDENT_RESOLVED.md** - Resolved Slack credentials security incident
-- **SECURITY_BEST_PRACTICES.md** - Security guidelines and best practices
-
-### 📋 Project Management
-Project status and next steps.
-
-- **PROJECT_STATUS.md** - Comprehensive production readiness report
-- **NEXT_STEPS.md** - Current status and upcoming tasks
-
----
-
-## 🎯 Quick Navigation
-
-### New to the project?
-1. Start with [../README.md](../README.md)
-2. Follow [setup/QUICK_START.md](./setup/QUICK_START.md)
-3. Set up environment: [setup/LOVABLE_ENV_SETUP.md](./setup/LOVABLE_ENV_SETUP.md)
-
-### Setting up authentication?
-1. [authentication/AUTH_README.md](./authentication/AUTH_README.md)
-2. [authentication/SUPABASE_AUTH_SETUP_GUIDE.md](./authentication/SUPABASE_AUTH_SETUP_GUIDE.md)
-3. [authentication/PRODUCTION_OAUTH_GUIDE.md](./authentication/PRODUCTION_OAUTH_GUIDE.md)
-
-### Working with the database?
-1. [supabase/SUPABASE_SETUP.md](./supabase/SUPABASE_SETUP.md)
-2. [implementation/MIGRATION_INSTRUCTIONS.md](./implementation/MIGRATION_INSTRUCTIONS.md)
-3. [supabase/SUPABASE_PERFORMANCE_GUIDE.md](./supabase/SUPABASE_PERFORMANCE_GUIDE.md)
-
-### Implementing features?
-1. [implementation/IMPLEMENTATION_CHECKLIST.md](./implementation/IMPLEMENTATION_CHECKLIST.md)
-2. Check relevant feature docs in [features/](./features/)
-3. Review [implementation/IMPLEMENTATION_SUMMARY.md](./implementation/IMPLEMENTATION_SUMMARY.md)
-
-### Troubleshooting?
-- OAuth issues: [authentication/OAUTH_DEBUG_GUIDE.md](./authentication/OAUTH_DEBUG_GUIDE.md)
-- Profile settings: [profile-settings/PROFILE_SETTINGS_FIXES.md](./profile-settings/PROFILE_SETTINGS_FIXES.md)
-- Security concerns: [authentication/SUPABASE_AUTH_SECURITY_GUIDE.md](./authentication/SUPABASE_AUTH_SECURITY_GUIDE.md)
-
----
-
-## 📝 Notes
-
-- The main `README.md` remains in the project root
-- SQL migration files are still in the project root
-- See individual folders for more specific documentation
-
-Last updated: January 2025
-
+- ✅ OAuth Integration Complete - All three services (Google Drive, Slack, Notion) working
+- ✅ Database Schema Fixed - Proper user_connections table with all required columns
+- ✅ Production Deployment - Both frontend and backend deployed and working
+- ✅ Security Implementation - OAuth 2.0 with proper RLS policies

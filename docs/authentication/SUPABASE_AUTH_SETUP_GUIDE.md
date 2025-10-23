@@ -1,190 +1,169 @@
-# Supabase Authentication & OAuth Setup Guide
+# OAuth Setup Guide
 
-## 🔧 Required Supabase Dashboard Configuration
+This guide covers setting up OAuth authentication for Google Drive, Slack, and Notion integrations.
 
-### 1. **Authentication Settings**
+## 🔐 Overview
 
-Go to: `https://supabase.com/dashboard/project/wjqlqmepnpvaywfbfpxb/auth/settings`
+Haven7 uses OAuth 2.0 to securely connect to your Google Drive, Slack, and Notion accounts. The OAuth flow is handled entirely by the backend, and users simply click "Connect" to authorize access.
 
-#### Email Auth Configuration:
-- ✅ **Enable email provider** (should be enabled by default)
-- ✅ **Confirm email** (optional - set based on your requirements)
-- ✅ **Secure email change** (recommended)
+## 🚀 Quick Setup
 
-#### Site URL Configuration:
-- **Development**: `http://localhost:5173`
-- **Production**: `https://yourdomain.com` (update when deploying)
+### 1. Google Drive OAuth
 
-#### Redirect URLs (Add these):
-```
-http://localhost:5173/**
-http://localhost:5173/auth/callback
-http://localhost:8080/**
-http://localhost:8080/auth/callback
-https://yourdomain.com/** (for production)
-https://yourdomain.com/auth/callback (for production)
-```
+1. **Go to Google Cloud Console**
+   - Visit: [https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
+   - Select your project or create a new one
 
-#### JWT Settings:
-- **JWT Expiry**: 3600 seconds (1 hour) - default is fine
-- ✅ **Refresh Token Rotation**: Enable (recommended for security)
+2. **Create OAuth 2.0 Credentials**
+   - Click "Create Credentials" → "OAuth 2.0 Client ID"
+   - Application type: "Web application"
+   - Name: "Haven7 Source Searcher"
 
-### 2. **OAuth Provider Configuration**
-
-Go to: `https://supabase.com/dashboard/project/wjqlqmepnpvaywfbfpxb/auth/providers`
-
-#### Google Provider Setup:
-1. **Enable Google provider**
-2. **Client ID**: Get from Google Cloud Console
-3. **Client Secret**: Get from Google Cloud Console
-4. **Redirect URL**: `https://wjqlqmepnpvaywfbfpxb.supabase.co/auth/v1/callback`
-
-#### Google Cloud Console Setup:
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Navigate to **APIs & Services > Credentials**
-3. Create OAuth 2.0 Client ID (if not exists)
-4. **Authorized redirect URIs** (add these):
+3. **Configure Redirect URIs**
    ```
-   https://wjqlqmepnpvaywfbfpxb.supabase.co/auth/v1/callback
-   http://localhost:5173/auth/callback
-   http://localhost:8080/auth/callback
+   https://source-searcher-pro.onrender.com/api/auth/google/callback
    ```
 
-#### Slack Provider Setup:
-1. **Enable Slack provider** (if available in Supabase)
-2. **Client ID**: Get from Slack App Settings
-3. **Client Secret**: Get from Slack App Settings
-4. **Redirect URL**: `https://wjqlqmepnpvaywfbfpxb.supabase.co/auth/v1/callback`
+4. **Get Your Credentials**
+   - Copy the Client ID and Client Secret
+   - Add them to your environment variables:
+     ```
+     GOOGLE_CLIENT_ID=your-client-id
+     GOOGLE_CLIENT_SECRET=your-client-secret
+     ```
 
-#### Slack App Configuration:
-1. Go to [Slack API](https://api.slack.com/apps)
-2. Select your app > **OAuth & Permissions**
-3. **Redirect URLs** (add these):
-   ```
-   https://wjqlqmepnpvaywfbfpxb.supabase.co/auth/v1/callback
-   http://localhost:5173/auth/callback
-   http://localhost:8080/auth/callback
-   ```
+### 2. Slack OAuth
 
-#### Notion Provider Setup:
-1. **Enable Notion provider** (if available in Supabase)
-2. **Client ID**: Get from Notion Integration
-3. **Client Secret**: Get from Notion Integration
-4. **Redirect URL**: `https://wjqlqmepnpvaywfbfpxb.supabase.co/auth/v1/callback`
+1. **Go to Slack API Dashboard**
+   - Visit: [https://api.slack.com/apps](https://api.slack.com/apps)
+   - Click "Create New App" → "From scratch"
 
-#### Notion Integration Configuration:
-1. Go to [Notion Integrations](https://www.notion.so/my-integrations)
-2. Create new integration
-3. **Redirect URLs** (add these):
-   ```
-   https://wjqlqmepnpvaywfbfpxb.supabase.co/auth/v1/callback
-   http://localhost:5173/auth/callback
-   http://localhost:8080/auth/callback
-   ```
+2. **Configure App Settings**
+   - App Name: "Haven7 Source Searcher"
+   - Development Slack Workspace: Select your workspace
 
-### 3. **Database Configuration**
+3. **Set OAuth Redirect URLs**
+   - Go to "OAuth & Permissions"
+   - Add Redirect URL: `https://source-searcher-pro.onrender.com/api/auth/slack/callback`
 
-Go to: `https://supabase.com/dashboard/project/wjqlqmepnpvaywfbfpxb/sql`
+4. **Configure Bot Token Scopes**
+   - Add these OAuth Scopes:
+     - `channels:read`
+     - `channels:history`
+     - `files:read`
+     - `users:read`
+     - `team:read`
 
-#### Run the Database Schema:
-Execute the SQL from `database-schema-fix.sql` in the Supabase SQL Editor:
+5. **Get Your Credentials**
+   - Copy the Client ID and Client Secret
+   - Add them to your environment variables:
+     ```
+     SLACK_CLIENT_ID=your-client-id
+     SLACK_CLIENT_SECRET=your-client-secret
+     ```
 
-```sql
--- This will create the proper user_connections and integrations tables
--- with Row Level Security policies
-```
+### 3. Notion OAuth
 
-### 4. **Environment Variables**
+1. **Go to Notion Integrations**
+   - Visit: [https://www.notion.so/my-integrations](https://www.notion.so/my-integrations)
+   - Click "New integration"
 
-#### Required in Supabase Dashboard:
-- `NEXT_PUBLIC_SUPABASE_URL`: `https://wjqlqmepnpvaywfbfpxb.supabase.co`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: `eyJhbGc...GAVIOM`
-- `SUPABASE_SERVICE_ROLE_KEY`: (get from Project Settings > API)
+2. **Configure Integration**
+   - Name: "Haven7 Source Searcher"
+   - Associated workspace: Select your workspace
 
-#### Required for OAuth (if using custom OAuth):
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `SLACK_CLIENT_ID`
-- `SLACK_CLIENT_SECRET`
-- `NOTION_CLIENT_ID`
-- `NOTION_CLIENT_SECRET`
+3. **Set Redirect URI**
+   - Redirect URI: `https://source-searcher-pro.onrender.com/api/auth/notion/callback`
 
-### 5. **Testing Checklist**
+4. **Get Your Credentials**
+   - Copy the Client ID and Client Secret
+   - Add them to your environment variables:
+     ```
+     NOTION_CLIENT_ID=your-client-id
+     NOTION_CLIENT_SECRET=your-client-secret
+     ```
 
-#### Authentication Flow:
-- [ ] User can sign up with email/password
-- [ ] User receives email confirmation (if enabled)
-- [ ] User can log in with email/password
-- [ ] Session persists after browser refresh
-- [ ] User can log out successfully
+## 🔧 Environment Variables
 
-#### OAuth Flow:
-- [ ] Google OAuth redirects to Google consent screen
-- [ ] Google OAuth redirects back to app after consent
-- [ ] Slack OAuth redirects to Slack consent screen
-- [ ] Slack OAuth redirects back to app after consent
-- [ ] Notion OAuth redirects to Notion consent screen
-- [ ] Notion OAuth redirects back to app after consent
-
-#### Database Integration:
-- [ ] OAuth connections are stored in `user_connections` table
-- [ ] User can see connected sources in dashboard
-- [ ] User can disconnect sources
-- [ ] Row Level Security policies work correctly
-
-### 6. **Troubleshooting**
-
-#### Common Issues:
-
-**"Invalid redirect URI" Error:**
-- Check that redirect URIs in OAuth provider match Supabase callback URL
-- Ensure no trailing slashes in URLs
-
-**"Client ID not found" Error:**
-- Verify OAuth provider is enabled in Supabase Dashboard
-- Check environment variables are set correctly
-
-**"Unauthorized" Error:**
-- Check Row Level Security policies are correctly configured
-- Verify user is authenticated before making database calls
-
-**Session not persisting:**
-- Check Site URL and Redirect URLs in Supabase Dashboard
-- Verify JWT expiry settings
-
-### 7. **Production Deployment**
-
-When deploying to production:
-
-1. **Update Site URL** in Supabase Dashboard to your production domain
-2. **Add production redirect URLs** to OAuth providers
-3. **Update environment variables** in your deployment platform
-4. **Test OAuth flows** in production environment
-5. **Verify SSL certificates** are working
-
----
-
-## 🎯 Quick Setup Commands
+Add these to your `.env.local` file:
 
 ```bash
-# 1. Copy environment variables
-cp env.example .env.local
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 
-# 2. Run database schema
-# Execute database-schema-fix.sql in Supabase SQL Editor
+# Slack OAuth
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
 
-# 3. Test locally
-npm run dev
+# Notion OAuth
+NOTION_CLIENT_ID=your-notion-client-id
+NOTION_CLIENT_SECRET=your-notion-client-secret
 
-# 4. Test OAuth flows
-# Visit http://localhost:5173/connect-sources
-# Click on Google Drive, Slack, or Notion connect buttons
+# Supabase
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# OpenAI
+OPENAI_API_KEY=your-openai-api-key
+
+# URLs
+VITE_API_URL=https://source-searcher-pro.onrender.com
+VITE_APP_URL=https://source-searcher-pro.vercel.app
 ```
 
-## 📞 Support
+## 🔄 OAuth Flow
 
-If you encounter issues:
-1. Check Supabase Dashboard logs
-2. Check browser console for errors
-3. Verify OAuth provider configurations
-4. Test with mock OAuth endpoints first
+### How It Works
+
+1. **User clicks "Connect"** on a service (Google Drive, Slack, or Notion)
+2. **Frontend redirects** to backend OAuth endpoint
+3. **Backend redirects** to OAuth provider (Google, Slack, or Notion)
+4. **User authorizes** the application on the provider's site
+5. **Provider redirects back** to backend callback
+6. **Backend exchanges** authorization code for access token
+7. **Backend saves** connection to database
+8. **User is redirected** back to frontend with success
+
+### Security Features
+
+- **State Parameter**: Prevents CSRF attacks
+- **Secure Token Storage**: Tokens encrypted in database
+- **Row Level Security**: Users can only access their own connections
+- **Token Expiration**: Automatic token refresh handling
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+1. **"Invalid redirect URI"**
+   - Ensure redirect URIs match exactly in OAuth app settings
+   - Check for trailing slashes or HTTP vs HTTPS
+
+2. **"Invalid scope"**
+   - Verify OAuth scopes are correctly configured
+   - Check that scopes are approved in OAuth app settings
+
+3. **"Database error"**
+   - Ensure `user_connections` table exists with proper schema
+   - Check Supabase connection and RLS policies
+
+4. **"No credentials found"**
+   - Verify environment variables are set correctly
+   - Check that OAuth credentials are valid
+
+### Debug Endpoints
+
+The backend provides debug endpoints for troubleshooting:
+
+- `GET /api/debug/env` - Check environment variables
+- `GET /api/debug/db-test` - Test database connection
+- `GET /api/health` - Check backend health
+
+## 📚 Additional Resources
+
+- [Google OAuth Documentation](https://developers.google.com/identity/protocols/oauth2)
+- [Slack OAuth Documentation](https://api.slack.com/authentication/oauth-v2)
+- [Notion OAuth Documentation](https://developers.notion.com/docs/authorization)
+- [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)

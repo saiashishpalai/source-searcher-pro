@@ -1,110 +1,162 @@
-# Quick Start Guide - Search Improvements
+# Quick Start Guide
 
-## 🚀 Get Started in 3 Steps
+Get Haven7 up and running in minutes with this step-by-step guide.
 
-### Step 1: Run Database Migration
+## 🚀 Prerequisites
 
-Copy and paste the entire contents of `database-search-threads.sql` into your Supabase SQL Editor and click "Run".
+Before you begin, ensure you have:
 
-```sql
--- The file creates:
--- 1. search_threads table
--- 2. search_thread_results table
--- 3. RLS policies
--- 4. Indexes
-```
+- Node.js 18+ installed
+- A Supabase account
+- OAuth credentials for Google, Slack, and Notion
+- An OpenAI API key
 
-**Verification**: Run this query to confirm:
-```sql
-SELECT COUNT(*) FROM search_threads;
-```
+## ⚡ 5-Minute Setup
 
----
-
-### Step 2: Restart Backend Server
+### 1. Clone and Install
 
 ```bash
-cd server
-npm start
+# Clone the repository
+git clone https://github.com/saiashishpalai/source-searcher-pro.git
+cd source-searcher-pro
+
+# Install dependencies
+npm install
 ```
 
-You should see:
+### 2. Environment Setup
+
+```bash
+# Copy environment template
+cp env.example .env.local
+
+# Edit with your credentials
+nano .env.local
 ```
-✓ API server running on http://localhost:3000
+
+**Required Environment Variables:**
+
+```bash
+# Supabase
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# OAuth Credentials
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+NOTION_CLIENT_ID=your-notion-client-id
+NOTION_CLIENT_SECRET=your-notion-client-secret
+
+# OpenAI
+OPENAI_API_KEY=your-openai-api-key
+
+# URLs
+VITE_API_URL=http://localhost:3000
+VITE_APP_URL=http://localhost:8081
 ```
 
----
+### 3. Database Setup
 
-### Step 3: Test the Features
+1. **Create Supabase Project**
+   - Go to [https://supabase.com](https://supabase.com)
+   - Create new project
+   - Copy URL and API keys
 
-Open your app and try these:
+2. **Run Database Migrations**
+   - Go to SQL Editor in Supabase
+   - Run `database/fixes/fix-user-connections-table.sql`
+   - Run `database/fixes/add-token-expires-column.sql`
 
-#### Test 1: Recent Searches (6 Max)
-1. Do 7 searches
-2. Only 6 most recent should show
-3. ✅ Works!
+### 4. OAuth Setup
 
-#### Test 2: Follow-up Questions
-1. Search: "product"
-2. Open console (F12)
-3. Ask follow-up: "what is the price?"
-4. Console shows: "🔍 Follow-up search within X documents"
-5. ✅ Works!
+#### Google Drive
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create OAuth 2.0 Client ID
+3. Add redirect URI: `http://localhost:3000/api/auth/google/callback`
 
-#### Test 3: Thread Persistence
-1. Search anything
-2. Click "Back to Search"
-3. Thread appears in sidebar
-4. Refresh page
-5. Thread still there
-6. ✅ Works!
+#### Slack
+1. Go to [Slack API Dashboard](https://api.slack.com/apps)
+2. Create new app
+3. Add redirect URL: `http://localhost:3000/api/auth/slack/callback`
+4. Add scopes: `channels:read`, `channels:history`, `files:read`, `users:read`, `team:read`
 
----
+#### Notion
+1. Go to [Notion Integrations](https://www.notion.so/my-integrations)
+2. Create new integration
+3. Add redirect URI: `http://localhost:3000/api/auth/notion/callback`
 
-## 📝 Quick Reference
+### 5. Start Development
 
-### Console Messages
+```bash
+# Start backend server
+npm run server
 
-**Success Messages**:
-- ✅ Thread saved to database
-- ✅ Thread renamed in database
-- ✅ Thread deleted from database
+# In another terminal, start frontend
+npm run dev
+```
 
-**Debug Messages**:
-- 🔍 Follow-up search within X documents
-- 📊 Found X relevant chunks
+**Your app will be available at:**
+- Frontend: http://localhost:8081
+- Backend: http://localhost:3000
 
----
+## 🧪 Test the Integration
+
+1. **Open the app** at http://localhost:8081
+2. **Sign up/Login** with your account
+3. **Connect Google Drive** - Click "Connect" and authorize
+4. **Connect Slack** - Click "Connect" and authorize
+5. **Connect Notion** - Click "Connect" and authorize
+6. **Test search** - Try searching across your connected sources
 
 ## 🔧 Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| TypeScript errors | Run the database migration first |
-| Threads not saving | Check RLS policies in Supabase |
-| Follow-up not working | Check console for document IDs |
-| Backend not responding | Restart server with `npm start` |
+### Common Issues
 
----
+**"OAuth not configured"**
+- Check environment variables are set correctly
+- Verify OAuth app settings match your URLs
 
-## 📚 Documentation
+**"Database error"**
+- Ensure Supabase project is created
+- Run database migration scripts
+- Check RLS policies are enabled
 
-- **Full Details**: See `SEARCH_IMPROVEMENTS_README.md`
-- **Summary**: See `IMPLEMENTATION_SUMMARY.md`
-- **This Guide**: `QUICK_START.md`
+**"Connection failed"**
+- Verify redirect URIs match exactly
+- Check OAuth scopes are correct
+- Test with debug endpoints
 
----
+### Debug Endpoints
 
-## ✅ All Done!
+```bash
+# Check backend health
+curl http://localhost:3000/api/health
 
-Your search improvements are ready to use! 🎉
+# Check environment variables
+curl http://localhost:3000/api/debug/env
 
-**What's New**:
-- Recent searches limited to 6 (FIFO)
-- Follow-up questions search within found docs
-- Threads auto-save and persist
-- Full CRUD on threads (edit/delete)
+# Test database connection
+curl http://localhost:3000/api/debug/db-test
+```
 
-**Need Help?**
-Check the detailed docs or review console logs for errors.
+## 📚 Next Steps
 
+Once you have the basic setup working:
+
+1. **Read the full documentation** in the `docs/` directory
+2. **Set up production deployment** using the [Deployment Guide](deployment/DEPLOYMENT_GUIDE.md)
+3. **Configure OAuth for production** using the [OAuth Setup Guide](authentication/SUPABASE_AUTH_SETUP_GUIDE.md)
+4. **Explore advanced features** like search customization and sync optimization
+
+## 🆘 Need Help?
+
+- **Documentation**: Check the `docs/` directory for detailed guides
+- **Issues**: Create a GitHub issue with detailed information
+- **Debug**: Use the debug endpoints to troubleshoot issues
+
+## 🎉 You're Ready!
+
+Your Haven7 instance should now be running locally with all OAuth integrations working. You can search across your Google Drive, Slack, and Notion content seamlessly!
