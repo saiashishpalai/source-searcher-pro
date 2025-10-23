@@ -792,33 +792,17 @@ app.get('/api/auth/notion/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
 
-    // Fetch user's OAuth credentials from database
-    const { data: credentials, error: credError } = await supabaseAdmin
-      .from('user_connections')
-      .select('client_id, client_secret_encrypted, redirect_uri')
-      .eq('user_id', userId)
-      .eq('source_type', 'notion')
-      .single();
+    // Use OAuth credentials from environment variables (original architecture)
+    const clientId = process.env.NOTION_CLIENT_ID;
+    const clientSecret = process.env.NOTION_CLIENT_SECRET;
 
-    if (credError || !credentials || !credentials.client_id) {
-      console.error('No OAuth credentials found for user');
+    if (!clientId || !clientSecret) {
+      console.error('Notion OAuth credentials not configured');
       return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
     }
 
-    // Decrypt client_secret
-    const { data: clientSecret, error: decryptError } = await supabaseAdmin
-      .rpc('decrypt_client_secret', {
-        encrypted: credentials.client_secret_encrypted,
-        user_id: userId
-      });
-
-    if (decryptError || !clientSecret) {
-      console.error('Failed to decrypt credentials:', decryptError);
-      return res.redirect(`${APP_URL}/connect-sources?error=decrypt_failed`);
-    }
-
     // Notion uses Basic Auth with base64 encoded client_id:client_secret
-    const auth = Buffer.from(`${credentials.client_id}:${clientSecret}`).toString('base64');
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
     const tokenResponse = await fetch('https://api.notion.com/v1/oauth/token', {
       method: 'POST',
@@ -829,7 +813,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
       body: JSON.stringify({
         code,
         grant_type: 'authorization_code',
-        redirect_uri: credentials.redirect_uri || `${API_BASE_URL}/api/auth/notion/callback`,
+        redirect_uri: `${API_BASE_URL}/api/auth/notion/callback`,
       }),
     });
 
