@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -402,6 +403,53 @@ app.get('/api/oauth-credentials/get', async (req, res) => {
   }
 });
 
+// GOOGLE OAUTH INITIAL REDIRECT
+app.get('/api/auth/google', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Get user's OAuth credentials from database
+    const { data: credentials, error: credentialsError } = await supabaseAdmin
+      .from('user_connections')
+      .select('client_id, client_secret')
+      .eq('user_id', userId)
+      .eq('source_type', 'google')
+      .single();
+
+    if (credentialsError || !credentials) {
+      return res.status(400).json({ error: 'Google OAuth credentials not configured for this user' });
+    }
+
+    const { client_id, client_secret } = credentials;
+    
+    // Generate state parameter for security
+    const state = crypto.randomBytes(32).toString('hex');
+    
+    // Store state in session or database for verification
+    // For now, we'll include userId in state
+    const stateWithUserId = `${state}:${userId}`;
+    
+    const authorizationUrl = `https://accounts.google.com/o/oauth2/auth?` +
+      `client_id=${client_id}&` +
+      `redirect_uri=${encodeURIComponent(`${API_BASE_URL}/api/auth/google/callback`)}&` +
+      `response_type=code&` +
+      `scope=${encodeURIComponent('https://www.googleapis.com/auth/drive.readonly')}&` +
+      `state=${stateWithUserId}&` +
+      `access_type=offline&` +
+      `prompt=consent`;
+
+    console.log('🔗 Redirecting to Google OAuth:', authorizationUrl);
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error('Google OAuth redirect error:', error);
+    res.status(500).json({ error: 'OAuth redirect failed' });
+  }
+});
+
 // GOOGLE OAUTH CALLBACK - COMPLETE IMPLEMENTATION
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
@@ -510,6 +558,47 @@ app.get('/api/auth/google/callback', async (req, res) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+  }
+});
+
+// SLACK OAUTH INITIAL REDIRECT
+app.get('/api/auth/slack', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Get user's OAuth credentials from database
+    const { data: credentials, error: credentialsError } = await supabaseAdmin
+      .from('user_connections')
+      .select('client_id, client_secret')
+      .eq('user_id', userId)
+      .eq('source_type', 'slack')
+      .single();
+
+    if (credentialsError || !credentials) {
+      return res.status(400).json({ error: 'Slack OAuth credentials not configured for this user' });
+    }
+
+    const { client_id, client_secret } = credentials;
+    
+    // Generate state parameter for security
+    const state = crypto.randomBytes(32).toString('hex');
+    const stateWithUserId = `${state}:${userId}`;
+    
+    const authorizationUrl = `https://slack.com/oauth/v2/authorize?` +
+      `client_id=${client_id}&` +
+      `redirect_uri=${encodeURIComponent(`${API_BASE_URL}/api/auth/slack/callback`)}&` +
+      `scope=${encodeURIComponent('channels:read,chat:read,files:read,users:read')}&` +
+      `state=${stateWithUserId}`;
+
+    console.log('🔗 Redirecting to Slack OAuth:', authorizationUrl);
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error('Slack OAuth redirect error:', error);
+    res.status(500).json({ error: 'OAuth redirect failed' });
   }
 });
 
@@ -626,6 +715,48 @@ app.get('/api/auth/slack/callback', async (req, res) => {
   } catch (error) {
     console.error('Slack OAuth callback error:', error);
     return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+  }
+});
+
+// NOTION OAUTH INITIAL REDIRECT
+app.get('/api/auth/notion', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Get user's OAuth credentials from database
+    const { data: credentials, error: credentialsError } = await supabaseAdmin
+      .from('user_connections')
+      .select('client_id, client_secret')
+      .eq('user_id', userId)
+      .eq('source_type', 'notion')
+      .single();
+
+    if (credentialsError || !credentials) {
+      return res.status(400).json({ error: 'Notion OAuth credentials not configured for this user' });
+    }
+
+    const { client_id, client_secret } = credentials;
+    
+    // Generate state parameter for security
+    const state = crypto.randomBytes(32).toString('hex');
+    const stateWithUserId = `${state}:${userId}`;
+    
+    const authorizationUrl = `https://api.notion.com/v1/oauth/authorize?` +
+      `client_id=${client_id}&` +
+      `redirect_uri=${encodeURIComponent(`${API_BASE_URL}/api/auth/notion/callback`)}&` +
+      `response_type=code&` +
+      `owner=user&` +
+      `state=${stateWithUserId}`;
+
+    console.log('🔗 Redirecting to Notion OAuth:', authorizationUrl);
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error('Notion OAuth redirect error:', error);
+    res.status(500).json({ error: 'OAuth redirect failed' });
   }
 });
 
