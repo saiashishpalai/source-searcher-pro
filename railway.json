@@ -1,7 +1,6 @@
 {
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "npm install --frozen-lockfile && npm run build"
+    "builder": "DOCKERFILE"
   },
   "deploy": {
     "startCommand": "node server/index.js",
