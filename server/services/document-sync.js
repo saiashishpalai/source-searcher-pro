@@ -48,17 +48,10 @@ export class DocumentSync {
         return response.data;
       }
 
-      // PDF
+      // PDF - Skip for now to avoid pdf-parse startup issues
       if (file.mimeType === 'application/pdf') {
-        const response = await drive.files.get({
-          fileId: file.id,
-          alt: 'media',
-        }, { responseType: 'arraybuffer' });
-        
-        const buffer = Buffer.from(response.data);
-        const pdfParse = (await import('pdf-parse')).default;
-        const data = await pdfParse(buffer);
-        return data.text;
+        console.log(`  📄 PDF file detected: ${file.name} - PDF parsing temporarily disabled`);
+        return `PDF Document: ${file.name}\n\nNote: PDF text extraction is temporarily disabled due to technical issues.\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
       }
 
       // Word documents
