@@ -700,20 +700,7 @@ const ConnectedSources = () => {
     setRefreshingConnection(sourceType);
     
     try {
-      const response = await fetch('/api/connections/disconnect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ sourceType }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Disconnect failed');
-      }
+      const data = await ApiClient.post('/api/connections/disconnect', { sourceType });
       
       console.log('✅ Disconnected successfully');
       await fetchConnections();
@@ -729,20 +716,7 @@ const ConnectedSources = () => {
     console.log(`🗑️ Clearing data for ${sourceType}...`);
     
     try {
-      const response = await fetch('/api/clear-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ sourceType }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Clear data failed');
-      }
+      const data = await ApiClient.post('/api/clear-data', { sourceType });
       
       const sourceName = sourceType === 'google_drive' ? 'Google Drive' : sourceType === 'notion' ? 'Notion' : sourceType;
       console.log(`✅ ${sourceName} data cleared successfully`);
@@ -774,18 +748,8 @@ const ConnectedSources = () => {
 
     setSyncStatusLoading(true);
     try {
-      const response = await fetch('/api/sync/status', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      });
-      
-      if (response.ok) {
-        const status = await response.json();
-        setSyncStatus(status);
-      } else {
-        console.log('Sync status response not ok:', response.status);
-      }
+      const status = await ApiClient.get('/api/sync/status');
+      setSyncStatus(status);
     } catch (error) {
       console.error('Error fetching sync status:', error);
       // Don't show error to user, just log it
@@ -829,25 +793,14 @@ const ConnectedSources = () => {
         : sourceType;
       console.log(`🔄 Calling endpoint: ${endpoint}`);
       
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      });
+      const data = await ApiClient.post(endpoint, {});
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        if (data.code === 'TOKEN_EXPIRED') {
-          setSyncError(prev => ({ ...prev, [sourceType]: `Your ${sourceName} connection has expired. Please reconnect ${sourceName}.` }));
-          return;
-        } else if (data.code === 'NOT_CONNECTED') {
-          setSyncError(prev => ({ ...prev, [sourceType]: `${sourceName} is not connected. Please connect first.` }));
-          return;
-        }
-        throw new Error(data.error || 'Sync failed');
+      if (data.code === 'TOKEN_EXPIRED') {
+        setSyncError(prev => ({ ...prev, [sourceType]: `Your ${sourceName} connection has expired. Please reconnect ${sourceName}.` }));
+        return;
+      } else if (data.code === 'NOT_CONNECTED') {
+        setSyncError(prev => ({ ...prev, [sourceType]: `${sourceName} is not connected. Please connect first.` }));
+        return;
       }
       
       console.log('✅ Sync complete:', data);
