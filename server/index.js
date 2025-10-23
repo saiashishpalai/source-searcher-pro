@@ -51,7 +51,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.error('Missing required environment variables:');
   console.error('- VITE_SUPABASE_URL:', !!supabaseUrl);
   console.error('- SUPABASE_SERVICE_ROLE_KEY:', !!supabaseServiceKey);
-  console.error('Please set these environment variables in Vercel');
+  console.error('Please set these environment variables in Render');
+  process.exit(1);
 }
 
 const supabaseAdmin = createClient(
