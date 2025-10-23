@@ -369,7 +369,7 @@ const ConnectSources = () => {
     
     try {
       // Build OAuth URLs - ALL services use HTTPS localhost with unified redirect pattern
-      const redirectUri = `https://localhost:3000/api/auth/${sourceId}/callback`;
+      const redirectUri = `/api/auth/${sourceId}/callback`;
       
       if (sourceId === 'googleDrive') {
         const clientId = getEnvVar('VITE_GOOGLE_CLIENT_ID');

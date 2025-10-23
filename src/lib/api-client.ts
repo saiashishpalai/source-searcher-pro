@@ -3,7 +3,7 @@ import { getEnvVar } from './env';
 
 // Use relative URL in development to go through Vite proxy
 // In production, use the full API URL
-const API_BASE_URL = import.meta.env.DEV ? '' : (getEnvVar('VITE_API_URL') || 'https://localhost:3000');
+const API_BASE_URL = import.meta.env.DEV ? '' : (getEnvVar('VITE_API_URL') || '');
 
 export class ApiClient {
   private static async getAuthHeaders(): Promise<HeadersInit> {
