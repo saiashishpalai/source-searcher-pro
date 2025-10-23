@@ -11,7 +11,7 @@ WHERE table_name = 'user_connections'
 AND column_name = 'token_expires_at';
 
 -- Method 3: Force a schema refresh by querying system tables
-SELECT schemaname, tablename, column_name, data_type
+SELECT table_name, column_name, data_type
 FROM information_schema.columns 
 WHERE table_name = 'user_connections'
 ORDER BY ordinal_position;
