@@ -4,7 +4,13 @@ import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-dotenv.config({ path: join(__dirname, '..', '.env.local') });
+
+// Try to load .env.local, but don't fail if it doesn't exist
+try {
+  dotenv.config({ path: join(__dirname, '..', '.env.local') });
+} catch (error) {
+  console.log('No .env.local file found, using environment variables from Vercel');
+}
 
 import express from 'express';
 import cors from 'cors';
@@ -37,9 +43,20 @@ app.get('/healthz', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Check for required environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing required environment variables:');
+  console.error('- VITE_SUPABASE_URL:', !!supabaseUrl);
+  console.error('- SUPABASE_SERVICE_ROLE_KEY:', !!supabaseServiceKey);
+  console.error('Please set these environment variables in Vercel');
+}
+
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  supabaseUrl,
+  supabaseServiceKey,
   { auth: { persistSession: false } }
 );
 
