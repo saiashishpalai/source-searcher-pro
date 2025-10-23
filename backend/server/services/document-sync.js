@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import * as pdfParse from 'pdf-parse';
+// import * as pdfParse from 'pdf-parse'; // Removed to avoid startup issues
 import mammoth from 'mammoth';
 import OpenAI from 'openai';
 
@@ -55,8 +55,9 @@ export class DocumentSync {
         }, { responseType: 'arraybuffer' });
         
         const buffer = Buffer.from(response.data);
-        const data = await pdfParse.default(buffer);
-        return data.text;
+        // PDF parsing temporarily disabled to avoid startup issues
+        console.log(`  📄 PDF file detected: ${file.name} - PDF parsing temporarily disabled`);
+        return `PDF Document: ${file.name}\n\nNote: PDF text extraction is temporarily disabled due to technical issues.\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
       }
 
       // Word documents

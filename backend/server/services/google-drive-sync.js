@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import * as pdfParse from 'pdf-parse';
+// import * as pdfParse from 'pdf-parse'; // Removed to avoid startup issues
 import mammoth from 'mammoth';
 import OpenAI from 'openai';
 import { computeTfIdf, cosineSimilarity } from '../utils/document-similarity.js';
@@ -376,8 +376,9 @@ export class GoogleDriveSync {
           }, { responseType: 'arraybuffer' });
           
           const buffer = Buffer.from(response.data);
-          const data = await pdfParse(buffer);
-          return data.text;
+          // PDF parsing temporarily disabled to avoid startup issues
+          console.log(`  📄 PDF file detected: ${file.name} - PDF parsing temporarily disabled`);
+          return `PDF Document: ${file.name}\n\nNote: PDF text extraction is temporarily disabled due to technical issues.\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
         } catch (pdfError) {
           console.log(`  ⚠️ Cannot parse PDF ${file.name}: ${pdfError.message}`);
           return null;
