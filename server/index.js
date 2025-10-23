@@ -446,28 +446,36 @@ app.get('/api/auth/google', async (req, res) => {
 
 // GOOGLE OAUTH CALLBACK - COMPLETE IMPLEMENTATION
 app.get('/api/auth/google/callback', async (req, res) => {
+  console.log('🎯 GOOGLE OAUTH CALLBACK RECEIVED!');
+  console.log('   Query params:', req.query);
   try {
     const { code, state } = req.query;
     
     if (!code || !state) {
+      console.log('❌ Missing code or state');
       return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
     }
     
     // Parse state format: "randomHex:userId"
     const [stateHex, userId] = state.split(':');
+    console.log('   Parsed state - hex:', stateHex?.substring(0, 10) + '...', 'userId:', userId);
     
     if (!userId) {
+      console.log('❌ Invalid state format');
       return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
-
+    
     // Use OAuth credentials from environment variables (original architecture)
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    console.log('   Using clientId:', clientId ? '✅ Found' : '❌ Missing');
 
     if (!clientId || !clientSecret) {
-      console.error('Google OAuth credentials not configured');
+      console.error('❌ Google OAuth credentials not configured');
       return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
     }
+    
+    console.log('🔄 Attempting Google token exchange...');
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -575,26 +583,30 @@ app.get('/api/auth/slack', async (req, res) => {
 
 // SLACK OAUTH CALLBACK
 app.get('/api/auth/slack/callback', async (req, res) => {
-  console.log('🎯 SLACK CALLBACK RECEIVED!', req.query);
+  console.log('🎯 SLACK CALLBACK RECEIVED!');
+  console.log('   Query params:', req.query);
   
   const { code, state } = req.query;
   
   if (!code || !state) {
-    console.error('❌ Missing code or state in callback');
+    console.log('❌ Missing code or state in callback');
     return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
   }
 
   try {
     // Parse state format: "randomHex:userId"
     const [stateHex, userId] = state.split(':');
+    console.log('   Parsed state - hex:', stateHex?.substring(0, 10) + '...', 'userId:', userId);
     
     if (!userId) {
+      console.log('❌ Invalid state format');
       return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
     }
 
     // Use OAuth credentials from environment variables (original architecture)
     const clientId = process.env.SLACK_CLIENT_ID;
     const clientSecret = process.env.SLACK_CLIENT_SECRET;
+    console.log('   Using clientId:', clientId ? '✅ Found' : '❌ Missing');
 
     if (!clientId || !clientSecret) {
       console.error('Slack OAuth credentials not configured');

@@ -660,6 +660,7 @@ const ConnectedSources = () => {
   };
 
   const handleConnect = async (sourceId: string) => {
+    console.log('🚀 Starting OAuth connection for:', sourceId);
     setPermissionModalOpen(false);
     setConnectingSource(sourceId);
     
@@ -669,24 +670,28 @@ const ConnectedSources = () => {
       const apiUrl = getEnvVar('VITE_API_URL') || 'https://source-searcher-pro.onrender.com';
       console.log('🔍 API URL:', apiUrl);
       console.log('🔍 Source ID:', sourceId);
+      console.log('👤 User ID:', user?.id);
       const redirectUri = `${apiUrl}/api/auth/${sourceId === 'googleDrive' ? 'google' : sourceId}/callback`;
       
       if (sourceId === 'googleDrive') {
         // Redirect to backend OAuth endpoint - backend handles the OAuth flow
         const backendOAuthUrl = `${apiUrl}/api/auth/google?userId=${user?.id}`;
         console.log('🔗 Redirecting to backend Google OAuth:', backendOAuthUrl);
+        console.log('🌐 About to redirect to:', backendOAuthUrl);
         window.location.href = backendOAuthUrl;
         
       } else if (sourceId === 'slack') {
         // Redirect to backend OAuth endpoint - backend handles the OAuth flow
         const backendOAuthUrl = `${apiUrl}/api/auth/slack?userId=${user?.id}`;
         console.log('🔗 Redirecting to backend Slack OAuth:', backendOAuthUrl);
+        console.log('🌐 About to redirect to:', backendOAuthUrl);
         window.location.href = backendOAuthUrl;
         
       } else if (sourceId === 'notion') {
         // Redirect to backend OAuth endpoint - backend handles the OAuth flow
         const backendOAuthUrl = `${apiUrl}/api/auth/notion?userId=${user?.id}`;
         console.log('🔗 Redirecting to backend Notion OAuth:', backendOAuthUrl);
+        console.log('🌐 About to redirect to:', backendOAuthUrl);
         window.location.href = backendOAuthUrl;
       }
     } catch (error) {
