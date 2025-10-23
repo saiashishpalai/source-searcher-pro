@@ -601,31 +601,19 @@ app.get('/api/auth/slack/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
     }
 
-    // Decrypt client_secret
-    const { data: clientSecret, error: decryptError } = await supabaseAdmin
-      .rpc('decrypt_client_secret', {
-        encrypted: credentials.client_secret_encrypted,
-        user_id: userId
-      });
-
-    if (decryptError || !clientSecret) {
-      console.error('Failed to decrypt credentials:', decryptError);
-      return res.redirect(`${APP_URL}/connect-sources?error=decrypt_failed`);
-    }
-
     console.log('🔄 Attempting Slack token exchange...');
     console.log('   Code:', code.substring(0, 20) + '...');
-    console.log('   Client ID:', credentials.client_id);
-    console.log('   Redirect URI:', credentials.redirect_uri);
+    console.log('   Client ID:', clientId);
+    console.log('   Redirect URI:', `${API_BASE_URL}/api/auth/slack/callback`);
     
     const tokenResponse = await fetch('https://slack.com/api/oauth.v2.access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: credentials.client_id,
+        client_id: clientId,
         client_secret: clientSecret,
-        redirect_uri: credentials.redirect_uri || `${API_BASE_URL}/api/auth/slack/callback`,
+        redirect_uri: `${API_BASE_URL}/api/auth/slack/callback`,
       }),
     });
 
