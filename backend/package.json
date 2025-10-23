@@ -2,13 +2,11 @@
   "name": "source-searcher-backend",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node index.js",
-    "build": "echo 'Backend only - no build needed'"
+    "start": "node server/index.js"
   },
   "dependencies": {
-    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "cors": "^2.8.5",
     "@supabase/supabase-js": "^2.58.0",

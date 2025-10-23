@@ -1,16 +1,11 @@
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Try to load .env.local, but don't fail if it doesn't exist
-try {
-  dotenv.config({ path: join(__dirname, '..', '.env.local') });
-} catch (error) {
-  console.log('No .env.local file found, using environment variables from Vercel');
-}
+// Render injects environment variables directly, no need for dotenv
+console.log('Using environment variables from Render');
 
 import express from 'express';
 import cors from 'cors';
