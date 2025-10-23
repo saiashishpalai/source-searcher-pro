@@ -17,7 +17,6 @@
     "@slack/web-api": "^7.11.0",
     "googleapis": "^161.0.0",
     "mammoth": "^1.11.0",
-    "pdf-parse": "^1.1.1",
     "bcryptjs": "^3.0.2",
     "jsonwebtoken": "^9.0.2"
   }

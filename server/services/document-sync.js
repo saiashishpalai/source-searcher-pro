@@ -1,6 +1,4 @@
 import { google } from 'googleapis';
-// Import pdf-parse only when needed to avoid test file issues
-// import * as pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import OpenAI from 'openai';
 

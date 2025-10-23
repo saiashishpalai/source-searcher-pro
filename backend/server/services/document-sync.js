@@ -1,5 +1,4 @@
 import { google } from 'googleapis';
-// import * as pdfParse from 'pdf-parse'; // Removed to avoid startup issues
 import mammoth from 'mammoth';
 import OpenAI from 'openai';
 
