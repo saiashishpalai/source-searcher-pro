@@ -11,7 +11,6 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ConnectedSources from "./pages/ConnectedSources";
 import ProfileSettings from "./pages/ProfileSettings";
 import Documentation from "./pages/Documentation";
-import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 const App = () => {
@@ -24,7 +23,6 @@ const App = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       
       {/* Protected routes */}
       <Route path="/dashboard" element={
