@@ -31,7 +31,13 @@ const API_BASE_URL = process.env.API_BASE_URL || `https://localhost:${PORT}`;
 
 
 app.use(cors({ 
-  origin: ['https://localhost:8081', 'http://localhost:8081'],
+  origin: [
+    'https://localhost:8081', 
+    'http://localhost:8081',
+    'https://source-searcher-pro.vercel.app',
+    'https://source-searcher-pro-git-main-saiashishpalai.vercel.app',
+    /\.vercel\.app$/
+  ],
   credentials: true 
 }));
 app.use(express.json());
