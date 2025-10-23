@@ -79,6 +79,20 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Debug endpoint to check environment variables
+app.get('/api/debug/env', (req, res) => {
+  res.json({
+    google_client_id: process.env.GOOGLE_CLIENT_ID ? '✅ Found' : '❌ Missing',
+    google_client_secret: process.env.GOOGLE_CLIENT_SECRET ? '✅ Found' : '❌ Missing',
+    slack_client_id: process.env.SLACK_CLIENT_ID ? '✅ Found' : '❌ Missing',
+    slack_client_secret: process.env.SLACK_CLIENT_SECRET ? '✅ Found' : '❌ Missing',
+    notion_client_id: process.env.NOTION_CLIENT_ID ? '✅ Found' : '❌ Missing',
+    notion_client_secret: process.env.NOTION_CLIENT_SECRET ? '✅ Found' : '❌ Missing',
+    supabase_url: process.env.VITE_SUPABASE_URL ? '✅ Found' : '❌ Missing',
+    supabase_service_key: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Found' : '❌ Missing'
+  });
+});
+
 // Test endpoint to check Slack file access
 app.get('/api/test/slack-file-access', async (req, res) => {
   try {
