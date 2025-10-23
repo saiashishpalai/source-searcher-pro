@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "npm run dev",
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
     "dev:vite": "vite",
     "dev:api": "node --watch server/index.js",
@@ -64,6 +65,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.462.0",
     "mammoth": "^1.11.0",
+    "mcp-framework": "^0.2.15",
     "next-themes": "^0.3.0",
     "openai": "^6.2.0",
     "pdf-parse": "^2.2.2",
