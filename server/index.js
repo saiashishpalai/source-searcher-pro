@@ -570,7 +570,7 @@ app.get('/api/auth/slack', async (req, res) => {
     const authorizationUrl = `https://slack.com/oauth/v2/authorize?` +
       `client_id=${clientId}&` +
       `redirect_uri=${encodeURIComponent(`${API_BASE_URL}/api/auth/slack/callback`)}&` +
-      `scope=${encodeURIComponent('channels:read,chat:read,files:read,users:read')}&` +
+      `scope=${encodeURIComponent('channels:list,chat:read,files:read,users:read,team:read')}&` +
       `state=${stateWithUserId}`;
 
     console.log('🔗 Redirecting to Slack OAuth:', authorizationUrl);
