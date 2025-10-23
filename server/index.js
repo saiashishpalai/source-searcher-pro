@@ -1,6 +1,27 @@
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+// Debug: Test each dependency import
+console.log('🔍 Starting dependency debugging...');
+
+let dotenv;
+try {
+  dotenv = await import('dotenv');
+  console.log('✅ dotenv imported successfully');
+} catch (error) {
+  console.error('❌ dotenv import failed:', error.message);
+  process.exit(1);
+}
+
+let fileURLToPath, dirname, join;
+try {
+  const url = await import('url');
+  const path = await import('path');
+  fileURLToPath = url.fileURLToPath;
+  dirname = path.dirname;
+  join = path.join;
+  console.log('✅ url and path imported successfully');
+} catch (error) {
+  console.error('❌ url/path import failed:', error.message);
+  process.exit(1);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -8,20 +29,100 @@ const __dirname = dirname(__filename);
 // Try to load .env.local, but don't fail if it doesn't exist
 try {
   dotenv.config({ path: join(__dirname, '..', '.env.local') });
+  console.log('✅ dotenv config loaded');
 } catch (error) {
-  console.log('No .env.local file found, using environment variables from Vercel');
+  console.log('⚠️ No .env.local file found, using environment variables from Vercel');
 }
 
-import express from 'express';
-import cors from 'cors';
-import https from 'https';
-import fs from 'fs';
-import { createClient } from '@supabase/supabase-js';
-import { DocumentSync } from './services/document-sync.js';
-import { GoogleDriveSync } from './services/google-drive-sync.js';
-import { SearchService } from './services/search-service.js';
-import { NotionSync } from './services/notion-sync.js';
-import { SlackSync } from './services/slack-sync.js';
+let express;
+try {
+  express = (await import('express')).default;
+  console.log('✅ express imported successfully');
+} catch (error) {
+  console.error('❌ express import failed:', error.message);
+  process.exit(1);
+}
+
+let cors;
+try {
+  cors = (await import('cors')).default;
+  console.log('✅ cors imported successfully');
+} catch (error) {
+  console.error('❌ cors import failed:', error.message);
+  process.exit(1);
+}
+
+let https, fs;
+try {
+  https = await import('https');
+  fs = await import('fs');
+  console.log('✅ https and fs imported successfully');
+} catch (error) {
+  console.error('❌ https/fs import failed:', error.message);
+  process.exit(1);
+}
+
+let createClient;
+try {
+  const supabase = await import('@supabase/supabase-js');
+  createClient = supabase.createClient;
+  console.log('✅ @supabase/supabase-js imported successfully');
+} catch (error) {
+  console.error('❌ @supabase/supabase-js import failed:', error.message);
+  process.exit(1);
+}
+
+let DocumentSync;
+try {
+  const docSync = await import('./services/document-sync.js');
+  DocumentSync = docSync.DocumentSync;
+  console.log('✅ DocumentSync imported successfully');
+} catch (error) {
+  console.error('❌ DocumentSync import failed:', error.message);
+  process.exit(1);
+}
+
+let GoogleDriveSync;
+try {
+  const gdSync = await import('./services/google-drive-sync.js');
+  GoogleDriveSync = gdSync.GoogleDriveSync;
+  console.log('✅ GoogleDriveSync imported successfully');
+} catch (error) {
+  console.error('❌ GoogleDriveSync import failed:', error.message);
+  process.exit(1);
+}
+
+let SearchService;
+try {
+  const search = await import('./services/search-service.js');
+  SearchService = search.SearchService;
+  console.log('✅ SearchService imported successfully');
+} catch (error) {
+  console.error('❌ SearchService import failed:', error.message);
+  process.exit(1);
+}
+
+let NotionSync;
+try {
+  const notion = await import('./services/notion-sync.js');
+  NotionSync = notion.NotionSync;
+  console.log('✅ NotionSync imported successfully');
+} catch (error) {
+  console.error('❌ NotionSync import failed:', error.message);
+  process.exit(1);
+}
+
+let SlackSync;
+try {
+  const slack = await import('./services/slack-sync.js');
+  SlackSync = slack.SlackSync;
+  console.log('✅ SlackSync imported successfully');
+} catch (error) {
+  console.error('❌ SlackSync import failed:', error.message);
+  process.exit(1);
+}
+
+console.log('🎉 All dependencies imported successfully!');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
