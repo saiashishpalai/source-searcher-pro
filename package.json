@@ -6,7 +6,8 @@
   "_comment": "Force new deployment",
   "packageManager": "npm@10.8.2",
   "scripts": {
-    "start": "npm run build && node server/index.js",
+    "start": "node server/index.js",
+    "postinstall": "npm run build",
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
     "dev:vite": "vite",
     "dev:api": "node --watch server/index.js",
