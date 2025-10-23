@@ -57,8 +57,8 @@ Automatically syncs and indexes your documents with vector embeddings for semant
 - **Efficiency Metrics**: See exactly how much processing time was saved
 - **Performance Optimization**: Reduced API calls and bandwidth usage
 
-### 🔐 **Secure OAuth Integration**
-Connect your accounts securely using OAuth 2.0. We never store your passwords.
+### 🔐 **User-Controlled OAuth**
+Each user provides their own OAuth credentials for maximum security and control. Your data stays under your control with no shared rate limits.
 
 ### 📝 **Thread Management**
 Save and revisit your search conversations. Never lose track of important research.

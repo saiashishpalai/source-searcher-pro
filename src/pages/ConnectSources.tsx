@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { CheckCircle, Plus, ArrowRight, Loader2, ExternalLink, Shield, Eye, Lock, X } from 'lucide-react';
 import { getEnvVar } from '@/lib/env';
 import { ApiClient } from '@/lib/api-client';
+import { OAuthCredentialsDialog } from '@/components/OAuthCredentialsDialog';
 
 // SVG Icon Components (reusing from SearchInterface)
 const SlackIcon = ({ className = "" }: { className?: string }) => (
@@ -246,6 +247,8 @@ const ConnectSources = () => {
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [credentialsDialogOpen, setCredentialsDialogOpen] = useState(false);
+  const [currentProvider, setCurrentProvider] = useState<'google' | 'slack' | 'notion' | null>(null);
 
   // Fetch connections from API
   const fetchConnections = async () => {
@@ -368,17 +371,48 @@ const ConnectSources = () => {
     setConnectingSource(sourceId);
     
     try {
-      // Build OAuth URLs - ALL services use HTTPS localhost with unified redirect pattern
-      const redirectUri = `/api/auth/${sourceId}/callback`;
+      // Determine provider name for API calls
+      const provider = sourceId === 'googleDrive' ? 'google' : sourceId;
       
-      if (sourceId === 'googleDrive') {
-        const clientId = getEnvVar('VITE_GOOGLE_CLIENT_ID');
-        if (!clientId) {
-          console.error('Google Client ID not configured');
-          alert('Google Drive integration is not configured. Please contact your administrator to set up Google OAuth credentials.');
+      // Check if user has OAuth credentials configured
+      try {
+        const credentialsResponse = await ApiClient.get(`/api/oauth-credentials/get?provider=${provider}`);
+        
+        if (!credentialsResponse.hasCredentials) {
+          // No credentials found - show dialog to collect them
+          console.log('No OAuth credentials found, showing dialog');
+          setCurrentProvider(provider as 'google' | 'slack' | 'notion');
+          setCredentialsDialogOpen(true);
+          setConnectingSource(null);
           return;
         }
         
+        // Credentials exist - proceed with OAuth flow using user's credentials
+        await initiateOAuthFlow(sourceId, credentialsResponse);
+        
+      } catch (error: any) {
+        if (error.message?.includes('No credentials found') || error.response?.status === 404) {
+          // No credentials found - show dialog
+          console.log('No OAuth credentials found, showing dialog');
+          setCurrentProvider(provider as 'google' | 'slack' | 'notion');
+          setCredentialsDialogOpen(true);
+          setConnectingSource(null);
+          return;
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error('OAuth connection error:', error);
+      setConnectingSource(null);
+    }
+  };
+
+  const initiateOAuthFlow = async (sourceId: string, credentials: any) => {
+    try {
+      // Build OAuth URLs using user's credentials
+      const redirectUri = credentials.redirect_uri;
+      
+      if (sourceId === 'googleDrive') {
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
           userId: user?.id,
@@ -387,7 +421,7 @@ const ConnectSources = () => {
         }));
         
         const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-        googleAuthUrl.searchParams.set('client_id', clientId);
+        googleAuthUrl.searchParams.set('client_id', credentials.client_id);
         googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
         googleAuthUrl.searchParams.set('response_type', 'code');
         googleAuthUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile');
@@ -399,12 +433,6 @@ const ConnectSources = () => {
         window.location.href = googleAuthUrl.toString();
         
       } else if (sourceId === 'slack') {
-        const clientId = getEnvVar('VITE_SLACK_CLIENT_ID');
-        if (!clientId) {
-          console.error('Slack Client ID not configured');
-          return;
-        }
-        
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
           userId: user?.id,
@@ -413,7 +441,7 @@ const ConnectSources = () => {
         }));
         
         const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
-        slackAuthUrl.searchParams.set('client_id', clientId);
+        slackAuthUrl.searchParams.set('client_id', credentials.client_id);
         slackAuthUrl.searchParams.set('redirect_uri', redirectUri);
         // Request bot scopes for accessing workspace data
         slackAuthUrl.searchParams.set('scope', 'channels:history,channels:read,files:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,users:read,users:read.email,team:read,usergroups:read');
@@ -424,12 +452,6 @@ const ConnectSources = () => {
         window.location.href = slackAuthUrl.toString();
         
       } else if (sourceId === 'notion') {
-        const clientId = getEnvVar('VITE_NOTION_CLIENT_ID');
-        if (!clientId) {
-          console.error('Notion Client ID not configured');
-          return;
-        }
-        
         // Create state parameter with userId
         const state = btoa(JSON.stringify({
           userId: user?.id,
@@ -438,7 +460,7 @@ const ConnectSources = () => {
         }));
         
         const notionAuthUrl = new URL('https://api.notion.com/v1/oauth/authorize');
-        notionAuthUrl.searchParams.set('client_id', clientId);
+        notionAuthUrl.searchParams.set('client_id', credentials.client_id);
         notionAuthUrl.searchParams.set('redirect_uri', redirectUri);
         notionAuthUrl.searchParams.set('response_type', 'code');
         notionAuthUrl.searchParams.set('owner', 'user');
@@ -448,8 +470,17 @@ const ConnectSources = () => {
         window.location.href = notionAuthUrl.toString();
       }
     } catch (error) {
-      console.error('OAuth connection error:', error);
+      console.error('OAuth initiation error:', error);
       setConnectingSource(null);
+    }
+  };
+
+  const handleCredentialsSaved = () => {
+    // Credentials saved successfully, now initiate OAuth flow
+    console.log('OAuth credentials saved, initiating OAuth flow');
+    if (currentProvider) {
+      const sourceId = currentProvider === 'google' ? 'googleDrive' : currentProvider;
+      handleConnect(sourceId);
     }
   };
 
@@ -684,6 +715,24 @@ const ConnectSources = () => {
         source={selectedSource}
         onConnect={() => handleConnect(selectedSource?.id)}
       />
+
+      {/* OAuth Credentials Dialog */}
+      {currentProvider && (
+        <OAuthCredentialsDialog
+          isOpen={credentialsDialogOpen}
+          onClose={() => {
+            setCredentialsDialogOpen(false);
+            setCurrentProvider(null);
+          }}
+          onSuccess={handleCredentialsSaved}
+          provider={currentProvider}
+          providerName={
+            currentProvider === 'google' ? 'Google Drive' :
+            currentProvider === 'slack' ? 'Slack' :
+            'Notion'
+          }
+        />
+      )}
     </div>
   );
 };

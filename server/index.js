@@ -238,6 +238,169 @@ app.get('/api/connections/get', async (req, res) => {
   }
 });
 
+// SAVE OAUTH CREDENTIALS
+app.post('/api/oauth-credentials/save', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { provider, client_id, client_secret, redirect_uri } = req.body;
+
+    // Validate inputs
+    if (!provider || !client_id || !client_secret || !redirect_uri) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Validate provider
+    const validProviders = ['google', 'slack', 'notion'];
+    if (!validProviders.includes(provider)) {
+      return res.status(400).json({ error: 'Invalid provider' });
+    }
+
+    // Map provider to source_type
+    const sourceType = provider === 'google' ? 'google_drive' : provider;
+
+    // Validate redirect URI format
+    try {
+      new URL(redirect_uri);
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid redirect URI format' });
+    }
+
+    // Encrypt client_secret using Supabase function
+    const { data: encryptedData, error: encryptError } = await supabaseAdmin
+      .rpc('encrypt_client_secret', {
+        secret: client_secret,
+        user_id: user.id
+      });
+
+    if (encryptError) {
+      console.error('Encryption error:', encryptError);
+      return res.status(500).json({ error: 'Failed to encrypt credentials' });
+    }
+
+    // Upsert credentials into user_connections
+    // Use a special record to store credentials separately from actual connections
+    const { error: upsertError } = await supabaseAdmin
+      .from('user_connections')
+      .upsert({
+        user_id: user.id,
+        source_type: sourceType,
+        source_user_id: 'credentials_only', // Placeholder
+        access_token: '', // Empty for credentials-only record
+        client_id: client_id,
+        client_secret_encrypted: encryptedData,
+        redirect_uri: redirect_uri,
+        credentials_configured_at: new Date().toISOString(),
+        is_active: false, // Not a real connection yet
+        metadata: { credentials_only: true }
+      }, {
+        onConflict: 'user_id,source_type',
+        ignoreDuplicates: false
+      });
+
+    if (upsertError) {
+      console.error('Database error:', upsertError);
+      return res.status(500).json({ error: 'Failed to save credentials' });
+    }
+
+    console.log(`✓ OAuth credentials saved for user ${user.id}, provider ${provider}`);
+    
+    return res.json({ 
+      success: true, 
+      message: 'OAuth credentials saved successfully' 
+    });
+
+  } catch (error) {
+    console.error('Save OAuth credentials error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET OAUTH CREDENTIALS
+app.get('/api/oauth-credentials/get', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { provider } = req.query;
+
+    // Validate provider
+    const validProviders = ['google', 'slack', 'notion'];
+    if (!provider || !validProviders.includes(provider)) {
+      return res.status(400).json({ error: 'Invalid or missing provider' });
+    }
+
+    // Map provider to source_type
+    const sourceType = provider === 'google' ? 'google_drive' : provider;
+
+    // Fetch credentials from user_connections
+    const { data: connection, error: fetchError } = await supabaseAdmin
+      .from('user_connections')
+      .select('client_id, client_secret_encrypted, redirect_uri, credentials_configured_at')
+      .eq('user_id', user.id)
+      .eq('source_type', sourceType)
+      .single();
+
+    if (fetchError || !connection) {
+      return res.status(404).json({ 
+        error: 'No credentials found',
+        hasCredentials: false 
+      });
+    }
+
+    // Check if credentials are configured
+    if (!connection.client_id || !connection.client_secret_encrypted) {
+      return res.status(404).json({ 
+        error: 'No credentials found',
+        hasCredentials: false 
+      });
+    }
+
+    // Decrypt client_secret using Supabase function
+    const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
+      .rpc('decrypt_client_secret', {
+        encrypted: connection.client_secret_encrypted,
+        user_id: user.id
+      });
+
+    if (decryptError) {
+      console.error('Decryption error:', decryptError);
+      return res.status(500).json({ error: 'Failed to decrypt credentials' });
+    }
+
+    return res.json({
+      hasCredentials: true,
+      client_id: connection.client_id,
+      client_secret: decryptedSecret,
+      redirect_uri: connection.redirect_uri,
+      configured_at: connection.credentials_configured_at
+    });
+
+  } catch (error) {
+    console.error('Get OAuth credentials error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GOOGLE OAUTH CALLBACK - COMPLETE IMPLEMENTATION
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
@@ -252,14 +415,39 @@ app.get('/api/auth/google/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=expired`);
     }
 
+    // Fetch user's OAuth credentials from database
+    const { data: credentials, error: credError } = await supabaseAdmin
+      .from('user_connections')
+      .select('client_id, client_secret_encrypted, redirect_uri')
+      .eq('user_id', stateData.userId)
+      .eq('source_type', 'google_drive')
+      .single();
+
+    if (credError || !credentials || !credentials.client_id) {
+      console.error('No OAuth credentials found for user');
+      return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
+    }
+
+    // Decrypt client_secret
+    const { data: clientSecret, error: decryptError } = await supabaseAdmin
+      .rpc('decrypt_client_secret', {
+        encrypted: credentials.client_secret_encrypted,
+        user_id: stateData.userId
+      });
+
+    if (decryptError || !clientSecret) {
+      console.error('Failed to decrypt credentials:', decryptError);
+      return res.redirect(`${APP_URL}/connect-sources?error=decrypt_failed`);
+    }
+
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI || `${API_BASE_URL}/api/auth/google/callback`,
+        client_id: credentials.client_id,
+        client_secret: clientSecret,
+        redirect_uri: credentials.redirect_uri || `${API_BASE_URL}/api/auth/googleDrive/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -342,19 +530,44 @@ app.get('/api/auth/slack/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=expired`);
     }
 
+    // Fetch user's OAuth credentials from database
+    const { data: credentials, error: credError } = await supabaseAdmin
+      .from('user_connections')
+      .select('client_id, client_secret_encrypted, redirect_uri')
+      .eq('user_id', stateData.userId)
+      .eq('source_type', 'slack')
+      .single();
+
+    if (credError || !credentials || !credentials.client_id) {
+      console.error('No OAuth credentials found for user');
+      return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
+    }
+
+    // Decrypt client_secret
+    const { data: clientSecret, error: decryptError } = await supabaseAdmin
+      .rpc('decrypt_client_secret', {
+        encrypted: credentials.client_secret_encrypted,
+        user_id: stateData.userId
+      });
+
+    if (decryptError || !clientSecret) {
+      console.error('Failed to decrypt credentials:', decryptError);
+      return res.redirect(`${APP_URL}/connect-sources?error=decrypt_failed`);
+    }
+
     console.log('🔄 Attempting Slack token exchange...');
     console.log('   Code:', code.substring(0, 20) + '...');
-    console.log('   Client ID:', process.env.SLACK_CLIENT_ID);
-    console.log('   Redirect URI:', `${API_BASE_URL}/api/auth/slack/callback`);
+    console.log('   Client ID:', credentials.client_id);
+    console.log('   Redirect URI:', credentials.redirect_uri);
     
     const tokenResponse = await fetch('https://slack.com/api/oauth.v2.access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: process.env.SLACK_CLIENT_ID,
-        client_secret: process.env.SLACK_CLIENT_SECRET,
-        redirect_uri: `${API_BASE_URL}/api/auth/slack/callback`,
+        client_id: credentials.client_id,
+        client_secret: clientSecret,
+        redirect_uri: credentials.redirect_uri || `${API_BASE_URL}/api/auth/slack/callback`,
       }),
     });
 
@@ -430,8 +643,33 @@ app.get('/api/auth/notion/callback', async (req, res) => {
       return res.redirect(`${APP_URL}/connect-sources?error=expired`);
     }
 
+    // Fetch user's OAuth credentials from database
+    const { data: credentials, error: credError } = await supabaseAdmin
+      .from('user_connections')
+      .select('client_id, client_secret_encrypted, redirect_uri')
+      .eq('user_id', stateData.userId)
+      .eq('source_type', 'notion')
+      .single();
+
+    if (credError || !credentials || !credentials.client_id) {
+      console.error('No OAuth credentials found for user');
+      return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
+    }
+
+    // Decrypt client_secret
+    const { data: clientSecret, error: decryptError } = await supabaseAdmin
+      .rpc('decrypt_client_secret', {
+        encrypted: credentials.client_secret_encrypted,
+        user_id: stateData.userId
+      });
+
+    if (decryptError || !clientSecret) {
+      console.error('Failed to decrypt credentials:', decryptError);
+      return res.redirect(`${APP_URL}/connect-sources?error=decrypt_failed`);
+    }
+
     // Notion uses Basic Auth with base64 encoded client_id:client_secret
-    const auth = Buffer.from(`${process.env.NOTION_CLIENT_ID}:${process.env.NOTION_CLIENT_SECRET}`).toString('base64');
+    const auth = Buffer.from(`${credentials.client_id}:${clientSecret}`).toString('base64');
 
     const tokenResponse = await fetch('https://api.notion.com/v1/oauth/token', {
       method: 'POST',
@@ -442,7 +680,7 @@ app.get('/api/auth/notion/callback', async (req, res) => {
       body: JSON.stringify({
         code,
         grant_type: 'authorization_code',
-        redirect_uri: `${API_BASE_URL}/api/auth/notion/callback`,
+        redirect_uri: credentials.redirect_uri || `${API_BASE_URL}/api/auth/notion/callback`,
       }),
     });
 
