@@ -93,6 +93,49 @@ app.get('/api/debug/env', (req, res) => {
   });
 });
 
+// Debug endpoint to test database save
+app.get('/api/debug/db-test', async (req, res) => {
+  try {
+    console.log('🧪 Testing database save...');
+    
+    const testConnection = {
+      user_id: 'b7a5b22c-34f5-446a-8627-112f70ba11b2',
+      source_type: 'test',
+      source_user_id: 'test-user',
+      access_token: 'test-token',
+      is_active: true
+    };
+    
+    const { data, error } = await supabaseAdmin
+      .from('user_connections')
+      .insert(testConnection)
+      .select();
+    
+    if (error) {
+      console.error('❌ Database save failed:', error);
+      return res.json({ 
+        status: 'failed', 
+        error: error.message,
+        details: error
+      });
+    }
+    
+    console.log('✅ Database save successful:', data);
+    res.json({ 
+      status: 'success', 
+      data: data,
+      message: 'Database save test passed'
+    });
+    
+  } catch (error) {
+    console.error('❌ Database test error:', error);
+    res.json({ 
+      status: 'error', 
+      error: error.message 
+    });
+  }
+});
+
 // Test endpoint to check Slack file access
 app.get('/api/test/slack-file-access', async (req, res) => {
   try {
