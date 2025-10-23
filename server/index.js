@@ -1540,10 +1540,6 @@ app.post('/api/debug/reset-dismissed-duplicates', async (req, res) => {
   }
 });
 
-// Catch-all handler: send back React's index.html file for client-side routing
-app.get('/*', (req, res) => {
-  res.sendFile(join(__dirname, '..', 'dist', 'index.html'));
-});
 
 // Load SSL certificates for HTTPS
 const certPath = join(__dirname, '..', 'localhost.pem');
