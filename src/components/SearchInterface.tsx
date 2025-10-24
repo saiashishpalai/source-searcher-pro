@@ -828,6 +828,57 @@ const SearchInterface = () => {
     }
   };
 
+  // Separate function for refreshing results without creating new search history
+  const handleRefreshResults = async () => {
+    if (searchResults?.query) {
+      try {
+        setIsSearchLoading(true);
+        setSearchError(null);
+        
+        const apiUrl = import.meta.env.DEV ? '' : ((import.meta.env as any).VITE_API_URL || 'https://source-searcher-pro.onrender.com');
+        const response = await fetch(`${apiUrl}/api/search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            query: searchResults.query,
+            filters: {
+              applications: filters.applications,
+              authors: filters.authors,
+              documentTypes: filters.documentTypes,
+              timeRange: filters.timeRange,
+              dateRange: filters.dateRange
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`Search failed: ${response.statusText}`);
+        }
+
+        const results = await response.json();
+        setSearchResults(results);
+        
+        // Update the first item in conversation thread without creating new history
+        if (conversationThread.length > 0) {
+          setConversationThread(prev => [
+            results,
+            ...prev.slice(1)
+          ]);
+        }
+        
+      } catch (error) {
+        console.error('Refresh results error:', error);
+        setSearchError('Failed to refresh results. Please try again.');
+      } finally {
+        setIsSearchLoading(false);
+      }
+    }
+  };
+
   const handleRegenerateSummary = async (qaIndex: number) => {
     // Check if we've already regenerated (max 1 regeneration)
     const versions = summaryVersions[qaIndex] || [];
@@ -1816,7 +1867,7 @@ const SearchInterface = () => {
                       data={qa}
                       isLoading={false}
                       onResultClick={handleSearchResultClick}
-                      onRetry={!selectedThread && index === 0 ? handleSearchRetry : undefined}
+                      onRetry={!selectedThread && index === 0 ? handleRefreshResults : undefined}
                       hasMore={false}
                       summaryVersions={summaryVersions[index]}
                       onRegenerateSummary={() => handleRegenerateSummary(index)}
@@ -1940,7 +1991,7 @@ const SearchInterface = () => {
                   data={qa}
                   isLoading={false}
                   onResultClick={handleSearchResultClick}
-                  onRetry={handleSearchRetry}
+                  onRetry={handleRefreshResults}
                   hasMore={false}
                   summaryVersions={summaryVersions[index]}
                   isClosedThread={true}
