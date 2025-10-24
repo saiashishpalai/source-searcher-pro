@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
+import DevEmailTester from '@/components/DevEmailTester';
+import { debugRedirectUrl } from '@/utils/debug-redirect';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -26,6 +28,12 @@ const Signup = () => {
       console.log('💬 Message state updated:', message);
     }
   }, [message]);
+
+  // Debug: Log redirect URL configuration
+  useEffect(() => {
+    console.log('🔍 Signup page loaded - checking redirect URL config:');
+    debugRedirectUrl();
+  }, []);
   
   const { signup } = useAuth();
 
@@ -321,6 +329,9 @@ const Signup = () => {
           <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.8s' }}>
             By signing up, you agree to our Terms of Service and Privacy Policy.
           </p>
+
+          {/* Development Email Tester */}
+          <DevEmailTester />
         </div>
       </div>
 
