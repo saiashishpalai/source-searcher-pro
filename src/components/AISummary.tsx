@@ -6,14 +6,54 @@ import { Badge } from '@/components/ui/badge';
 
 // Parse AI summary into structured components
 const parseAISummary = (summary: string) => {
+  console.log('Original summary:', summary);
+  
   // Handle the actual format: <b>Answer:</b> content <b>Found in:</b> content <b>Key details:</b> content
   const answerMatch = summary.match(/<b>Answer:<\/b>\s*([^<]+)/);
   const foundInMatch = summary.match(/<b>Found in:<\/b>\s*([^<]+)/);
   const keyDetailsMatch = summary.match(/<b>Key details:<\/b>\s*(.+)/);
   
+  console.log('Matches:', { answerMatch, foundInMatch, keyDetailsMatch });
+  
   if (!answerMatch || !foundInMatch || !keyDetailsMatch) {
-    // Fallback for non-structured summaries
-    return <div dangerouslySetInnerHTML={{ __html: summary.replace(/\n/g, '<br/>') }} />;
+    // Fallback for non-structured summaries - still make it look better
+    console.log('Using fallback rendering');
+    const lines = summary.split(/(<b>.*?<\/b>)/g).filter(Boolean);
+    
+    return (
+      <div className="space-y-4">
+        {lines.map((line, index) => {
+          if (line.includes('<b>')) {
+            return (
+              <h3 key={index} className="text-primary font-semibold text-lg mt-4 first:mt-0">
+                {line.replace(/<\/?b>/g, '')}
+              </h3>
+            );
+          }
+          
+          // Handle bullet points
+          if (line.trim().startsWith('-')) {
+            const items = line.split(/\s*-\s+/).filter(Boolean);
+            return (
+              <ul key={index} className="space-y-2 ml-4">
+                {items.map((item, i) => (
+                  <li key={i} className="flex items-start">
+                    <span className="text-primary mr-2">•</span>
+                    <span className="text-foreground/90">{item.trim()}</span>
+                  </li>
+                ))}
+              </ul>
+            );
+          }
+          
+          return (
+            <p key={index} className="text-foreground/90 leading-relaxed">
+              {line.trim()}
+            </p>
+          );
+        })}
+      </div>
+    );
   }
 
   const answer = answerMatch[1].trim();
@@ -21,7 +61,7 @@ const parseAISummary = (summary: string) => {
   const keyDetails = keyDetailsMatch[1].trim();
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Answer Section */}
       <div className="space-y-2">
         <h3 className="text-primary font-semibold text-lg">Answer:</h3>
@@ -37,10 +77,10 @@ const parseAISummary = (summary: string) => {
       {/* Key Details Section */}
       <div className="space-y-2">
         <h3 className="text-primary font-semibold text-lg">Key details:</h3>
-        <ul className="space-y-1">
+        <ul className="space-y-2 ml-2">
           {keyDetails.split('- ').filter(item => item.trim()).map((item, index) => (
             <li key={index} className="flex items-start">
-              <span className="text-primary mr-2 mt-1">•</span>
+              <span className="text-primary mr-2 flex-shrink-0">•</span>
               <span className="text-foreground/90 leading-relaxed">{item.trim()}</span>
             </li>
           ))}
