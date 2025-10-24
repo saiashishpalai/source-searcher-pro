@@ -6,34 +6,39 @@ import { Badge } from '@/components/ui/badge';
 
 // Parse AI summary into structured components
 const parseAISummary = (summary: string) => {
-  const parts = summary.split(/<b>(Answer|Found in|Key details):<\/b>/);
+  // Handle the actual format: <b>Answer:</b> content <b>Found in:</b> content <b>Key details:</b> content
+  const answerMatch = summary.match(/<b>Answer:<\/b>\s*([^<]+)/);
+  const foundInMatch = summary.match(/<b>Found in:<\/b>\s*([^<]+)/);
+  const keyDetailsMatch = summary.match(/<b>Key details:<\/b>\s*(.+)/);
   
-  if (parts.length < 4) {
+  if (!answerMatch || !foundInMatch || !keyDetailsMatch) {
     // Fallback for non-structured summaries
     return <div dangerouslySetInnerHTML={{ __html: summary.replace(/\n/g, '<br/>') }} />;
   }
 
-  const [, answerLabel, answer, foundInLabel, foundIn, keyDetailsLabel, keyDetails] = parts;
+  const answer = answerMatch[1].trim();
+  const foundIn = foundInMatch[1].trim();
+  const keyDetails = keyDetailsMatch[1].trim();
   
   return (
     <div className="space-y-4">
       {/* Answer Section */}
       <div className="space-y-2">
         <h3 className="text-primary font-semibold text-lg">Answer:</h3>
-        <p className="text-foreground/90 leading-relaxed">{answer?.trim()}</p>
+        <p className="text-foreground/90 leading-relaxed">{answer}</p>
       </div>
 
       {/* Found in Section */}
       <div className="space-y-2">
         <h3 className="text-primary font-semibold text-lg">Found in:</h3>
-        <p className="text-foreground/90 leading-relaxed">{foundIn?.trim()}</p>
+        <p className="text-foreground/90 leading-relaxed">{foundIn}</p>
       </div>
 
       {/* Key Details Section */}
       <div className="space-y-2">
         <h3 className="text-primary font-semibold text-lg">Key details:</h3>
         <ul className="space-y-1">
-          {keyDetails?.trim().split('- ').filter(item => item.trim()).map((item, index) => (
+          {keyDetails.split('- ').filter(item => item.trim()).map((item, index) => (
             <li key={index} className="flex items-start">
               <span className="text-primary mr-2 mt-1">•</span>
               <span className="text-foreground/90 leading-relaxed">{item.trim()}</span>
