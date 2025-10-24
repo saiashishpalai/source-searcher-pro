@@ -6,30 +6,35 @@ import { Badge } from '@/components/ui/badge';
 
 // Parse AI summary into structured components
 const parseAISummary = (summary: string) => {
-  console.log('=== PARSING SUMMARY v2.0 - NEW CODE ===');
+  console.log('=== PARSING SUMMARY v3.0 - BULLETPROOF ===');
   console.log('Raw summary:', summary);
   
-  // Split the summary into sections based on <b> tags
-  // Format: <b>Answer:</b> text <b>Found in:</b> text <b>Key details:</b> - item - item
+  // FORCE PARSE - Split by <b> tags and handle manually
+  const parts = summary.split(/(<b>.*?<\/b>)/g);
+  console.log('Split parts:', parts);
+  
   const sections: { label: string; content: string }[] = [];
   
-  // Match each section: <b>Label:</b> content (until next <b> or end)
-  const pattern = /<b>(.*?):<\/b>\s*(.*?)(?=<b>|$)/g;
-  let match;
-  
-  while ((match = pattern.exec(summary)) !== null) {
-    sections.push({
-      label: match[1].trim(),
-      content: match[2].trim()
-    });
+  for (let i = 0; i < parts.length; i += 2) {
+    if (parts[i] && parts[i].includes('<b>')) {
+      const label = parts[i].replace(/<\/?b>/g, '').replace(':', '').trim();
+      const content = parts[i + 1] ? parts[i + 1].trim() : '';
+      
+      if (label && content) {
+        sections.push({ label, content });
+        console.log(`Found section: ${label} = ${content.substring(0, 50)}...`);
+      }
+    }
   }
   
-  console.log('Parsed sections:', sections);
+  console.log('Final sections:', sections);
   
   if (sections.length === 0) {
-    // Fallback: no structured content found
+    console.log('NO SECTIONS FOUND - Using fallback');
     return <p className="text-foreground/90 leading-relaxed">{summary}</p>;
   }
+  
+  console.log('RENDERING STRUCTURED OUTPUT');
   
   return (
     <div className="flex flex-col gap-6">
