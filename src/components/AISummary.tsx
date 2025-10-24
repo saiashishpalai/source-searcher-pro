@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 
 // Parse AI summary into structured components
 const parseAISummary = (summary: string) => {
-  console.log('=== PARSING SUMMARY ===');
+  console.log('=== PARSING SUMMARY v2.0 - NEW CODE ===');
   console.log('Raw summary:', summary);
   
   // Split the summary into sections based on <b> tags
