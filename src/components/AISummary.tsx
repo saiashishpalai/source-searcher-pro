@@ -4,6 +4,47 @@ import { Sparkles, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+// Parse AI summary into structured components
+const parseAISummary = (summary: string) => {
+  const parts = summary.split(/<b>(Answer|Found in|Key details):<\/b>/);
+  
+  if (parts.length < 4) {
+    // Fallback for non-structured summaries
+    return <div dangerouslySetInnerHTML={{ __html: summary.replace(/\n/g, '<br/>') }} />;
+  }
+
+  const [, answerLabel, answer, foundInLabel, foundIn, keyDetailsLabel, keyDetails] = parts;
+  
+  return (
+    <div className="space-y-4">
+      {/* Answer Section */}
+      <div className="space-y-2">
+        <h3 className="text-primary font-semibold text-lg">Answer:</h3>
+        <p className="text-foreground/90 leading-relaxed">{answer?.trim()}</p>
+      </div>
+
+      {/* Found in Section */}
+      <div className="space-y-2">
+        <h3 className="text-primary font-semibold text-lg">Found in:</h3>
+        <p className="text-foreground/90 leading-relaxed">{foundIn?.trim()}</p>
+      </div>
+
+      {/* Key Details Section */}
+      <div className="space-y-2">
+        <h3 className="text-primary font-semibold text-lg">Key details:</h3>
+        <ul className="space-y-1">
+          {keyDetails?.trim().split('- ').filter(item => item.trim()).map((item, index) => (
+            <li key={index} className="flex items-start">
+              <span className="text-primary mr-2 mt-1">•</span>
+              <span className="text-foreground/90 leading-relaxed">{item.trim()}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+};
+
 interface AISummaryProps {
   summary: string;
   query: string;
@@ -116,10 +157,9 @@ const AISummary: React.FC<AISummaryProps> = ({
           )}
           
           <div className="prose prose-invert max-w-none">
-            <div 
-              className="text-foreground/90 leading-relaxed text-base"
-              dangerouslySetInnerHTML={{ __html: currentSummary }}
-            />
+            <div className="text-foreground/90 leading-relaxed text-base space-y-4">
+              {parseAISummary(currentSummary)}
+            </div>
           </div>
           
           {/* Interactive elements */}
