@@ -596,7 +596,8 @@ const SearchInterface = () => {
       };
       
       // Call real search API
-      const response = await fetch('/api/search', {
+      const apiUrl = import.meta.env.DEV ? '' : ((import.meta.env as any).VITE_API_URL || 'https://source-searcher-pro.onrender.com');
+      const response = await fetch(`${apiUrl}/api/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -839,7 +840,8 @@ const SearchInterface = () => {
 
     try {
       const qa = conversationThread[qaIndex];
-      const response = await fetch('/api/regenerate-summary', {
+      const apiUrl = import.meta.env.DEV ? '' : ((import.meta.env as any).VITE_API_URL || 'https://source-searcher-pro.onrender.com');
+      const response = await fetch(`${apiUrl}/api/regenerate-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -907,7 +909,8 @@ const SearchInterface = () => {
         try {
           console.log('🔍 Follow-up search within', currentSearchDocumentIds.length, 'documents');
           
-          const response = await fetch('/api/search/followup', {
+          const apiUrl = import.meta.env.DEV ? '' : ((import.meta.env as any).VITE_API_URL || 'https://source-searcher-pro.onrender.com');
+          const response = await fetch(`${apiUrl}/api/search/followup`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
