@@ -126,17 +126,18 @@ const AISummary: React.FC<AISummaryProps> = ({
           )}
           
           <div className="prose prose-invert max-w-none">
-            <ReactMarkdown 
-              className="text-foreground/90 leading-relaxed text-base"
-              components={{
-                strong: ({node, ...props}) => <span className="text-primary font-semibold" {...props} />,
-                ul: ({node, ...props}) => <ul className="list-disc ml-4 space-y-2" {...props} />,
-                li: ({node, ...props}) => <li className="text-foreground/90" {...props} />,
-                p: ({node, ...props}) => <p className="text-foreground/90 leading-relaxed mb-3" {...props} />
-              }}
-            >
-              {convertToMarkdown(currentSummary)}
-            </ReactMarkdown>
+            <div className="text-foreground/90 leading-relaxed text-base">
+              <ReactMarkdown 
+                components={{
+                  strong: ({node, ...props}) => <span className="text-primary font-semibold" {...props} />,
+                  ul: ({node, ...props}) => <ul className="list-disc ml-4 space-y-2" {...props} />,
+                  li: ({node, ...props}) => <li className="text-foreground/90" {...props} />,
+                  p: ({node, ...props}) => <p className="text-foreground/90 leading-relaxed mb-3" {...props} />
+                }}
+              >
+                {convertToMarkdown(currentSummary)}
+              </ReactMarkdown>
+            </div>
           </div>
           
           {/* Interactive elements */}
