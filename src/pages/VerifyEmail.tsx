@@ -1,20 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, Mail, ArrowLeft, RefreshCw } from 'lucide-react';
+import { CheckCircle, Mail, ArrowLeft, RefreshCw, Sparkles, LogIn } from 'lucide-react';
 
 const VerifyEmail = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [email, setEmail] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   const { resendVerificationEmail } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Get email from URL params
@@ -40,15 +42,22 @@ const VerifyEmail = () => {
       // No need to call a separate function
       setMessage({ type: 'success', text: 'Email verified successfully!' });
       setIsVerified(true);
-      // Redirect to connected sources after successful verification
-      setTimeout(() => {
-        window.location.href = '/connected-sources';
-      }, 2000);
+      
+      // Show success modal instead of immediate redirect
+      setShowSuccessModal(true);
     } catch (error) {
       setMessage({ type: 'error', text: 'Email verification failed. Please try again.' });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSignIn = () => {
+    navigate('/login');
+  };
+
+  const handleContinueToApp = () => {
+    navigate('/connected-sources');
   };
 
   const resendVerification = async () => {
@@ -66,67 +75,131 @@ const VerifyEmail = () => {
     }
   };
 
-  if (isVerified) {
+  // Success Modal Component
+  const SuccessModal = () => {
+    if (!showSuccessModal) return null;
+
     return (
-      <div className="flex h-screen bg-black">
-        {/* Left side - Content */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
-          {/* Radial gradient overlay from center */}
-          <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
-          
-          {/* Soft purple glow accents */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
-            <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-fuchsia-600/15 rounded-full blur-[128px]" />
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 max-w-md w-full mx-4 animate-fade-in-up">
+          {/* Success Icon */}
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-10 h-10 text-green-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              🎉 Email Verified!
+            </h2>
+            <p className="text-gray-300 text-sm">
+              Your account has been successfully verified. You can now sign in to start using Haven7.
+            </p>
           </div>
 
-          <div className="w-full max-w-md relative z-20">
-            {/* Back to Haven7 */}
-            <div className="mb-8 animate-fade-in">
-              <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
-                <ArrowLeft className="w-4 h-4" />
-                Back to Haven7
-              </Link>
-            </div>
-
-            {/* Success Content */}
-            <div className="text-center animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-10 h-10 text-green-400" />
-              </div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                Email Verified!
-              </h1>
-              <p className="text-gray-400 text-base mb-8">
-                Your account has been successfully verified. Redirecting you to connect your sources...
-              </p>
-              
-              <Link to="/connected-sources">
-                <Button className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50">
-                  <span className="inline-flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Continue to Haven7 →
-                  </span>
-                </Button>
-              </Link>
-            </div>
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <Button
+              onClick={handleSignIn}
+              className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
+            >
+              <span className="inline-flex items-center gap-2">
+                <LogIn className="w-4 h-4" />
+                Sign In to Continue
+              </span>
+            </Button>
+            
+            <Button
+              onClick={handleContinueToApp}
+              variant="outline"
+              className="w-full border-white/20 text-white hover:bg-white/10 rounded-xl py-3.5 font-medium transition-all duration-200"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                Continue to App
+              </span>
+            </Button>
           </div>
-        </div>
 
-        {/* Right side - Visual */}
-        <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
-          {/* Background image - auth-bg-4 */}
-          <img 
-            src="/src/assets/auth-bg-4.jpg" 
-            alt="Abstract purple gradient background" 
-            className="absolute inset-0 w-full h-full object-cover scale-105"
-          />
-          {/* Wide soft gradient blend from left */}
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
-          {/* Subtle vignette for depth */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
+          {/* Close button */}
+          <button
+            onClick={() => setShowSuccessModal(false)}
+            className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       </div>
+    );
+  };
+
+  if (isVerified) {
+    return (
+      <>
+        <div className="flex h-screen bg-black">
+          {/* Left side - Content */}
+          <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
+            {/* Radial gradient overlay from center */}
+            <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
+            
+            {/* Soft purple glow accents */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
+              <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-fuchsia-600/15 rounded-full blur-[128px]" />
+            </div>
+
+            <div className="w-full max-w-md relative z-20">
+              {/* Back to Haven7 */}
+              <div className="mb-8 animate-fade-in">
+                <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Haven7
+                </Link>
+              </div>
+
+              {/* Success Content */}
+              <div className="text-center animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle className="w-10 h-10 text-green-400" />
+                </div>
+                <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                  Email Verified!
+                </h1>
+                <p className="text-gray-400 text-base mb-8">
+                  Your account has been successfully verified. You can now sign in to start using Haven7.
+                </p>
+                
+                <Button
+                  onClick={() => setShowSuccessModal(true)}
+                  className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <LogIn className="w-4 h-4" />
+                    Sign In to Continue →
+                  </span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right side - Visual */}
+          <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+            {/* Background image - auth-bg-4 */}
+            <img 
+              src="/src/assets/auth-bg-4.jpg" 
+              alt="Abstract purple gradient background" 
+              className="absolute inset-0 w-full h-full object-cover scale-105"
+            />
+            {/* Wide soft gradient blend from left */}
+            <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
+            {/* Subtle vignette for depth */}
+            <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
+          </div>
+        </div>
+
+        {/* Success Modal */}
+        <SuccessModal />
+      </>
     );
   }
 
