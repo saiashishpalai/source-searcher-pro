@@ -40,9 +40,9 @@ const VerifyEmail = () => {
       // No need to call a separate function
       setMessage({ type: 'success', text: 'Email verified successfully!' });
       setIsVerified(true);
-      // Redirect to connect sources after successful verification
+      // Redirect to connected sources after successful verification
       setTimeout(() => {
-        window.location.href = '/connect-sources';
+        window.location.href = '/connected-sources';
       }, 2000);
     } catch (error) {
       setMessage({ type: 'error', text: 'Email verification failed. Please try again.' });
@@ -101,7 +101,7 @@ const VerifyEmail = () => {
                 Your account has been successfully verified. Redirecting you to connect your sources...
               </p>
               
-              <Link to="/connect-sources">
+              <Link to="/connected-sources">
                 <Button className="w-full bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white rounded-xl py-3.5 font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50">
                   <span className="inline-flex items-center gap-2">
                     <CheckCircle className="w-4 h-4" />
