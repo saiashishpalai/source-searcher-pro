@@ -8,8 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
-import DevEmailTester from '@/components/DevEmailTester';
-import { debugRedirectUrl } from '@/utils/debug-redirect';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -22,18 +20,7 @@ const Signup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; isExistingUser?: boolean } | null>(null);
 
-  // Debug: Log whenever message changes
-  useEffect(() => {
-    if (message) {
-      console.log('💬 Message state updated:', message);
-    }
-  }, [message]);
 
-  // Debug: Log redirect URL configuration
-  useEffect(() => {
-    console.log('🔍 Signup page loaded - checking redirect URL config:');
-    debugRedirectUrl();
-  }, []);
   
   const { signup } = useAuth();
 
@@ -56,20 +43,15 @@ const Signup = () => {
     }
 
     try {
-      console.log('📝 Signup page: Calling signup function...');
       const result = await signup(formData.email, formData.password);
-      console.log('📝 Signup page: Result received:', result);
       
       if (result.success) {
-        console.log('✅ Signup page: Success - redirecting to verify-email');
         setMessage({ type: 'success', text: result.message });
         // Redirect to email verification page or show success message
         setTimeout(() => {
           window.location.href = '/verify-email';
         }, 2000);
       } else {
-        console.log('❌ Signup page: Error -', result.message);
-        console.log('❌ Is existing user?', (result as any).isExistingUser);
         setMessage({ 
           type: 'error', 
           text: result.message,
@@ -77,11 +59,9 @@ const Signup = () => {
         });
       }
     } catch (error) {
-      console.error('❌ Signup page: Exception:', error);
       setMessage({ type: 'error', text: 'An unexpected error occurred' });
     } finally {
       setIsLoading(false);
-      console.log('🏁 Signup page: Process complete');
     }
   };
 
@@ -330,8 +310,6 @@ const Signup = () => {
             By signing up, you agree to our Terms of Service and Privacy Policy.
           </p>
 
-          {/* Development Email Tester */}
-          <DevEmailTester />
         </div>
       </div>
 
