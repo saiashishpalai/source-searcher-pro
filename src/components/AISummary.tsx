@@ -6,86 +6,68 @@ import { Badge } from '@/components/ui/badge';
 
 // Parse AI summary into structured components
 const parseAISummary = (summary: string) => {
-  console.log('Original summary:', summary);
+  console.log('=== PARSING SUMMARY ===');
+  console.log('Raw summary:', summary);
   
-  // Handle the actual format: <b>Answer:</b> content <b>Found in:</b> content <b>Key details:</b> content
-  const answerMatch = summary.match(/<b>Answer:<\/b>\s*([^<]+)/);
-  const foundInMatch = summary.match(/<b>Found in:<\/b>\s*([^<]+)/);
-  const keyDetailsMatch = summary.match(/<b>Key details:<\/b>\s*(.+)/);
+  // Split the summary into sections based on <b> tags
+  // Format: <b>Answer:</b> text <b>Found in:</b> text <b>Key details:</b> - item - item
+  const sections: { label: string; content: string }[] = [];
   
-  console.log('Matches:', { answerMatch, foundInMatch, keyDetailsMatch });
+  // Match each section: <b>Label:</b> content (until next <b> or end)
+  const pattern = /<b>(.*?):<\/b>\s*(.*?)(?=<b>|$)/g;
+  let match;
   
-  if (!answerMatch || !foundInMatch || !keyDetailsMatch) {
-    // Fallback for non-structured summaries - still make it look better
-    console.log('Using fallback rendering');
-    const lines = summary.split(/(<b>.*?<\/b>)/g).filter(Boolean);
-    
-    return (
-      <div className="space-y-4">
-        {lines.map((line, index) => {
-          if (line.includes('<b>')) {
-            return (
-              <h3 key={index} className="text-primary font-semibold text-lg mt-4 first:mt-0">
-                {line.replace(/<\/?b>/g, '')}
-              </h3>
-            );
-          }
-          
-          // Handle bullet points
-          if (line.trim().startsWith('-')) {
-            const items = line.split(/\s*-\s+/).filter(Boolean);
-            return (
-              <ul key={index} className="space-y-2 ml-4">
-                {items.map((item, i) => (
-                  <li key={i} className="flex items-start">
-                    <span className="text-primary mr-2">•</span>
-                    <span className="text-foreground/90">{item.trim()}</span>
-                  </li>
-                ))}
-              </ul>
-            );
-          }
-          
-          return (
-            <p key={index} className="text-foreground/90 leading-relaxed">
-              {line.trim()}
-            </p>
-          );
-        })}
-      </div>
-    );
+  while ((match = pattern.exec(summary)) !== null) {
+    sections.push({
+      label: match[1].trim(),
+      content: match[2].trim()
+    });
   }
-
-  const answer = answerMatch[1].trim();
-  const foundIn = foundInMatch[1].trim();
-  const keyDetails = keyDetailsMatch[1].trim();
+  
+  console.log('Parsed sections:', sections);
+  
+  if (sections.length === 0) {
+    // Fallback: no structured content found
+    return <p className="text-foreground/90 leading-relaxed">{summary}</p>;
+  }
   
   return (
-    <div className="space-y-5">
-      {/* Answer Section */}
-      <div className="space-y-2">
-        <h3 className="text-primary font-semibold text-lg">Answer:</h3>
-        <p className="text-foreground/90 leading-relaxed">{answer}</p>
-      </div>
-
-      {/* Found in Section */}
-      <div className="space-y-2">
-        <h3 className="text-primary font-semibold text-lg">Found in:</h3>
-        <p className="text-foreground/90 leading-relaxed">{foundIn}</p>
-      </div>
-
-      {/* Key Details Section */}
-      <div className="space-y-2">
-        <h3 className="text-primary font-semibold text-lg">Key details:</h3>
-        <ul className="space-y-2 ml-2">
-          {keyDetails.split('- ').filter(item => item.trim()).map((item, index) => (
-            <li key={index} className="flex items-start">
-              <span className="text-primary mr-2 flex-shrink-0">•</span>
-              <span className="text-foreground/90 leading-relaxed">{item.trim()}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+    <div className="flex flex-col gap-6">
+      {sections.map((section, index) => {
+        const isKeyDetails = section.label.toLowerCase().includes('key detail');
+        
+        return (
+          <div key={index} className="flex flex-col gap-2">
+            {/* Section Header */}
+            <h3 className="text-primary font-semibold text-lg">
+              {section.label}:
+            </h3>
+            
+            {/* Section Content */}
+            {isKeyDetails ? (
+              // Parse bullet points for Key Details section
+              <ul className="flex flex-col gap-2 ml-2">
+                {section.content
+                  .split(/\s*-\s+/)
+                  .filter(item => item.trim())
+                  .map((item, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-primary mt-0.5">•</span>
+                      <span className="text-foreground/90 leading-relaxed flex-1">
+                        {item.trim()}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              // Regular paragraph for other sections
+              <p className="text-foreground/90 leading-relaxed">
+                {section.content}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
