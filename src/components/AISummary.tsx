@@ -3,78 +3,15 @@ import React, { useState } from 'react';
 import { Sparkles, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import ReactMarkdown from 'react-markdown';
 
-// Parse AI summary into structured components
-const parseAISummary = (summary: string) => {
-  console.log('=== PARSING SUMMARY v3.0 - BULLETPROOF ===');
-  console.log('Raw summary:', summary);
-  
-  // FORCE PARSE - Split by <b> tags and handle manually
-  const parts = summary.split(/(<b>.*?<\/b>)/g);
-  console.log('Split parts:', parts);
-  
-  const sections: { label: string; content: string }[] = [];
-  
-  for (let i = 0; i < parts.length; i += 2) {
-    if (parts[i] && parts[i].includes('<b>')) {
-      const label = parts[i].replace(/<\/?b>/g, '').replace(':', '').trim();
-      const content = parts[i + 1] ? parts[i + 1].trim() : '';
-      
-      if (label && content) {
-        sections.push({ label, content });
-        console.log(`Found section: ${label} = ${content.substring(0, 50)}...`);
-      }
-    }
-  }
-  
-  console.log('Final sections:', sections);
-  
-  if (sections.length === 0) {
-    console.log('NO SECTIONS FOUND - Using fallback');
-    return <p className="text-foreground/90 leading-relaxed">{summary}</p>;
-  }
-  
-  console.log('RENDERING STRUCTURED OUTPUT');
-  
-  return (
-    <div className="flex flex-col gap-6">
-      {sections.map((section, index) => {
-        const isKeyDetails = section.label.toLowerCase().includes('key detail');
-        
-        return (
-          <div key={index} className="flex flex-col gap-2">
-            {/* Section Header */}
-            <h3 className="text-primary font-semibold text-lg">
-              {section.label}:
-            </h3>
-            
-            {/* Section Content */}
-            {isKeyDetails ? (
-              // Parse bullet points for Key Details section
-              <ul className="flex flex-col gap-2 ml-2">
-                {section.content
-                  .split(/\s*-\s+/)
-                  .filter(item => item.trim())
-                  .map((item, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-primary mt-0.5">•</span>
-                      <span className="text-foreground/90 leading-relaxed flex-1">
-                        {item.trim()}
-                      </span>
-                    </li>
-                  ))}
-              </ul>
-            ) : (
-              // Regular paragraph for other sections
-              <p className="text-foreground/90 leading-relaxed">
-                {section.content}
-              </p>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+// Convert HTML tags to markdown for proper rendering
+const convertToMarkdown = (summary: string) => {
+  return summary
+    .replace(/<b>(.*?):<\/b>/g, '**$1:**')  // Convert <b>Answer:</b> to **Answer:**
+    .replace(/<b>(.*?)<\/b>/g, '**$1**')    // Convert other <b> tags to **bold**
+    .replace(/\s*-\s*/g, '\n- ')            // Convert - to proper markdown bullets
+    .replace(/\n\s*\n/g, '\n\n');           // Clean up extra newlines
 };
 
 interface AISummaryProps {
@@ -189,9 +126,17 @@ const AISummary: React.FC<AISummaryProps> = ({
           )}
           
           <div className="prose prose-invert max-w-none">
-            <div className="text-foreground/90 leading-relaxed text-base space-y-4">
-              {parseAISummary(currentSummary)}
-            </div>
+            <ReactMarkdown 
+              className="text-foreground/90 leading-relaxed text-base"
+              components={{
+                strong: ({node, ...props}) => <span className="text-primary font-semibold" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc ml-4 space-y-2" {...props} />,
+                li: ({node, ...props}) => <li className="text-foreground/90" {...props} />,
+                p: ({node, ...props}) => <p className="text-foreground/90 leading-relaxed mb-3" {...props} />
+              }}
+            >
+              {convertToMarkdown(currentSummary)}
+            </ReactMarkdown>
           </div>
           
           {/* Interactive elements */}
