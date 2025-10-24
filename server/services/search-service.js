@@ -711,7 +711,7 @@ Answer the question using the format specified. Only use information from the do
         messages: [
           {
             role: 'system',
-            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n**Answer:** [One sentence direct answer]\n\n**Found in:** [Document name(s)]\n\n**Key details:**\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
+            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n<b>Answer:</b> [One sentence direct answer]\n\n<b>Found in:</b> [Document name(s)]\n\n<b>Key details:</b>\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
           },
           {
             role: 'user',
@@ -760,7 +760,7 @@ Answer the question using the format specified. Only use information from the do
         messages: [
           {
             role: 'system',
-            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n**Answer:** [One sentence direct answer]\n\n**Found in:** [Document name(s)]\n\n**Key details:**\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
+            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n<b>Answer:</b> [One sentence direct answer]\n\n<b>Found in:</b> [Document name(s)]\n\n<b>Key details:</b>\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
           },
           {
             role: 'user',

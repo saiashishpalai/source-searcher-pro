@@ -116,9 +116,10 @@ const AISummary: React.FC<AISummaryProps> = ({
           )}
           
           <div className="prose prose-invert max-w-none">
-            <p className="text-foreground/90 leading-relaxed text-base">
-              {currentSummary}
-            </p>
+            <div 
+              className="text-foreground/90 leading-relaxed text-base"
+              dangerouslySetInnerHTML={{ __html: currentSummary }}
+            />
           </div>
           
           {/* Interactive elements */}
