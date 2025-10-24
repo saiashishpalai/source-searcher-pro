@@ -177,16 +177,24 @@ const Login = () => {
 
       {/* Right side - Visual */}
       <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
-        {/* Background image - second abstract purple gradient */}
-        <img 
-          src="/src/assets/auth-bg-2.jpg" 
-          alt="Abstract purple gradient background" 
-          className="absolute inset-0 w-full h-full object-cover scale-105"
-        />
+        {/* CSS Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-fuchsia-900 to-indigo-900" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-transparent to-fuchsia-600/20" />
+        
+        {/* Animated gradient orbs */}
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-fuchsia-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 right-1/3 w-48 h-48 bg-indigo-500/25 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '4s' }} />
+        
         {/* Wide soft gradient blend from left */}
         <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
         {/* Subtle vignette for depth */}
         <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
+        
+        {/* Decorative elements */}
+        <div className="absolute top-20 right-20 w-32 h-32 border border-purple-400/20 rounded-full" />
+        <div className="absolute bottom-32 left-20 w-24 h-24 border border-fuchsia-400/20 rounded-full" />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 border border-indigo-400/30 rounded-full" />
       </div>
     </div>
   );
