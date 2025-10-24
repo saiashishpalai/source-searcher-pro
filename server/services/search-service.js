@@ -699,19 +699,19 @@ export class SearchService {
         .map(chunk => `Source: ${chunk.metadata.title}\nContent: ${chunk.content}`)
         .join('\n\n');
 
-      const prompt = `Based on the following documents, provide a comprehensive summary answering the user's query: "${query}"
+      const prompt = `User's question: "${query}"
 
-Documents:
+Documents found:
 ${context}
 
-Please provide a clear, concise summary that directly addresses the user's question. Include specific details and cite sources when relevant. Keep the summary under 300 words. Provide a fresh perspective with different wording than previous summaries.`;
+Answer the question using the format specified. Only use information from the documents. If you can't answer from these documents, say 'Not found in your documents.'`;
 
       const response = await this.openai.chat.completions.create({
         model: this.llmModel,
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that summarizes information from documents to answer user queries. Be accurate and cite sources. Provide varied perspectives when asked to regenerate.',
+            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n**Answer:** [One sentence direct answer]\n\n**Found in:** [Document name(s)]\n\n**Key details:**\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
           },
           {
             role: 'user',
@@ -748,19 +748,19 @@ Please provide a clear, concise summary that directly addresses the user's quest
         .map(chunk => `Source: ${chunk.metadata.title}\nContent: ${chunk.content}`)
         .join('\n\n');
 
-      const prompt = `Based on the following documents, provide a comprehensive summary answering the user's query: "${query}"
+      const prompt = `User's question: "${query}"
 
-Documents:
+Documents found:
 ${context}
 
-Please provide a clear, concise summary that directly addresses the user's question. Include specific details and cite sources when relevant. Keep the summary under 300 words.`;
+Answer the question using the format specified. Only use information from the documents. If you can't answer from these documents, say 'Not found in your documents.'`;
 
       const response = await this.openai.chat.completions.create({
         model: this.llmModel,
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that summarizes information from documents to answer user queries. Be accurate and cite sources.',
+            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n**Answer:** [One sentence direct answer]\n\n**Found in:** [Document name(s)]\n\n**Key details:**\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
           },
           {
             role: 'user',
