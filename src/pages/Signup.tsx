@@ -8,10 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
-<<<<<<< HEAD
-=======
 import { debugRedirectUrl } from '@/utils/debug-redirect';
->>>>>>> Feedbacks_improvement_v0
 
 const Signup = () => {
   const [formData, setFormData] = useState({
