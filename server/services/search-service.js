@@ -7,7 +7,488 @@ export class SearchService {
   constructor(apiKey) {
     this.openai = new OpenAI({ apiKey });
     this.embeddingModel = 'text-embedding-3-small';
-    this.llmModel = 'gpt-3.5-turbo'; // Cheaper than GPT-4
+    this.llmModel = 'gpt-4o-mini'; // Upgraded for better reasoning
+  }
+
+  /**
+   * Classify query type for tailored prompts and boost terms
+   */
+  classifyQuery(query) {
+    const lowerQuery = query.toLowerCase();
+    
+    // Strategic/Decision queries
+    if (lowerQuery.match(/why (did|do) (we|i|they) (choose|decide|prioritize|select)|rationale|trade-?off|justify/)) {
+      return { 
+        type: 'strategic', 
+        boostTerms: ['because', 'rationale', 'reasoning', 'justification', 'trade-off', 'decided', 'prioritized', 'ROI', 'impact', 'value', 'risk'] 
+      };
+    }
+    
+    // Status/Progress queries
+    if (lowerQuery.match(/status|progress|where are we|update on|is .* (complete|done|finished)|on track/)) {
+      return { 
+        type: 'status', 
+        boostTerms: ['status', 'progress', 'update', 'completed', 'in-progress', 'blocked', 'timeline', 'milestone', 'ETA'] 
+      };
+    }
+    
+    // Client/Stakeholder Context queries
+    if (lowerQuery.match(/what (does|did) .* (want|need|say)|client|stakeholder|feedback from|requirements from/)) {
+      return { 
+        type: 'client_context', 
+        boostTerms: ['client', 'customer', 'stakeholder', 'feedback', 'request', 'requirement', 'concern', 'mentioned', 'said'] 
+      };
+    }
+    
+    // Comparison queries
+    if (lowerQuery.match(/(compare|versus|vs\.?|difference between|which is better|pros and cons)/)) {
+      return { 
+        type: 'comparison', 
+        boostTerms: ['versus', 'compared to', 'advantage', 'disadvantage', 'better', 'worse', 'pros', 'cons', 'trade-off'] 
+      };
+    }
+    
+    // Metrics/Data queries
+    if (lowerQuery.match(/metric|KPI|conversion|revenue|growth|rate|numbers|performance|analytics|success metric|what are.*metric/i)) {
+      return { 
+        type: 'metrics', 
+        boostTerms: ['metric', 'KPI', 'rate', 'percentage', 'growth', 'revenue', 'conversion', 'users', 'MRR', 'ARR', 'churn', 'success', 'measure', 'track'] 
+      };
+    }
+    
+    // Process/Workflow queries
+    if (lowerQuery.match(/how (do|to)|process for|workflow|steps to|procedure|checklist/)) {
+      return { 
+        type: 'process', 
+        boostTerms: ['step', 'process', 'workflow', 'procedure', 'first', 'then', 'next', 'finally', 'checklist'] 
+      };
+    }
+    
+    // Definition/Explanation queries
+    if (lowerQuery.match(/what is|define|explain|what does .* mean|tell me about/)) {
+      return { 
+        type: 'definition', 
+        boostTerms: ['is', 'means', 'refers to', 'defined as', 'explanation', 'concept', 'term', 'definition'] 
+      };
+    }
+    
+    // Timeline/Planning queries
+    if (lowerQuery.match(/when is|timeline|roadmap|deadline|schedule|planned for|Q[1-4]/)) {
+      return { 
+        type: 'timeline', 
+        boostTerms: ['timeline', 'roadmap', 'schedule', 'deadline', 'date', 'launch', 'release', 'quarter', 'planned'] 
+      };
+    }
+    
+    // Problem/Issue queries
+    if (lowerQuery.match(/what'?s wrong|issue|bug|problem|not working|broken|complaint|error/)) {
+      return { 
+        type: 'problem', 
+        boostTerms: ['issue', 'problem', 'bug', 'error', 'broken', 'failing', 'complaint', 'reported', 'fix', 'resolve'] 
+      };
+    }
+    
+    // Best Practice/Recommendation queries
+    if (lowerQuery.match(/best (way|practice)|recommended|should we|standard for|how should/)) {
+      return { 
+        type: 'recommendation', 
+        boostTerms: ['best practice', 'recommended', 'should', 'standard', 'guideline', 'approach', 'strategy', 'prefer'] 
+      };
+    }
+    
+    // Meeting/Communication queries
+    if (lowerQuery.match(/meeting|discussed in|action items|decisions made|notes from|standup/)) {
+      return { 
+        type: 'meeting', 
+        boostTerms: ['meeting', 'call', 'discussion', 'action item', 'decision', 'next step', 'notes', 'takeaway'] 
+      };
+    }
+    
+    // Risk/Blocker queries
+    if (lowerQuery.match(/risk|blocker|blocking|concern|dependency|what could go wrong/)) {
+      return { 
+        type: 'risk', 
+        boostTerms: ['risk', 'blocker', 'dependency', 'concern', 'blocks', 'depends on', 'waiting for', 'mitigation'] 
+      };
+    }
+    
+    // Ownership/Responsibility queries
+    if (lowerQuery.match(/who (owns|is responsible|'?s working on)|responsible for|team assignment/)) {
+      return { 
+        type: 'ownership', 
+        boostTerms: ['owner', 'responsible', 'assigned', 'working on', 'lead', 'DRI', 'accountable'] 
+      };
+    }
+    
+    // Historical/Past Decision queries
+    if (lowerQuery.match(/why did we stop|what happened to|history of|used to|no longer|deprecated/)) {
+      return { 
+        type: 'historical', 
+        boostTerms: ['previously', 'past', 'history', 'stopped', 'removed', 'changed from', 'used to', 'discontinued'] 
+      };
+    }
+    
+    // List/Enumeration queries
+    if (lowerQuery.match(/list (all|of)|what are (the|all)|show me all|complete list|inventory of/)) {
+      return { 
+        type: 'enumeration', 
+        boostTerms: ['all', 'every', 'complete', 'full list', 'inventory', 'includes', 'consists of'] 
+      };
+    }
+    
+    // Default: General
+    return { type: 'general', boostTerms: [] };
+  }
+
+  /**
+   * Get system prompt tailored to query type
+   */
+  getSystemPrompt(queryType) {
+    const prompts = {
+      strategic: `You are answering questions about decisions and reasoning from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Answer:** [Write 1-2 complete sentences as a single paragraph. Do NOT use bullets here.]
+
+**Reasoning:** [Write 2-3 complete sentences explaining why. Do NOT use bullets here. Write as flowing paragraphs.]
+
+**Supporting Details:**
+- [First supporting fact as a complete sentence]
+- [Second supporting fact as a complete sentence]
+- [Third supporting fact as a complete sentence]
+
+**Source:** [Document name]
+
+Rules:
+- Only use bullet points in the "Supporting Details" section
+- All other sections must be complete paragraphs without bullets
+- Do not break sentences across lines
+- Do not insert bullets in the middle of compound words or hyphenated phrases
+- Each bullet must be a complete, standalone sentence
+- Keep total response under 300 words`,
+
+      status: `You are answering status and progress questions from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Answer:** [Write the current status as 1-2 complete sentences in paragraph form. No bullets.]
+
+**Status Details:**
+- [Completed items as a complete sentence]
+- [In progress items as a complete sentence]
+- [Next steps as a complete sentence]
+
+**Source:** [Source type - Document name]
+
+Rules:
+- Only use bullets in the "Status Details" section
+- The "Answer" section must be a complete paragraph with NO bullets
+- Do not break sentences mid-word
+- Each bullet must be a complete sentence starting with a capital letter
+- Keep response under 200 words`,
+
+      client_context: `You are answering questions about client or stakeholder feedback and requirements.
+
+Format your response EXACTLY like this:
+
+**What They Said:** [Direct statement or request as a continuous paragraph]
+
+**Context:** [When/where this was mentioned - meeting, email, etc., as a continuous paragraph]
+
+**Specific Asks:** [List key requirements in ONE sentence separated by commas]
+
+**Source:** [Document name]
+
+RULES:
+- Write "What They Said:" as a continuous paragraph (no bullets)
+- Write "Context:" as a continuous paragraph (no bullets)
+- Write "Specific Asks:" as ONE sentence with commas (no bullets)
+- Write "Source:" as plain text (no bullets)
+- Never use bullet points, dashes, or list formatting anywhere
+- Keep under 200 words`,
+
+      comparison: `You are answering comparison questions from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Quick Answer:** [Which option is recommended, if stated]
+
+**Key Differences:** [List 2-3 key differences in ONE sentence separated by commas]
+
+**Option A:** [Pros and cons for option A as a continuous paragraph]
+
+**Option B:** [Pros and cons for option B as a continuous paragraph]
+
+**Source:** [Document name]
+
+RULES:
+- Write "Quick Answer:" as plain text (no bullets)
+- Write "Key Differences:" as ONE sentence with commas (no bullets)
+- Write "Option A:" as a continuous paragraph (no bullets)
+- Write "Option B:" as a continuous paragraph (no bullets)
+- Write "Source:" as plain text (no bullets)
+- Never use bullet points, dashes, or list formatting anywhere
+- Keep under 250 words`,
+
+      metrics: `You are answering questions about metrics and data from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Answer:** [Write the key metrics answer as 1-2 complete sentences in paragraph form. No bullets.]
+
+**Key Metrics:**
+- [First metric with numbers as a complete sentence]
+- [Second metric with numbers as a complete sentence]
+- [Third metric with numbers as a complete sentence]
+
+**Source:** [Source type - Document name]
+
+Rules:
+- Only use bullets in the "Key Metrics" section
+- The "Answer" section must be a complete paragraph with NO bullets
+- Do not break sentences mid-word
+- Each bullet must be a complete sentence starting with a capital letter
+- Do not use bullets for compound words
+- Keep response under 150 words`,
+
+      process: `You are answering process and workflow questions from the user's documents.
+
+Format:
+<b>Steps:</b>
+1. [First step]
+2. [Second step]
+3. [Third step]
+4. [Additional steps as needed]
+
+<b>Prerequisites:</b> [If mentioned, otherwise omit]
+
+<b>Tools Needed:</b> [If mentioned, otherwise omit]
+
+<b>Expected Outcome:</b> [End result]
+
+Keep under 200 words. Use numbered steps.`,
+
+      definition: `You are answering definition and explanation questions from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Definition:** [One clear sentence defining the term]
+
+**Context:** [Write 2-3 complete sentences explaining how it's used in the organization. Write as a continuous paragraph.]
+
+**Related Concepts:** [If relevant, list 2-3 related concepts in ONE sentence separated by commas. If not relevant, omit this section entirely.]
+
+**Source:** [Document name]
+
+RULES:
+- Write "Definition:" as a complete paragraph (no bullets)
+- Write "Context:" as a continuous paragraph (no bullets)  
+- Write "Related Concepts:" as ONE sentence (no bullets)
+- Write "Source:" as plain text (no bullets)
+- Never use bullet points, dashes, or list formatting anywhere
+- Keep under 150 words`,
+
+      timeline: `You are answering timeline and planning questions from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Key Dates:** [List key dates and milestones in ONE sentence separated by commas]
+
+**Current Phase:** [Where things stand now as a continuous paragraph]
+
+**Dependencies:** [If mentioned, as a continuous paragraph. If none, omit this section]
+
+**Owner:** [Responsible party if mentioned]
+
+**Source:** [Document name]
+
+RULES:
+- Write "Key Dates:" as ONE sentence with commas (no bullets)
+- Write "Current Phase:" as a continuous paragraph (no bullets)
+- Write "Dependencies:" as a continuous paragraph (no bullets)
+- Write "Owner:" as plain text (no bullets)
+- Write "Source:" as plain text (no bullets)
+- Never use bullet points, dashes, or list formatting anywhere
+- Keep under 200 words`,
+
+      problem: `You are answering questions about problems and issues from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Answer:** [Write the problem description as 1-2 complete sentences in paragraph form. No bullets.]
+
+**Problem Details:**
+- [Impact on users as a complete sentence]
+- [Workarounds or status as a complete sentence]
+- [Additional relevant information as a complete sentence]
+
+**Source:** [Source type - Document name]
+
+Rules:
+- Only use bullets in the "Problem Details" section
+- The "Answer" section must be a complete paragraph with NO bullets
+- Do not break sentences mid-word
+- Each bullet must be a complete sentence starting with a capital letter
+- Keep response under 200 words`,
+
+      recommendation: `You are answering questions about best practices and recommendations from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Answer:** [Write the recommendation as 1-2 complete sentences in paragraph form. No bullets.]
+
+**Recommendation Details:**
+- [Reasoning for the recommendation as a complete sentence]
+- [Alternatives considered as a complete sentence]
+- [When to apply this recommendation as a complete sentence]
+
+**Source:** [Source type - Document name]
+
+Rules:
+- Only use bullets in the "Recommendation Details" section
+- The "Answer" section must be a complete paragraph with NO bullets
+- Do not break sentences mid-word
+- Each bullet must be a complete sentence starting with a capital letter
+- Keep response under 250 words`,
+
+      meeting: `You are answering questions about meetings and discussions from the user's documents.
+
+Format:
+<b>Key Decisions:</b>
+- [Decision 1]
+- [Decision 2]
+
+<b>Action Items:</b>
+- [Item 1] - [Owner]
+- [Item 2] - [Owner]
+
+<b>Important Discussion Points:</b> [Brief summary]
+
+<b>Source:</b> [Document/Meeting name]
+
+Keep under 200 words. Focus on outcomes and actions.`,
+
+      risk: `You are answering questions about risks and blockers from the user's documents.
+
+Format:
+<b>Risks/Blockers:</b>
+- [Risk 1] - [Impact if unresolved]
+- [Risk 2] - [Impact if unresolved]
+
+<b>Mitigation Plans:</b> [If documented, otherwise omit]
+
+<b>Owner:</b> [Responsible party if mentioned]
+
+<b>Source:</b> [Document name]
+
+Keep under 200 words. Be clear about impacts.`,
+
+      ownership: `You are answering questions about ownership and responsibilities from the user's documents.
+
+Format your response EXACTLY like this:
+
+**Owner:** [Person/team name]
+
+**Responsibilities:** [List key responsibilities in ONE sentence separated by commas]
+
+**Contact:** [If available, otherwise omit this section]
+
+**Source:** [Document name]
+
+RULES:
+- Write "Owner:" as plain text (no bullets)
+- Write "Responsibilities:" as ONE sentence with commas (no bullets)
+- Write "Contact:" as plain text (no bullets)
+- Write "Source:" as plain text (no bullets)
+- Never use bullet points, dashes, or list formatting anywhere
+- Keep under 150 words`,
+
+      historical: `You are answering questions about past decisions and changes from the user's documents.
+
+Format your response EXACTLY like this:
+
+**What Changed:** [What was done previously vs now as a continuous paragraph]
+
+**Why It Changed:** [Reason for the change as a continuous paragraph]
+
+**When:** [Timeline if available]
+
+**Current State:** [How things work now as a continuous paragraph]
+
+**Source:** [Document name]
+
+RULES:
+- Write "What Changed:" as a continuous paragraph (no bullets)
+- Write "Why It Changed:" as a continuous paragraph (no bullets)
+- Write "When:" as plain text (no bullets)
+- Write "Current State:" as a continuous paragraph (no bullets)
+- Write "Source:" as plain text (no bullets)
+- Never use bullet points, dashes, or list formatting anywhere
+- Keep under 200 words`,
+
+      enumeration: `You are answering questions that ask for lists from the user's documents.
+
+Format:
+<b>Complete List:</b>
+- [Item 1] - [Brief context]
+- [Item 2] - [Brief context]
+- [Item 3] - [Brief context]
+- [Continue as needed]
+
+<b>Total Count:</b> [Number if meaningful]
+
+<b>Source:</b> [Document name]
+
+Keep under 250 words. Be comprehensive but concise.`,
+
+      general: `You are a direct, no-bullshit search assistant.
+
+Format your response EXACTLY like this:
+
+**Answer:** [Write the answer as 1-2 complete sentences in paragraph form. No bullets.]
+
+**Found in:** [Source type - Document name]
+
+**Details:**
+- [First detail as a complete sentence]
+- [Second detail as a complete sentence]  
+- [Third detail as a complete sentence]
+
+Rules:
+- Only use bullets in the "Details" section
+- The "Answer" section must be a complete paragraph with NO bullets
+- Do not break sentences mid-word
+- Each bullet must be a complete sentence starting with a capital letter
+- Do not use bullets for compound words (e.g., "post-signup" stays as one phrase)
+- Keep response under 200 words`
+    };
+    
+    return prompts[queryType] || prompts.general;
+  }
+
+  /**
+   * Re-rank chunks based on boost terms from query classification
+   */
+  reRankChunks(chunks, boostTerms) {
+    if (!boostTerms || boostTerms.length === 0) {
+      return chunks;
+    }
+
+    return chunks.map(chunk => {
+      const contentLower = chunk.content.toLowerCase();
+      const matchCount = boostTerms.filter(term => 
+        contentLower.includes(term.toLowerCase())
+      ).length;
+      const boostScore = Math.min(matchCount * 0.1, 0.3); // Max boost of 0.3
+      
+      return {
+        ...chunk,
+        boosted_similarity: (chunk.similarity || 0) + boostScore,
+        boost_applied: boostScore,
+        matched_boost_terms: matchCount
+      };
+    }).sort((a, b) => b.boosted_similarity - a.boosted_similarity);
   }
 
   /**
@@ -16,6 +497,11 @@ export class SearchService {
   async search(userId, query, supabaseAdmin) {
     try {
       console.log(`🔍 Searching for: "${query}" (user: ${userId})`);
+
+      // Classify query type for tailored processing
+      const queryClassification = this.classifyQuery(query);
+      const queryType = queryClassification.type;
+      console.log(`📊 Query classified as: ${queryType} (boost terms: ${queryClassification.boostTerms.length})`);
 
       // 1. Generate query embedding
       const queryEmbedding = await this.generateQueryEmbedding(query);
@@ -125,6 +611,12 @@ export class SearchService {
       }
 
       console.log(`📊 Found ${chunks.length} relevant chunks (vector similarity search)`);
+
+      // Re-rank chunks based on boost terms if available
+      if (queryClassification.boostTerms.length > 0) {
+        chunks = this.reRankChunks(chunks, queryClassification.boostTerms);
+        console.log(`🔄 Re-ranked chunks using boost terms: ${queryClassification.boostTerms.slice(0, 3).join(', ')}...`);
+      }
 
       // Log sources of results
       const sources = [...new Set(chunks.map(c => c.metadata?.source_type))];
@@ -248,8 +740,8 @@ export class SearchService {
       const deduplicatedChunks = this.deduplicateVersions(boostedChunks);
       console.log(`🔄 Deduplicated versions: ${boostedChunks.length} → ${deduplicatedChunks.length} chunks`);
 
-      // 3. Generate AI summary using RAG
-      const aiSummary = await this.generateSummary(query, deduplicatedChunks);
+      // 3. Generate AI summary using RAG with query-type-specific prompt
+      const aiSummary = await this.generateSummary(query, deduplicatedChunks, queryType);
 
       // 4. Format results
       const results = deduplicatedChunks.map(chunk => {
@@ -681,23 +1173,29 @@ export class SearchService {
   /**
    * Regenerate summary with higher temperature for variation
    */
-  async regenerateSummary(query, results) {
+  async regenerateSummary(query, results, queryType = 'general') {
     try {
       // Convert results back to chunks format for summary generation
       const chunks = results.map(result => ({
         content: result.content || result.snippet,
         metadata: {
           title: result.title || result.filename,
-          source: result.source
+          source: result.source,
+          source_type: result.source
         }
       }));
 
       const maxChunks = 10;
       const contextChunks = chunks.slice(0, maxChunks);
       
+      // Enhanced context formatting with separators
       const context = contextChunks
-        .map(chunk => `Source: ${chunk.metadata.title}\nContent: ${chunk.content}`)
-        .join('\n\n');
+        .map(chunk => {
+          const sourceType = chunk.metadata?.source_type || 'unknown';
+          const title = chunk.metadata?.title || 'Unknown Document';
+          return `Source: ${sourceType} - ${title}\nContent: ${chunk.content}`;
+        })
+        .join('\n\n---\n\n');
 
       const prompt = `User's question: "${query}"
 
@@ -706,19 +1204,43 @@ ${context}
 
 Answer the question using the format specified. Only use information from the documents. If you can't answer from these documents, say 'Not found in your documents.'`;
 
+      // Get system prompt for this query type
+      const systemPrompt = this.getSystemPrompt(queryType);
+
+      // Token limits by query type
+      const tokenLimits = {
+        strategic: 600,
+        status: 500,
+        client_context: 500,
+        comparison: 550,
+        metrics: 400,
+        process: 500,
+        definition: 350,
+        timeline: 500,
+        problem: 500,
+        recommendation: 550,
+        meeting: 500,
+        risk: 500,
+        ownership: 350,
+        historical: 500,
+        enumeration: 500,
+        general: 400
+      };
+      const maxTokens = tokenLimits[queryType] || 400;
+
       const response = await this.openai.chat.completions.create({
         model: this.llmModel,
         messages: [
           {
             role: 'system',
-            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n<b>Answer:</b> [One sentence direct answer]\n\n<b>Found in:</b> [Document name(s)]\n\n<b>Key details:</b>\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
+            content: systemPrompt,
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        max_tokens: 300,
+        max_tokens: maxTokens,
         temperature: 0.7, // Higher temperature for more variation in regeneration
       });
 
@@ -738,15 +1260,20 @@ Answer the question using the format specified. Only use information from the do
   /**
    * Generate AI summary using RAG with safety limits
    */
-  async generateSummary(query, chunks) {
+  async generateSummary(query, chunks, queryType = 'general') {
     try {
       // SAFETY: Limit context to prevent high costs
       const maxChunks = 10;
       const contextChunks = chunks.slice(0, maxChunks);
       
+      // Enhanced context formatting with separators
       const context = contextChunks
-        .map(chunk => `Source: ${chunk.metadata.title}\nContent: ${chunk.content}`)
-        .join('\n\n');
+        .map(chunk => {
+          const sourceType = chunk.metadata?.source_type || 'unknown';
+          const title = chunk.metadata?.title || 'Unknown Document';
+          return `Source: ${sourceType} - ${title}\nContent: ${chunk.content}`;
+        })
+        .join('\n\n---\n\n');
 
       const prompt = `User's question: "${query}"
 
@@ -755,19 +1282,43 @@ ${context}
 
 Answer the question using the format specified. Only use information from the documents. If you can't answer from these documents, say 'Not found in your documents.'`;
 
+      // Get system prompt for this query type
+      const systemPrompt = this.getSystemPrompt(queryType);
+
+      // Token limits by query type
+      const tokenLimits = {
+        strategic: 600,
+        status: 500,
+        client_context: 500,
+        comparison: 550,
+        metrics: 400,
+        process: 500,
+        definition: 350,
+        timeline: 500,
+        problem: 500,
+        recommendation: 550,
+        meeting: 500,
+        risk: 500,
+        ownership: 350,
+        historical: 500,
+        enumeration: 500,
+        general: 400
+      };
+      const maxTokens = tokenLimits[queryType] || 400;
+
       const response = await this.openai.chat.completions.create({
         model: this.llmModel,
         messages: [
           {
             role: 'system',
-            content: 'You are a direct, no-bullshit search assistant. Answer in this exact format:\n\n<b>Answer:</b> [One sentence direct answer]\n\n<b>Found in:</b> [Document name(s)]\n\n<b>Key details:</b>\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3]\n\nKeep under 150 words. Use bullets, not paragraphs. Be direct.',
+            content: systemPrompt,
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        max_tokens: 300, // Limit response length
+        max_tokens: maxTokens,
         temperature: 0.3, // Reduce randomness for accuracy
       });
 
