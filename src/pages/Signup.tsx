@@ -8,6 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
+<<<<<<< HEAD
+=======
+import { debugRedirectUrl } from '@/utils/debug-redirect';
+>>>>>>> Feedbacks_improvement_v0
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -309,7 +313,6 @@ const Signup = () => {
           <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.8s' }}>
             By signing up, you agree to our Terms of Service and Privacy Policy.
           </p>
-
         </div>
       </div>
 
