@@ -624,10 +624,17 @@ app.get('/api/auth/slack', async (req, res) => {
     const state = crypto.randomBytes(32).toString('hex');
     const stateWithUserId = `${state}:${userId}`;
 
+    // Bot token scopes (for app functionality)
+    const botScopes = 'channels:history,files:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,remote_files:read,team:read,usergroups:read,users:read,users:read.email';
+    
+    // User token scopes (for user data access - this will give us xoxp- tokens)
+    const userScopes = 'channels:read,channels:history,files:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,users:read,team:read';
+
     const authorizationUrl = `https://slack.com/oauth/v2/authorize?` +
       `client_id=${clientId}&` +
       `redirect_uri=${encodeURIComponent(`${API_BASE_URL}/api/auth/slack/callback`)}&` +
-      `scope=${encodeURIComponent('channels:read,channels:history,files:read,users:read,team:read')}&` +
+      `scope=${encodeURIComponent(botScopes)}&` +
+      `user_scope=${encodeURIComponent(userScopes)}&` +
       `state=${stateWithUserId}`;
 
     console.log('🔗 Redirecting to Slack OAuth:', authorizationUrl);
@@ -1037,12 +1044,13 @@ app.post('/api/sync/slack', async (req, res) => {
     // Get Slack connection
     const { data: connection, error: connError } = await supabaseAdmin
       .from('user_connections')
-      .select('access_token')
+      .select('access_token, metadata')
       .eq('user_id', user.id)
       .eq('source_type', 'slack')
       .single();
     
     if (connError || !connection) {
+      console.error('❌ Slack connection not found:', connError);
       return res.status(400).json({ 
         error: 'Slack not connected',
         code: 'NOT_CONNECTED'
@@ -1050,6 +1058,18 @@ app.post('/api/sync/slack', async (req, res) => {
     }
     
     console.log('✓ Starting Slack sync for user:', user.id);
+    console.log('🔑 Access token preview:', connection.access_token ? `${connection.access_token.substring(0, 20)}...` : 'MISSING');
+    console.log('📊 Connection metadata:', connection.metadata);
+    
+    // Check if token is a bot token (starts with xoxb-)
+    if (connection.access_token && connection.access_token.startsWith('xoxb-')) {
+      console.error('❌ ERROR: Bot token detected! User tokens should start with xoxp-');
+      return res.status(400).json({
+        error: 'Invalid token type. Please reconnect your Slack account.',
+        code: 'INVALID_TOKEN_TYPE',
+        details: 'Bot token cannot be used for user data sync'
+      });
+    }
     
     // Call sync service
     const result = await slackSync.syncSlack(user.id, connection.access_token);
