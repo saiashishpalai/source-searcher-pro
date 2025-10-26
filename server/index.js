@@ -704,7 +704,10 @@ app.get('/api/auth/slack/callback', async (req, res) => {
       teamId, 
       teamName, 
       userId: slackUserId,
-      hasAccessToken: !!tokens.access_token 
+      hasAccessToken: !!tokens.access_token,
+      hasAuthedUserToken: !!tokens.authed_user?.access_token,
+      tokenType: tokens.authed_user?.access_token ? 'user' : 'app',
+      scopes: tokens.scope
     });
 
     const { error: dbError } = await supabaseAdmin
@@ -713,7 +716,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
         user_id: userId,
         source_type: 'slack',
         source_user_id: slackUserId, // Required by schema
-        access_token: tokens.access_token || process.env.SLACK_BOT_TOKEN, // Use bot token if no user token
+        access_token: tokens.authed_user?.access_token || tokens.access_token, // Use user token for sync
         refresh_token: tokens.refresh_token || null,
         token_expires_at: null, // Slack tokens don't expire
         is_active: true,
@@ -1056,18 +1059,32 @@ app.post('/api/sync/slack', async (req, res) => {
     res.json(result);
     
   } catch (error) {
-    console.error('✗ Slack sync error:', error.message);
+    console.error('✗ Slack sync error:', error);
+    console.error('✗ Error details:', {
+      message: error.message,
+      code: error.code,
+      data: error.data
+    });
     
-    if (error.code === 'slack_api_error' || error.message.includes('Slack')) {
+    if (error.code === 'slack_api_error') {
       return res.status(401).json({ 
-        error: 'Slack API error. Token may have expired.',
-        code: 'TOKEN_EXPIRED'
+        error: `Slack API error: ${error.data?.error || error.message}`,
+        code: 'SLACK_API_ERROR',
+        details: error.data
+      });
+    }
+    
+    if (error.message.includes('not_authed') || error.message.includes('invalid_auth')) {
+      return res.status(401).json({ 
+        error: 'Slack authentication failed. Please reconnect your Slack account.',
+        code: 'AUTH_FAILED'
       });
     }
     
     res.status(500).json({ 
-      error: error.message,
-      code: 'SYNC_FAILED'
+      error: error.message || 'Sync failed',
+      code: 'SYNC_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

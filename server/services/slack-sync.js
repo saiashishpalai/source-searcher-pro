@@ -325,6 +325,13 @@ export class SlackSync {
       console.log(`🔄 Starting Slack incremental sync with MESSAGE-LEVEL CHUNKING for user ${userId}`);
       console.log(`📊 Limits: Max ${this.SYNC_LIMITS.MAX_CHANNELS} conversations, ${this.SYNC_LIMITS.MAX_MESSAGES_PER_CHANNEL} messages/conversation, last ${this.SYNC_LIMITS.MESSAGE_DAYS_BACK} days`);
 
+      // Validate access token
+      if (!accessToken) {
+        throw new Error('No Slack access token provided');
+      }
+      
+      console.log(`🔑 Using token: ${accessToken.substring(0, 20)}...`);
+
       // Get last sync timestamp
       const lastSyncTimestamp = await this.getLastSyncTimestamp(userId, 'slack');
       console.log(`📅 Last sync: ${lastSyncTimestamp || 'Never'}`);
@@ -333,6 +340,15 @@ export class SlackSync {
       const slack = new WebClient(accessToken);
       
       console.log('✓ Slack client initialized');
+      
+      // Test token validity with a simple API call
+      try {
+        const authTest = await slack.auth.test();
+        console.log(`✓ Token validation successful: ${authTest.user} (${authTest.team})`);
+      } catch (authError) {
+        console.error('❌ Token validation failed:', authError.message);
+        throw new Error(`Invalid Slack token: ${authError.message}`);
+      }
       
       // Test remote files access
       const fileAccessTest = await this.testRemoteFileAccess(slack);
