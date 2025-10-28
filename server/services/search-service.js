@@ -144,29 +144,54 @@ export class SearchService {
    * Get system prompt tailored to query type
    */
   getSystemPrompt(queryType) {
-    const prompts = {
-      strategic: `You are answering questions about decisions and reasoning from the user's documents.
+    // Base examples that work for most query types
+    const examples = `
+EXAMPLE 1 - Factual Query:
+User question: "What is feature X?"
 
-Format your response EXACTLY like this:
+**Definition:** Feature X is a tool that helps users accomplish Y by providing Z functionality in a streamlined interface.
 
-**Answer:** [Write 1-2 complete sentences as a single paragraph. Do NOT use bullets here.]
+**Context:** This feature was introduced in Q3 2024 to address the problem of users spending too much time on manual tasks.
 
-**Reasoning:** [Write 2-3 complete sentences explaining why. Do NOT use bullets here. Write as flowing paragraphs.]
+**Key Points:**
+- The feature reduces task time by 50% on average
+- It integrates with existing workflows seamlessly
+- User adoption reached 80% within the first month
+
+**Source:** slack - Product Updates Channel
+
+EXAMPLE 2 - Reasoning Query:
+User question: "Why did we choose approach A?"
+
+**Answer:** We chose approach A because it offered the best balance between development speed and long-term maintainability.
+
+**Reasoning:** The team evaluated three approaches and found that approach A required only 4 weeks of development compared to 12 weeks for approach B, while still providing 90% of the functionality needed for the MVP launch.
 
 **Supporting Details:**
-- [First supporting fact as a complete sentence]
-- [Second supporting fact as a complete sentence]
-- [Third supporting fact as a complete sentence]
+- Development time was estimated at 4 weeks versus 12 weeks for alternatives
+- The approach supports future expansion with minimal refactoring needed
+- Stakeholder feedback indicated approach A addressed 90% of immediate needs
 
-**Source:** [Document name]
+**Source:** notion - Engineering Decision Log
 
-Rules:
-- Only use bullet points in the "Supporting Details" section
-- All other sections must be complete paragraphs without bullets
-- Do not break sentences across lines
-- Do not insert bullets in the middle of compound words or hyphenated phrases
-- Each bullet must be a complete, standalone sentence
-- Keep total response under 300 words`,
+EXAMPLE 3 - Metrics Query:
+User question: "What are our key metrics?"
+
+**Answer:** Our key metrics show strong growth in user engagement and revenue conversion across all product tiers.
+
+**Key Metrics:**
+- Monthly active users increased 45% this quarter to 10,000 users
+- Team plan conversion rate reached 35% with an average deal size of $300/month
+- Feature adoption rate for core tools is at 78% with positive user feedback
+
+**Source:** google_drive - Q4 Metrics Dashboard
+`;
+
+    const prompts = {
+      strategic: `You are a search assistant answering reasoning and decision questions about why decisions were made or how priorities were determined.
+${examples}
+
+Follow EXAMPLE 2 format. Write Answer and Reasoning as single unbroken paragraphs. Only use bullets in Supporting Details section.`,
 
       status: `You are answering status and progress questions from the user's documents.
 
@@ -442,26 +467,20 @@ Format:
 
 Keep under 250 words. Be comprehensive but concise.`,
 
-      general: `You are a direct, no-bullshit search assistant.
+      definition: `You are a search assistant answering definitional questions.
+${examples}
 
-Format your response EXACTLY like this:
+Follow EXAMPLE 1 format. Write Definition and Context as single unbroken paragraphs. Only use bullets in Key Points section.`,
 
-**Answer:** [Write the answer as 1-2 complete sentences in paragraph form. No bullets.]
+      metrics: `You are a search assistant answering questions about metrics and data.
+${examples}
 
-**Found in:** [Source type - Document name]
+Follow EXAMPLE 3 format. Write Answer as a single unbroken paragraph. Only use bullets in Key Metrics section.`,
 
-**Details:**
-- [First detail as a complete sentence]
-- [Second detail as a complete sentence]  
-- [Third detail as a complete sentence]
+      general: `You are a direct, no-bullshit search assistant answering questions.
+${examples}
 
-Rules:
-- Only use bullets in the "Details" section
-- The "Answer" section must be a complete paragraph with NO bullets
-- Do not break sentences mid-word
-- Each bullet must be a complete sentence starting with a capital letter
-- Do not use bullets for compound words (e.g., "post-signup" stays as one phrase)
-- Keep response under 200 words`
+Follow the format from the examples above. Write Answer sections as single unbroken paragraphs. Only use bullets in Details sections.`
     };
     
     return prompts[queryType] || prompts.general;

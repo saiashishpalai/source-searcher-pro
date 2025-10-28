@@ -32,7 +32,7 @@ export default defineConfig(({ command, mode }) => {
         },
         proxy: {
           '/api': {
-            target: 'https://localhost:3000',
+            target: 'https://localhost:8085',
             changeOrigin: true,
             secure: false,
           },
@@ -44,8 +44,9 @@ export default defineConfig(({ command, mode }) => {
         port: 8081,
         proxy: {
           '/api': {
-            target: 'http://localhost:3000',
+            target: 'https://localhost:8085',
             changeOrigin: true,
+            secure: false,
           },
         },
       };
