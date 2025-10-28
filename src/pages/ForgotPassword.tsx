@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import authBg8 from '@/assets/auth-bg-8.png';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -111,7 +112,7 @@ const ForgotPassword = () => {
           <div 
             className="absolute inset-0 bg-cover bg-center bg-no-repeat"
             style={{
-              backgroundImage: 'url(/src/assets/auth-bg-8.png)'
+              backgroundImage: `url(${authBg8})`
             }}
           />
           
@@ -236,7 +237,7 @@ const ForgotPassword = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: 'url(/src/assets/auth-bg-8.png)'
+            backgroundImage: `url(${authBg8})`
           }}
         />
         

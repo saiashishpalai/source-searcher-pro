@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, LogIn } from 'lucide-react';
+import authBg7 from '@/assets/auth-bg-7.png';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -181,7 +182,7 @@ const Login = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: 'url(/src/assets/auth-bg-7.png)'
+            backgroundImage: `url(${authBg7})`
           }}
         />
         

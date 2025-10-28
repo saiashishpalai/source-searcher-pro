@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
 import { debugRedirectUrl } from '@/utils/debug-redirect';
+import authBg6 from '@/assets/auth-bg-6.png';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -319,7 +320,7 @@ const Signup = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: 'url(/src/assets/auth-bg-6.png)'
+            backgroundImage: `url(${authBg6})`
           }}
         />
         
