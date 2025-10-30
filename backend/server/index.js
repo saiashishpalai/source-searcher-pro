@@ -533,30 +533,10 @@ app.post('/api/sync/google-drive', async (req, res) => {
     let accessToken = connection.access_token;
     const now = new Date();
     const expiresAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
-    
-    // TEST MODE: Set to true to force token refresh (for testing only)
-    // WARNING: Change back to false before deploying to production!
-    const TEST_FORCE_REFRESH = false;
-    
-    // If TEST_FORCE_REFRESH is enabled, treat token as expired
-    const fiveMinutesFromNow = TEST_FORCE_REFRESH 
-      ? new Date(now.getTime() - 1000) // Force expiration check
-      : new Date(now.getTime() + 5 * 60 * 1000);
-    
-    console.log('🔍 Token refresh check:', {
-      hasRefreshToken: !!connection.refresh_token,
-      hasExpiresAt: !!expiresAt,
-      expiresAt: expiresAt?.toISOString(),
-      fiveMinutesFromNow: fiveMinutesFromNow.toISOString(),
-      willRefresh: expiresAt && expiresAt < fiveMinutesFromNow && connection.refresh_token,
-      TEST_MODE: TEST_FORCE_REFRESH
-    });
+    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
     
     // If token is expired or will expire soon, refresh it
     if (expiresAt && expiresAt < fiveMinutesFromNow && connection.refresh_token) {
-      if (TEST_FORCE_REFRESH) {
-        console.log('🧪 TEST MODE: Forcing token refresh...');
-      }
       console.log('🔄 Access token expired or expiring soon, refreshing...');
       
       try {
