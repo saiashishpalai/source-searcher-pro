@@ -182,16 +182,14 @@ graph TB
 - Storage utilization
 - Backup and recovery
 
-## Future Enhancements
-
-### 1. Advanced Features
-- Real-time collaboration
-- Advanced analytics
-- Custom integrations
-- Mobile applications
-
-### 2. Scalability Improvements
-- Microservices architecture
-- Event-driven processing
-- Advanced caching
-- Global CDN deployment
+## Incremental Sync Update (2025-10)
+- Google Drive moves to production-grade incremental sync
+  - Time filter: `modifiedTime > last_sync_at` with 7‑day safety lookback
+  - Hash detection: compare `md5Checksum` vs `documents.content_hash`
+  - Forced reprocess: prior PDF placeholders reprocessed once
+  - Pagination + cap: newest-first, limit 200 per run
+  - Batching: process 5 files concurrently, update `sync_metadata.files_processed`
+- PDF parsing module with caching, 30s timeout, 10MB cap; graceful skips for unsupported/too‑large/password/no‑text
+- New table `sync_metadata` for status, timestamps, and counters
+- UI updates: progress `(processed/200)`, Drive KPIs (Files, Updated, Unchanged, Efficiency), limit messaging
+- Token precheck with timeout; structured logs (start, pages, batches, completion)

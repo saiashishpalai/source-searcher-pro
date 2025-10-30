@@ -16,18 +16,31 @@ import {
 } from 'lucide-react';
 
 interface IncrementalSyncStats {
+  // Shared/optional totals
   totalFiles?: number;
   totalPages?: number;
   totalConversations?: number;
+
+  // Changed counts (generic)
   changedFiles?: number;
   changedPages?: number;
   activeConversations?: number;
+
+  // Unchanged counts
   unchangedFiles?: number;
   unchangedPages?: number;
   unchangedConversations?: number;
+
+  // Slack-specific
   totalMessages?: number;
-  isIncremental: boolean;
-  efficiencyMessage: string;
+
+  // Drive-specific additions
+  newFiles?: number;
+  updatedFiles?: number;
+
+  // Control/flags
+  isIncremental?: boolean;
+  efficiencyMessage?: string;
 }
 
 interface IncrementalSyncFeedbackProps {
@@ -85,7 +98,7 @@ const IncrementalSyncFeedback: React.FC<IncrementalSyncFeedbackProps> = ({
 
   const calculateEfficiencyPercentage = () => {
     if (sourceType === 'google_drive') {
-      const total = stats.totalFiles || 0;
+      const total = (stats.totalFiles ?? ((stats.newFiles ?? 0) + (stats.updatedFiles ?? 0) + (stats.unchangedFiles ?? 0)));
       const unchanged = stats.unchangedFiles || 0;
       return total > 0 ? Math.round((unchanged / total) * 100) : 0;
     } else if (sourceType === 'notion') {
@@ -123,27 +136,26 @@ const IncrementalSyncFeedback: React.FC<IncrementalSyncFeedbackProps> = ({
 
         {/* Compact Statistics Grid */}
         <div className="grid grid-cols-4 gap-1.5 text-xs">
-
-          {sourceType === 'notion' && (
-            <>
-              <div className="text-center p-1.5 bg-muted/30 rounded">
-                <div className="text-muted-foreground text-[10px]">Pages</div>
-                <div className="font-semibold">{stats.totalPages || 0}</div>
-              </div>
-              <div className="text-center p-1.5 bg-green-500/10 rounded">
-                <div className="text-green-400 text-[10px]">Changed</div>
-                <div className="font-semibold text-green-400">{stats.changedPages || 0}</div>
-              </div>
-              <div className="text-center p-1.5 bg-muted/30 rounded">
-                <div className="text-muted-foreground text-[10px]">Skipped</div>
-                <div className="font-semibold">{stats.unchangedPages || 0}</div>
-              </div>
-              <div className="text-center p-1.5 bg-blue-500/10 rounded">
-                <div className="text-blue-400 text-[10px]">Efficiency</div>
-                <div className="font-semibold text-blue-400">{efficiencyPercentage}%</div>
-              </div>
-            </>
-          )}
+            {sourceType === 'notion' && (
+              <>
+                <div className="text-center p-1.5 bg-muted/30 rounded">
+                  <div className="text-muted-foreground text-[10px]">Pages</div>
+                  <div className="font-semibold">{stats.totalPages || 0}</div>
+                </div>
+                <div className="text-center p-1.5 bg-green-500/10 rounded">
+                  <div className="text-green-400 text-[10px]">Changed</div>
+                  <div className="font-semibold text-green-400">{stats.changedPages || 0}</div>
+                </div>
+                <div className="text-center p-1.5 bg-muted/30 rounded">
+                  <div className="text-muted-foreground text-[10px]">Skipped</div>
+                  <div className="font-semibold">{stats.unchangedPages || 0}</div>
+                </div>
+                <div className="text-center p-1.5 bg-blue-500/10 rounded">
+                  <div className="text-blue-400 text-[10px]">Efficiency</div>
+                  <div className="font-semibold text-blue-400">{efficiencyPercentage}%</div>
+                </div>
+              </>
+            )}
 
           {sourceType === 'slack' && (
             <>
