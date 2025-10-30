@@ -372,13 +372,23 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                     </>
                   )}
                   {connection.source_type !== 'slack' && (
-                    <div className="flex justify-between">
-                      <span>
-                        {connection.source_type === 'google_drive' ? 'Files:' :
-                         connection.source_type === 'notion' ? 'Pages:' : 'Documents:'}
-                      </span>
-                      <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
-                    </div>
+                    <>
+                      <div className="flex justify-between">
+                        <span>
+                          {connection.source_type === 'google_drive' ? 'Files:' :
+                           connection.source_type === 'notion' ? 'Pages:' : 'Documents:'}
+                        </span>
+                        <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
+                      </div>
+                      {connection.source_type === 'google_drive' && syncStatus?.[connection.source_type]?.totalDocuments > 0 && (
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>Limit:</span>
+                          <span className="font-medium">
+                            {syncStatus[connection.source_type].totalDocuments}/200
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="flex justify-between">
                     <span>Last Sync:</span>
