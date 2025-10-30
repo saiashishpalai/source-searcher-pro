@@ -1322,6 +1322,13 @@ app.post('/api/clear-data', async (req, res) => {
         .eq('source_type', sourceType);
     }
     
+    // CRITICAL FIX: Delete sync metadata so next sync is a full sync
+    await supabaseAdmin
+      .from('sync_metadata')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('source_type', sourceType);
+    
     console.log(`✓ Cleared ${sourceType} data for user ${user.id} (${documents?.length || 0} documents)`);
     res.json({ 
       success: true, 
