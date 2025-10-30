@@ -7,6 +7,8 @@ A powerful AI-powered search platform that connects to your Google Drive, Slack,
 - **Multi-Source Search**: Search across Google Drive, Slack, and Notion simultaneously
 - **AI-Powered**: Advanced semantic search with OpenAI integration
 - **Incremental Sync (Drive)**: Sync only new/updated files using `modifiedTime` + `md5Checksum`
+- **Automatic Token Refresh**: OAuth tokens refresh automatically, connections last up to 6 months
+- **Full Sync After Data Clear**: Clear and resync triggers full sync of all files (up to 200)
 - **PDF Parsing**: Robust parsing with caching, timeouts, and graceful fallbacks
 - **Safety Limits**: Per-run cap of 200 Drive files with newest-first pagination
 - **Modern UI**: Progress `(processed/200)` and post-sync KPIs (Files, Updated, Unchanged, Efficiency)
@@ -81,10 +83,11 @@ A powerful AI-powered search platform that connects to your Google Drive, Slack,
 
 ## 🔐 Security
 
-- OAuth 2.0 authentication
+- OAuth 2.0 authentication with automatic token refresh
 - Row Level Security (RLS) in Supabase
 - Encrypted token storage
 - Secure environment variable management
+- Automatic token expiration handling (Google Drive tokens refresh before expiry)
 
 ## 📄 License
 
