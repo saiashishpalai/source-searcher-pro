@@ -1,6 +1,9 @@
 import { google } from 'googleapis';
 import mammoth from 'mammoth';
+import { createRequire } from 'module';
 import OpenAI from 'openai';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 /**
  * DocumentSync - Handles document processing and embedding generation with SAFETY LIMITS
@@ -12,7 +15,7 @@ export class DocumentSync {
     
     // CRITICAL SAFETY LIMITS
     this.SYNC_LIMITS = {
-      MAX_DOCUMENTS: parseInt(process.env.MAX_GOOGLE_DRIVE_FILES) || 1000,  // Production limit
+      MAX_DOCUMENTS: parseInt(process.env.MAX_GOOGLE_DRIVE_FILES) || 200,  // 200 document limit
       MAX_FILE_SIZE: 1000000,     // 1MB max per file
       MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
       MAX_TEXT_LENGTH: 15000,     // ~4000 tokens max
@@ -46,17 +49,29 @@ export class DocumentSync {
         return response.data;
       }
 
-      // PDF
+      // PDF parsing
       if (file.mimeType === 'application/pdf') {
-        const response = await drive.files.get({
-          fileId: file.id,
-          alt: 'media',
-        }, { responseType: 'arraybuffer' });
-        
-        const buffer = Buffer.from(response.data);
-        // PDF parsing temporarily disabled to avoid startup issues
-        console.log(`  📄 PDF file detected: ${file.name} - PDF parsing temporarily disabled`);
-        return `PDF Document: ${file.name}\n\nNote: PDF text extraction is temporarily disabled due to technical issues.\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
+        try {
+          console.log(`  📄 Processing PDF: ${file.name}`);
+          const response = await drive.files.get({
+            fileId: file.id,
+            alt: 'media',
+          }, { responseType: 'arraybuffer' });
+          
+          const buffer = Buffer.from(response.data);
+          const pdfData = await pdfParse(buffer);
+          
+          if (pdfData.text && pdfData.text.trim().length > 0) {
+            console.log(`  ✅ PDF parsed successfully: ${file.name} (${pdfData.text.length} characters)`);
+            return pdfData.text;
+          } else {
+            console.log(`  ⚠️ PDF has no extractable text: ${file.name}`);
+            return `PDF Document: ${file.name}\n\nNote: This PDF contains no extractable text (possibly scanned image or protected).\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
+          }
+        } catch (pdfError) {
+          console.log(`  ⚠️ Cannot parse PDF ${file.name}: ${pdfError.message}`);
+          return `PDF Document: ${file.name}\n\nNote: PDF text extraction failed - ${pdfError.message}\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
+        }
       }
 
       // Word documents

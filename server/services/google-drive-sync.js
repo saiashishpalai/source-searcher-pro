@@ -1,7 +1,11 @@
 import { google } from 'googleapis';
 import mammoth from 'mammoth';
+import { createRequire } from 'module';
 import OpenAI from 'openai';
 import { computeTfIdf, cosineSimilarity } from '../utils/document-similarity.js';
+import { pdfParser } from './pdf-parser.js';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 /**
  * GoogleDriveSync - Handles Google Drive document processing with incremental sync
@@ -14,7 +18,7 @@ export class GoogleDriveSync {
     
     // SAFETY LIMITS
     this.SYNC_LIMITS = {
-      MAX_DOCUMENTS: parseInt(process.env.MAX_GOOGLE_DRIVE_FILES) || 1000,  // Production limit
+      MAX_DOCUMENTS: parseInt(process.env.MAX_GOOGLE_DRIVE_FILES) || 200,  // 200 document limit
       MAX_FILE_SIZE: 1000000,     // 1MB max per file
       MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
       MAX_TEXT_LENGTH: 15000,      // ~4000 tokens max
@@ -22,6 +26,288 @@ export class GoogleDriveSync {
       CHUNK_OVERLAP: 200,          // Prevent sentence splitting
       STOP_AT_COST: 0.50           // Stop if cost exceeds $0.50
     };
+
+    this.INCREMENTAL_CONFIG = {
+      FULL_SYNC_INTERVAL_DAYS: 30,
+      INCREMENTAL_LOOKBACK_DAYS: 7,
+      BATCH_SIZE: 5
+    };
+  }
+
+  async getSyncMetadata(userId) {
+    const { data } = await this.supabaseAdmin
+      .from('sync_metadata')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('source_type', 'google_drive')
+      .single();
+    return data || null;
+  }
+
+  async updateSyncMetadata(userId, updates) {
+    await this.supabaseAdmin
+      .from('sync_metadata')
+      .upsert({
+        user_id: userId,
+        source_type: 'google_drive',
+        ...updates,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,source_type' });
+  }
+
+  determineSyncType(lastSync, lastFullSync) {
+    if (!lastSync) return 'full';
+    if (lastFullSync) {
+      const days = (Date.now() - new Date(lastFullSync).getTime()) / (1000*60*60*24);
+      if (days > this.INCREMENTAL_CONFIG.FULL_SYNC_INTERVAL_DAYS) return 'full';
+    }
+    return 'incremental';
+  }
+
+  async listFilesOptimized(drive, accessToken, syncType, lastSyncAt) {
+    const files = [];
+    let pageToken = null;
+    const lookbackMs = this.INCREMENTAL_CONFIG.INCREMENTAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    let query = "trashed=false";
+    if (syncType === 'incremental' && lastSyncAt) {
+      const lookback = new Date(new Date(lastSyncAt).getTime() - lookbackMs).toISOString();
+      query += ` and modifiedTime > '${lookback}'`;
+      console.log(`   🔍 Filtering modifiedTime > ${lookback}`);
+    }
+    do {
+      const response = await drive.files.list({
+        pageSize: 100,
+        fields: 'nextPageToken, files(id, name, mimeType, modifiedTime, size, webViewLink, owners, md5Checksum)',
+        q: query,
+        orderBy: 'modifiedTime desc',
+        pageToken
+      });
+      const batch = response.data.files || [];
+      files.push(...batch);
+      pageToken = response.data.nextPageToken;
+      console.log(`📄 Page fetched: +${batch.length}, total=${files.length}${pageToken ? ', hasNext' : ''}`);
+      if (files.length >= this.SYNC_LIMITS.MAX_DOCUMENTS) break;
+    } while (pageToken);
+
+    return files.slice(0, this.SYNC_LIMITS.MAX_DOCUMENTS);
+  }
+
+  async getExistingDocumentHashes(userId) {
+    const { data } = await this.supabaseAdmin
+      .from('documents')
+      .select('id, source_id, content_hash, last_modified_at, content')
+      .eq('user_id', userId)
+      .eq('source_type', 'google_drive')
+      .eq('is_deleted', false);
+    const map = new Map();
+    for (const d of (data || [])) {
+      map.set(d.source_id, { id: d.id, hash: d.content_hash, modified: d.last_modified_at, content: d.content });
+    }
+    return map;
+  }
+
+  needsProcessing(file, existingDoc) {
+    if (!existingDoc) return { needs: true, reason: 'new_file' };
+    const content = existingDoc.content || '';
+    const isPlaceholder = content.includes('PDF text extraction is temporarily disabled') ||
+                          content.includes('PDF text extraction is not yet implemented') ||
+                          content.length < 50;
+    if (isPlaceholder && file.mimeType === 'application/pdf') return { needs: true, reason: 'placeholder' };
+    if (file.md5Checksum && file.md5Checksum === existingDoc.hash) return { needs: false, reason: 'hash_match' };
+    const fileMod = new Date(file.modifiedTime);
+    const docMod = existingDoc.modified ? new Date(existingDoc.modified) : null;
+    if (docMod && fileMod <= docMod) return { needs: false, reason: 'not_modified' };
+    return { needs: true, reason: 'modified' };
+  }
+
+  async processFile(userId, accessToken, file, existingDoc) {
+    let content = '';
+    const metadata = {
+      mimeType: file.mimeType,
+      size: file.size,
+      modifiedTime: file.modifiedTime
+    };
+    try {
+      if (file.mimeType === 'application/pdf') {
+        const r = await pdfParser.parsePDF(file.id, accessToken, file.size, file.md5Checksum);
+        content = r.text;
+        metadata.pages = r.pages;
+        metadata.pdfParsed = true;
+        if (r.metadata?.title) metadata.pdfTitle = r.metadata.title;
+        if (r.metadata?.author) metadata.pdfAuthor = r.metadata.author;
+      } else if (file.mimeType.includes('document')) {
+        const exportUrl = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text/plain`;
+        const resp = await fetch(exportUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);
+        content = await resp.text();
+      } else if (file.mimeType.includes('text')) {
+        const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+        content = await resp.text();
+      } else {
+        throw new Error(`Unsupported mime type: ${file.mimeType}`);
+      }
+
+      if (!content || content.trim().length === 0) throw new Error('Empty content extracted');
+
+      const { data: doc, error: upErr } = await this.supabaseAdmin
+        .from('documents')
+        .upsert({
+          id: existingDoc?.id,
+          user_id: userId,
+          source_type: 'google_drive',
+          source_id: file.id,
+          title: file.name,
+          content,
+          url: file.webViewLink,
+          mime_type: file.mimeType,
+          file_size: parseInt(file.size) || 0,
+          last_modified_at: file.modifiedTime,
+          content_hash: file.md5Checksum || null,
+          sync_status: 'synced',
+          sync_error: null,
+          metadata
+        })
+        .select('id')
+        .single();
+      if (upErr) throw upErr;
+
+      // Chunking and embeddings are handled by existing methods in class
+      const chunks = this.createChunks(content);
+      await this.storeChunks(userId, doc.id, chunks, {
+        title: file.name,
+        url: file.webViewLink
+      });
+
+      return { ok: true };
+    } catch (e) {
+      await this.supabaseAdmin
+        .from('documents')
+        .upsert({
+          id: existingDoc?.id,
+          user_id: userId,
+          source_type: 'google_drive',
+          source_id: file.id,
+          title: file.name,
+          sync_status: 'error',
+          sync_error: e.message
+        });
+      return { ok: false, error: e.message };
+    }
+  }
+
+  createChunks(text) {
+    const chunks = [];
+    const size = this.SYNC_LIMITS.CHUNK_SIZE;
+    const overlap = this.SYNC_LIMITS.CHUNK_OVERLAP;
+    let i = 0;
+    while (i < text.length && chunks.length < this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC) {
+      const end = Math.min(i + size, text.length);
+      chunks.push(text.slice(i, end));
+      i += size - overlap;
+    }
+    return chunks;
+  }
+
+  async storeChunks(userId, documentId, chunks, meta) {
+    if (!chunks.length) return;
+    const embeddings = await this.openai.embeddings.create({
+      model: this.embeddingModel,
+      input: chunks
+    });
+    const rows = chunks.map((chunk, idx) => ({
+      document_id: documentId,
+      user_id: userId,
+      content: chunk,
+      chunk_index: idx,
+      embedding: embeddings.data[idx].embedding,
+      metadata: { source_type: 'google_drive', ...meta }
+    }));
+    await this.supabaseAdmin.from('document_chunks').delete().eq('document_id', documentId);
+    await this.supabaseAdmin.from('document_chunks').insert(rows);
+  }
+
+  async syncGoogleDriveIncremental(userId, accessToken) {
+    const start = Date.now();
+    const stats = { processed: 0, skipped: 0, errors: 0, newFiles: 0, updatedFiles: 0, unchangedFiles: 0 };
+    console.log('\n============================================================');
+    console.log('🚀 GOOGLE DRIVE INCREMENTAL SYNC');
+    console.log('============================================================');
+    console.log(`User: ${userId}`);
+    console.log(`Started: ${new Date().toISOString()}`);
+    console.log('============================================================\n');
+
+    // Setup Drive client
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    const meta = await this.getSyncMetadata(userId);
+    const syncType = this.determineSyncType(meta?.last_sync_at, meta?.last_full_sync_at);
+    await this.updateSyncMetadata(userId, { status: 'running', sync_type: syncType, started_at: new Date().toISOString(), error_message: null, files_processed: 0, files_skipped: 0, files_errored: 0 });
+
+    const files = await this.listFilesOptimized(drive, accessToken, syncType, meta?.last_sync_at);
+    if (files.length === 0) {
+      await this.updateSyncMetadata(userId, { status: 'completed', completed_at: new Date().toISOString(), last_sync_at: new Date().toISOString() });
+      const duration = Date.now() - start;
+      return { success: true, syncType, ...stats, totalDocuments: 0, totalChunks: 0, duration };
+    }
+
+    const existing = await this.getExistingDocumentHashes(userId);
+    const candidates = [];
+    for (const f of files) {
+      const ex = existing.get(f.id);
+      const decision = this.needsProcessing(f, ex);
+      if (decision.needs) {
+        candidates.push({ file: f, existing: ex, reason: decision.reason });
+        if (decision.reason === 'new_file') stats.newFiles++;
+        if (decision.reason === 'modified' || decision.reason === 'placeholder') stats.updatedFiles++;
+      } else {
+        stats.skipped++;
+        stats.unchangedFiles++;
+      }
+    }
+
+    console.log(`\n📦 Processing ${candidates.length} files in batches of ${this.INCREMENTAL_CONFIG.BATCH_SIZE}\n`);
+    for (let i = 0; i < candidates.length; i += this.INCREMENTAL_CONFIG.BATCH_SIZE) {
+      const batch = candidates.slice(i, i + this.INCREMENTAL_CONFIG.BATCH_SIZE);
+      await Promise.all(batch.map(({ file, existing }) => this.processFile(userId, accessToken, file, existing).then(r => { if (r.ok) stats.processed++; else stats.errors++; })));
+      await this.updateSyncMetadata(userId, { files_processed: stats.processed, files_skipped: stats.skipped, files_errored: stats.errors });
+    }
+
+    // Final counts
+    const { count: totalDocs } = await this.supabaseAdmin
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('source_type', 'google_drive')
+      .eq('is_deleted', false);
+    const { count: totalChunks } = await this.supabaseAdmin
+      .from('document_chunks')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    const completion = { status: 'completed', completed_at: new Date().toISOString(), last_sync_at: new Date().toISOString() };
+    if (syncType === 'full') completion.last_full_sync_at = new Date().toISOString();
+    await this.updateSyncMetadata(userId, completion);
+
+    const duration = Date.now() - start;
+    console.log('\n============================================================');
+    console.log('✅ SYNC COMPLETED');
+    console.log('============================================================');
+    console.log(`Type: ${syncType}`);
+    console.log(`New files: ${stats.newFiles}`);
+    console.log(`Updated files: ${stats.updatedFiles}`);
+    console.log(`Unchanged: ${stats.unchangedFiles}`);
+    console.log(`Processed: ${stats.processed}`);
+    console.log(`Skipped: ${stats.skipped}`);
+    console.log(`Errors: ${stats.errors}`);
+    console.log(`Total documents: ${totalDocs || 0}`);
+    console.log(`Total chunks: ${totalChunks || 0}`);
+    console.log(`Duration: ${(duration/1000).toFixed(1)}s`);
+    console.log('============================================================\n');
+
+    return { success: true, syncType, ...stats, totalDocuments: totalDocs || 0, totalChunks: totalChunks || 0, duration };
   }
 
   /**
@@ -182,15 +468,29 @@ export class GoogleDriveSync {
       const lastSyncTimestamp = await this.getLastSyncTimestamp(userId, 'google_drive');
       console.log(`📅 Last sync: ${lastSyncTimestamp || 'Never'}`);
 
-      // List all files
-      const response = await drive.files.list({
-        pageSize: 100,
-        fields: 'files(id, name, mimeType, modifiedTime, size, webViewLink, owners)',
-        q: "trashed=false",
-      });
+      // List files with pagination up to MAX_DOCUMENTS, newest first
+      let files = [];
+      let pageToken = null;
+      const pageSize = Math.min(this.SYNC_LIMITS.MAX_DOCUMENTS, 1000);
+      do {
+        const response = await drive.files.list({
+          pageSize,
+          fields: 'nextPageToken, files(id, name, mimeType, modifiedTime, size, webViewLink, owners)',
+          q: "trashed=false",
+          orderBy: 'modifiedTime desc',
+          pageToken,
+        });
+        const batch = response.data.files || [];
+        files.push(...batch);
+        pageToken = response.data.nextPageToken;
+        console.log(`📄 Page fetched: +${batch.length}, total=${files.length}${pageToken ? `, nextPageToken present` : ''}`);
+        if (files.length >= this.SYNC_LIMITS.MAX_DOCUMENTS) break;
+      } while (pageToken);
 
-      const files = response.data.files || [];
-      console.log(`📁 Found ${files.length} files in Google Drive`);
+      if (files.length > this.SYNC_LIMITS.MAX_DOCUMENTS) {
+        files = files.slice(0, this.SYNC_LIMITS.MAX_DOCUMENTS);
+      }
+      console.log(`📁 Files considered for sync: ${files.length} (limit ${this.SYNC_LIMITS.MAX_DOCUMENTS})`);
 
       const processedDocs = [];
       let processedCount = 0;
@@ -201,6 +501,18 @@ export class GoogleDriveSync {
         // SAFETY CHECK #1: Document limit
         if (processedCount >= this.SYNC_LIMITS.MAX_DOCUMENTS) {
           console.log(`🛑 Safety limit reached: Processed ${processedCount}/${this.SYNC_LIMITS.MAX_DOCUMENTS} documents`);
+          
+          // Enhanced progress callback with limit information
+          if (progressCallback) {
+            progressCallback({
+              status: 'limit_reached',
+              processedDocuments: processedCount,
+              totalDocuments: this.SYNC_LIMITS.MAX_DOCUMENTS,
+              limitReached: true,
+              message: `Document limit reached! Processed ${processedCount} of ${this.SYNC_LIMITS.MAX_DOCUMENTS} documents.`,
+              remainingFiles: files.length - processedCount
+            });
+          }
           break;
         }
 
@@ -216,16 +528,23 @@ export class GoogleDriveSync {
           // Check if document already exists in database
           const { data: existingDoc } = await this.supabaseAdmin
             .from('documents')
-            .select('id, metadata')
+            .select('id, metadata, content')
             .eq('user_id', userId)
             .eq('source_type', 'google_drive')
             .eq('source_id', file.id)
             .single();
 
           if (existingDoc) {
-            // Check if file has changed using revision ID
+            // Check if file has changed using revision ID OR needs reprocessing (placeholder content)
             const storedRevisionId = existingDoc.metadata?.revision_id;
-            const hasChanged = await this.hasFileChanged(drive, file.id, storedRevisionId);
+            let hasChanged = await this.hasFileChanged(drive, file.id, storedRevisionId);
+            // Force reprocess if previous run stored placeholder PDF content
+            const placeholderPattern = 'PDF text extraction is temporarily disabled';
+            const hadPlaceholder = typeof existingDoc.content === 'string' && existingDoc.content.includes(placeholderPattern);
+            if (!hasChanged && hadPlaceholder) {
+              console.log(`  ♻️ Forcing reprocess for ${file.name} due to previous placeholder PDF content`);
+              hasChanged = true;
+            }
             
             if (!hasChanged) {
               console.log(`  ✅ File ${file.name} unchanged, skipping (revision ${storedRevisionId})`);
@@ -320,6 +639,8 @@ export class GoogleDriveSync {
       // Update last sync timestamp
       await this.updateLastSyncTimestamp(userId, 'google_drive');
 
+      const limitReached = processedCount >= this.SYNC_LIMITS.MAX_DOCUMENTS;
+      
       console.log(`🎉 Google Drive incremental sync complete: ${processedDocs.length} documents processed, ${skippedCount} skipped, estimated cost: $${totalCost.toFixed(3)}`);
       return {
         synced: processedDocs.length,
@@ -327,6 +648,9 @@ export class GoogleDriveSync {
         total: files.length,
         details: processedDocs,
         message: `Successfully synced ${processedDocs.length} documents, skipped ${skippedCount} unchanged files`,
+        limitReached: limitReached,
+        processedDocuments: processedCount,
+        remainingFiles: limitReached ? files.length - processedCount : 0,
         // User-friendly incremental sync feedback
         incrementalStats: {
           totalFiles: files.length,
@@ -366,10 +690,29 @@ export class GoogleDriveSync {
         }
       }
 
-      // PDF - Skip for now to avoid pdf-parse startup issues
+      // PDF parsing
       if (file.mimeType === 'application/pdf') {
-        console.log(`  📄 PDF file detected: ${file.name} - PDF parsing temporarily disabled`);
-        return `PDF Document: ${file.name}\n\nNote: PDF text extraction is temporarily disabled due to technical issues.\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
+        try {
+          console.log(`  📄 Processing PDF: ${file.name}`);
+          const response = await drive.files.get({
+            fileId: file.id,
+            alt: 'media',
+          }, { responseType: 'arraybuffer' });
+          
+          const buffer = Buffer.from(response.data);
+          const pdfData = await pdfParse(buffer);
+          
+          if (pdfData.text && pdfData.text.trim().length > 0) {
+            console.log(`  ✅ PDF parsed successfully: ${file.name} (${pdfData.text.length} characters)`);
+            return pdfData.text;
+          } else {
+            console.log(`  ⚠️ PDF has no extractable text: ${file.name}`);
+            return `PDF Document: ${file.name}\n\nNote: This PDF contains no extractable text (possibly scanned image or protected).\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
+          }
+        } catch (pdfError) {
+          console.log(`  ⚠️ Cannot parse PDF ${file.name}: ${pdfError.message}`);
+          return `PDF Document: ${file.name}\n\nNote: PDF text extraction failed - ${pdfError.message}\n\nFile URL: https://drive.google.com/file/d/${file.id}/view\nCreated: ${new Date(file.createdTime).toISOString()}`;
+        }
       }
 
       // Word documents

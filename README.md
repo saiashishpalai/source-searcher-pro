@@ -6,9 +6,10 @@ A powerful AI-powered search platform that connects to your Google Drive, Slack,
 
 - **Multi-Source Search**: Search across Google Drive, Slack, and Notion simultaneously
 - **AI-Powered**: Advanced semantic search with OpenAI integration
-- **Real-time Sync**: Automatic content synchronization from connected sources
-- **Secure OAuth**: Industry-standard OAuth 2.0 authentication
-- **Modern UI**: Clean, responsive interface built with React and Tailwind CSS
+- **Incremental Sync (Drive)**: Sync only new/updated files using `modifiedTime` + `md5Checksum`
+- **PDF Parsing**: Robust parsing with caching, timeouts, and graceful fallbacks
+- **Safety Limits**: Per-run cap of 200 Drive files with newest-first pagination
+- **Modern UI**: Progress `(processed/200)` and post-sync KPIs (Files, Updated, Unchanged, Efficiency)
 
 ## 🏗️ Architecture
 
@@ -66,9 +67,9 @@ A powerful AI-powered search platform that connects to your Google Drive, Slack,
 ```
 ├── src/                    # Frontend React application
 ├── server/                 # Backend Express server
-├── database/              # Database migrations and schemas
-├── docs/                  # Documentation
-└── public/                # Static assets
+├── database/               # Database migrations and schemas
+├── docs/                   # Documentation
+└── public/                 # Static assets
 ```
 
 ### Available Scripts

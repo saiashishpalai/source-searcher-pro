@@ -37,6 +37,8 @@ import {
 import { getEnvVar } from '@/lib/env';
 import { ApiClient } from '@/lib/api-client';
 import IncrementalSyncFeedback from '@/components/IncrementalSyncFeedback';
+import DocumentLimitDialog from '@/components/DocumentLimitDialog';
+import { toast } from '@/components/ui/sonner';
 
 // SVG Icon Components (reusing from existing components)
 const SlackIcon = ({ className = "" }: { className?: string }) => (
@@ -105,7 +107,7 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 );
 
 // Connection Status Component
-    const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing, onSyncDocuments, isSyncing, syncStatus, syncStatusLoading = false, syncError = null, setSyncError, onClearData, incrementalSyncResults }: {
+    const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing, onSyncDocuments, isSyncing, syncStatus, syncStatusLoading = false, syncError = null, setSyncError, onClearData, incrementalSyncResults, limitReached, limitInfo, onLimitDialogOpen }: {
       connection: any;
       onRefresh: () => void;
       onDisconnect: () => void;
@@ -118,6 +120,9 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
       setSyncError?: (error: string | null) => void;
       onClearData?: () => void;
       incrementalSyncResults?: any;
+      limitReached?: boolean;
+      limitInfo?: any;
+      onLimitDialogOpen?: () => void;
     }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -174,14 +179,67 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
         </Button>
       </div>
 
+      {/* Document Limit Warning */}
+      {limitReached && limitInfo && (
+        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                Document Limit Reached
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                {limitInfo.message}
+                {limitInfo.remainingFiles > 0 && (
+                  <span className="block mt-1">
+                    {limitInfo.remainingFiles} files were not processed due to the 200 document limit.
+                  </span>
+                )}
+              </p>
+              {onLimitDialogOpen && (
+                <button
+                  onClick={onLimitDialogOpen}
+                  className="text-xs text-amber-600 dark:text-amber-400 hover:underline mt-1"
+                >
+                  Learn more
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sync Progress */}
       {connection.sync_in_progress && (
         <div className="space-y-2 mb-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Syncing...</span>
-            <span className="font-medium">{connection.sync_progress || 0}%</span>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const processed = (syncStatus?.[connection.source_type]?.filesProcessed) || (connection.processedDocuments) || 0;
+                const percent = Math.min(100, Math.round((processed / 200) * 100)) || 0;
+                return (
+                  <>
+                    <span className="font-medium">{percent}%</span>
+                    <span className="text-xs text-muted-foreground">({processed}/200)</span>
+                  </>
+                );
+              })()}
+            </div>
           </div>
-          <Progress value={connection.sync_progress || 0} className="h-2" />
+          {(() => {
+            const processed = (syncStatus?.[connection.source_type]?.filesProcessed) || (connection.processedDocuments) || 0;
+            const percent = Math.min(100, Math.round((processed / 200) * 100)) || 0;
+            return <Progress value={percent} className="h-2" />;
+          })()}
+          
+          {/* Limit warning when approaching limit */}
+          {connection.processedDocuments && connection.processedDocuments >= 180 && (
+            <div className="text-xs text-amber-500 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Approaching 200 document limit
+            </div>
+          )}
         </div>
       )}
 
@@ -548,6 +606,9 @@ const ConnectedSources = () => {
   const [syncStatusLoading, setSyncStatusLoading] = useState(false);
   const [syncError, setSyncError] = useState<Record<string, string | null>>({});
   const [incrementalSyncResults, setIncrementalSyncResults] = useState<Record<string, any>>({});
+  const [limitReached, setLimitReached] = useState<Record<string, boolean>>({});
+  const [limitInfo, setLimitInfo] = useState<Record<string, any>>({});
+  const [limitDialogOpen, setLimitDialogOpen] = useState<Record<string, boolean>>({});
 
   // Mock data for demonstration - in real app this would come from API
   const availableSources = [
@@ -771,6 +832,7 @@ const ConnectedSources = () => {
     // Set syncing state for this specific source
     setSyncingDocuments(prev => ({ ...prev, [sourceType]: true }));
     setSyncError(prev => ({ ...prev, [sourceType]: null }));
+    setLimitReached(prev => ({ ...prev, [sourceType]: false }));
     
     if (!session?.access_token) {
       setSyncError(prev => ({ ...prev, [sourceType]: 'Your session has expired. Please refresh the page to log in again.' }));
@@ -810,6 +872,30 @@ const ConnectedSources = () => {
       
       console.log('✅ Sync complete:', data);
       
+      // Check if limit was reached
+      if (data.limitReached) {
+        setLimitReached(prev => ({ ...prev, [sourceType]: true }));
+        setLimitInfo(prev => ({ 
+          ...prev, 
+          [sourceType]: {
+            processedCount: data.processedDocuments,
+            remainingFiles: data.remainingFiles || 0,
+            message: data.message
+          }
+        }));
+        
+        // Show toast notification
+        toast.warning("Document Limit Reached", {
+          description: `Processed ${data.processedDocuments} of 200 documents. ${data.remainingFiles || 0} files will be processed in the next sync.`,
+          duration: 5000,
+        });
+      } else {
+        // Show success toast
+        toast.success("Sync Complete", {
+          description: `Successfully synced ${data.synced} documents from ${sourceName}`,
+        });
+      }
+      
       if (data.synced === 0) {
         setSyncError(prev => ({ ...prev, [sourceType]: `No documents were synced from ${sourceName}. Make sure you have accessible content.` }));
       }
@@ -820,6 +906,37 @@ const ConnectedSources = () => {
           ...prev,
           [sourceType]: {
             ...data.incrementalStats,
+            timestamp: new Date().toISOString(),
+            sourceName: sourceName
+          }
+        }));
+      } else if (sourceType === 'google_drive') {
+        // Build stats object from incremental sync response fields for Google Drive
+        const processed = Number(data.processed || 0);
+        const skipped = Number(data.skipped || 0);
+        const updatedFiles = Number(data.updatedFiles || 0);
+        const newFiles = Number(data.newFiles || 0);
+        const unchangedFiles = Number(data.unchangedFiles || 0);
+        const errors = Number(data.errors || 0);
+        const totalCandidates = processed + skipped + errors || 0;
+        const efficiency = totalCandidates > 0 ? Math.round((processed / totalCandidates) * 100) : 100;
+        const totalFiles = newFiles + updatedFiles + unchangedFiles;
+
+        setIncrementalSyncResults(prev => ({
+          ...prev,
+          [sourceType]: {
+            processed,
+            skipped,
+            errors,
+            newFiles,
+            updatedFiles,
+            unchangedFiles,
+            totalFiles,
+            totalCandidates,
+            efficiency,
+            isIncremental: (data.syncType === 'incremental'),
+            totalDocuments: data.totalDocuments || 0,
+            totalChunks: data.totalChunks || 0,
             timestamp: new Date().toISOString(),
             sourceName: sourceName
           }
@@ -852,6 +969,15 @@ const ConnectedSources = () => {
     } finally {
       setSyncingDocuments(prev => ({ ...prev, [sourceType]: false }));
     }
+  };
+
+  // Limit dialog handlers
+  const handleLimitDialogOpen = (sourceType: string) => {
+    setLimitDialogOpen(prev => ({ ...prev, [sourceType]: true }));
+  };
+
+  const handleLimitDialogClose = (sourceType: string) => {
+    setLimitDialogOpen(prev => ({ ...prev, [sourceType]: false }));
   };
 
   const getConnectedSources = () => {
@@ -931,6 +1057,20 @@ const ConnectedSources = () => {
           </div>
         </div>
 
+        {/* Document Limits Info */}
+        <div className="border-b border-border/30 bg-muted/20">
+          <div className="max-w-6xl mx-auto px-6 py-4">
+            <div className="flex items-center gap-2 text-sm">
+              <Info className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium">Document Limits</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Each source is limited to 200 documents per sync to ensure optimal performance. 
+              Future syncs will process remaining files automatically.
+            </p>
+          </div>
+        </div>
+
         {/* Main Content */}
         <div className="flex-1">
           <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
@@ -1001,6 +1141,13 @@ const ConnectedSources = () => {
             handleClearData(dbSourceType);
           }}
           incrementalSyncResults={incrementalSyncResults}
+          limitReached={limitReached[source.id === 'googleDrive' ? 'google_drive' : source.id] || false}
+          limitInfo={limitInfo[source.id === 'googleDrive' ? 'google_drive' : source.id]}
+          onLimitDialogOpen={() => {
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const dbSourceType = sourceTypeMap[source.id] || source.id;
+            handleLimitDialogOpen(dbSourceType);
+          }}
         />
                     ) : (
                       <div className="mt-auto space-y-3">
@@ -1121,6 +1268,23 @@ const ConnectedSources = () => {
         source={selectedSource}
         onConnect={() => handleConnect(selectedSource?.id)}
       />
+
+      {/* Document Limit Dialogs */}
+      {connectedSources.map((source) => {
+        const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+        const dbSourceType = sourceTypeMap[source.id] || source.id;
+        
+        return (
+          <DocumentLimitDialog
+            key={dbSourceType}
+            isOpen={limitDialogOpen[dbSourceType] || false}
+            onClose={() => handleLimitDialogClose(dbSourceType)}
+            sourceType={dbSourceType}
+            processedCount={limitInfo[dbSourceType]?.processedCount || 0}
+            remainingFiles={limitInfo[dbSourceType]?.remainingFiles || 0}
+          />
+        );
+      })}
     </div>
   );
 };

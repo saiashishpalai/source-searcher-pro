@@ -13,7 +13,7 @@ export class NotionSync {
     
     // SAFETY LIMITS (matching Google Drive)
     this.SYNC_LIMITS = {
-      MAX_DOCUMENTS: parseInt(process.env.MAX_NOTION_PAGES) || 500,  // Production limit
+      MAX_DOCUMENTS: parseInt(process.env.MAX_NOTION_PAGES) || 200,  // 200 document limit
       MAX_TEXT_LENGTH: 15000,      // ~4000 tokens max
       MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
       CHUNK_SIZE: 1500,            // ~400 tokens

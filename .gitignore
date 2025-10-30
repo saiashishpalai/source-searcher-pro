@@ -135,3 +135,10 @@ desktop.ini
 # ==========================================
 .vercel
 .turbo
+
+# ==========================================
+# Local-only design docs
+# ==========================================
+docs/design/HLD.md
+docs/design/LLD.md
+docs/design/System_Design.md

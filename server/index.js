@@ -42,6 +42,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Minimal request logger for sync endpoints to aid debugging during development
+app.use((req, _res, next) => {
+  if (req.path.startsWith('/api/sync')) {
+    console.log(`⇢ ${req.method} ${req.path}`);
+  }
+  next();
+});
+
 // Serve static files from the dist directory
 app.use(express.static('dist'));
 
@@ -915,17 +923,36 @@ app.post('/api/sync/google-drive', async (req, res) => {
     
     console.log('✓ Starting Google Drive sync...');
     
-    // Validate OAuth token first
+    // Validate OAuth token first (with timeout)
     console.log('🔍 Testing Google Drive token...');
-    const testResponse = await fetch(
-      'https://www.googleapis.com/drive/v3/about?fields=user',
-      { 
-        headers: { 
-          'Authorization': `Bearer ${connection.access_token}`,
-          'Content-Type': 'application/json'
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    let testResponse;
+    try {
+      testResponse = await fetch(
+        'https://www.googleapis.com/drive/v3/about?fields=user',
+        { 
+          headers: { 
+            'Authorization': `Bearer ${connection.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
         }
+      );
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError') {
+        console.error('✗ OAuth token validation timed out');
+        return res.status(504).json({ 
+          error: 'Google OAuth validation timed out',
+          code: 'TOKEN_VALIDATION_TIMEOUT'
+        });
       }
-    );
+      console.error('✗ OAuth token validation failed:', e.message);
+      return res.status(500).json({ error: 'Validation failed', code: 'VALIDATION_FAILED' });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     
     console.log(`📊 Token test response: ${testResponse.status} ${testResponse.ok ? 'OK' : 'FAILED'}`);
     
@@ -943,9 +970,9 @@ app.post('/api/sync/google-drive', async (req, res) => {
     
     console.log('✅ OAuth token is valid');
     
-    // Call sync service with real-time logging
-    const result = await googleDriveSync.syncGoogleDrive(
-      user.id, 
+    // Call incremental sync service
+    const result = await googleDriveSync.syncGoogleDriveIncremental(
+      user.id,
       connection.access_token
     );
     

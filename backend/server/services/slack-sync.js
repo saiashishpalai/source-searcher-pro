@@ -1,6 +1,9 @@
 import { WebClient } from '@slack/web-api';
 import OpenAI from 'openai';
+import { createRequire } from 'module';
 import { computeTfIdf, cosineSimilarity } from '../utils/document-similarity.js';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 /**
  * SlackSync - Handles Slack message/file processing and embedding generation
@@ -13,6 +16,7 @@ export class SlackSync {
     
     // SAFETY LIMITS (matching Google Drive and Notion)
     this.SYNC_LIMITS = {
+      MAX_DOCUMENTS: parseInt(process.env.MAX_SLACK_FILES) || 200,  // 200 document limit
       MAX_CHANNELS: parseInt(process.env.MAX_SLACK_CHANNELS) || 100,  // Production limit
       MAX_MESSAGES_PER_CHANNEL: parseInt(process.env.MAX_SLACK_MESSAGES_PER_CHANNEL) || 1000,  // Production limit
       MESSAGE_DAYS_BACK: 30,         // Last 30 days only
@@ -1055,16 +1059,21 @@ export class SlackSync {
           // Check if file already exists in database
           const { data: existingDoc } = await this.supabaseAdmin
             .from('documents')
-            .select('id, synced_at')
+            .select('id, synced_at, content')
             .eq('user_id', userId)
             .eq('source_type', 'slack')
             .eq('source_id', file.id)
             .single();
           
           if (existingDoc) {
-            console.log(`  ✓ Already synced: ${file.name} (last synced: ${existingDoc.synced_at})`);
-            processed++; // Count as processed
-            continue;
+            const hadPlaceholder = typeof existingDoc.content === 'string' && existingDoc.content.includes('PDF text extraction is not yet implemented');
+            if (!hadPlaceholder) {
+              console.log(`  ✓ Already synced: ${file.name} (last synced: ${existingDoc.synced_at})`);
+              processed++; // Count as processed
+              continue;
+            } else {
+              console.log(`  ♻️ Reprocessing previously placeholder PDF: ${file.name}`);
+            }
           }
           
           // Skip files that are too old or not accessible
@@ -1191,10 +1200,37 @@ export class SlackSync {
         }
       }
 
-      // For PDF files, return metadata with note that PDF extraction needs implementation
+      // For PDF files, download and parse
       if (fileData.filetype === 'pdf') {
-        console.log(`  📄 PDF file detected: ${fileData.name}`);
-        return `PDF Document: ${fileData.name}\n\nNote: PDF text extraction is not yet implemented. This file contains ${Math.round(fileData.size / 1024)}KB of data.\n\nTo enable PDF search:\n1. The file needs to be downloaded from Slack\n2. PDF text extraction library (like pdf-parse) needs to be added\n3. Text content would be extracted and indexed\n\nFile URL: ${fileData.permalink}\nCreated: ${new Date(fileData.created * 1000).toISOString()}`;
+        try {
+          console.log(`  📄 Processing PDF: ${fileData.name}`);
+          
+          // Download PDF file
+          const response = await fetch(fileData.url_private_download, {
+            headers: {
+              'Authorization': `Bearer ${slack.token}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to download PDF: ${response.statusText}`);
+          }
+          
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const pdfData = await pdfParse(buffer);
+          
+          if (pdfData.text && pdfData.text.trim().length > 0) {
+            console.log(`  ✅ PDF parsed successfully: ${fileData.name} (${pdfData.text.length} characters)`);
+            return pdfData.text;
+          } else {
+            console.log(`  ⚠️ PDF has no extractable text: ${fileData.name}`);
+            return `PDF Document: ${fileData.name}\n\nNote: This PDF contains no extractable text (possibly scanned image or protected).\n\nFile URL: ${fileData.permalink}\nCreated: ${new Date(fileData.created * 1000).toISOString()}`;
+          }
+        } catch (pdfError) {
+          console.log(`  ⚠️ Cannot parse PDF ${fileData.name}: ${pdfError.message}`);
+          return `PDF Document: ${fileData.name}\n\nNote: PDF text extraction failed - ${pdfError.message}\n\nFile URL: ${fileData.permalink}\nCreated: ${new Date(fileData.created * 1000).toISOString()}`;
+        }
       }
 
       // For other file types, return metadata
