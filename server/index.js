@@ -909,7 +909,7 @@ app.post('/api/sync/google-drive', async (req, res) => {
     // Get Google Drive connection
     const { data: connection, error: connError } = await supabaseAdmin
       .from('user_connections')
-      .select('access_token')
+      .select('access_token, refresh_token, token_expires_at')
       .eq('user_id', user.id)
       .eq('source_type', 'google_drive')
       .single();
@@ -923,6 +923,85 @@ app.post('/api/sync/google-drive', async (req, res) => {
     
     console.log('✓ Starting Google Drive sync...');
     
+    // Check if token is expired or close to expiring (within 5 minutes)
+    let accessToken = connection.access_token;
+    const now = new Date();
+    const expiresAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
+    
+    // TEST MODE: Set to true to force token refresh (for testing only)
+    // WARNING: Change back to false before deploying to production!
+    const TEST_FORCE_REFRESH = true;
+    
+    // If TEST_FORCE_REFRESH is enabled, treat token as expired
+    const fiveMinutesFromNow = TEST_FORCE_REFRESH 
+      ? new Date(now.getTime() - 1000) // Force expiration check
+      : new Date(now.getTime() + 5 * 60 * 1000);
+    
+    console.log('🔍 Token refresh check:', {
+      hasRefreshToken: !!connection.refresh_token,
+      hasExpiresAt: !!expiresAt,
+      expiresAt: expiresAt?.toISOString(),
+      fiveMinutesFromNow: fiveMinutesFromNow.toISOString(),
+      willRefresh: expiresAt && expiresAt < fiveMinutesFromNow && connection.refresh_token,
+      TEST_MODE: TEST_FORCE_REFRESH
+    });
+    
+    // If token is expired or will expire soon, refresh it
+    if (expiresAt && expiresAt < fiveMinutesFromNow && connection.refresh_token) {
+      if (TEST_FORCE_REFRESH) {
+        console.log('🧪 TEST MODE: Forcing token refresh...');
+      }
+      console.log('🔄 Access token expired or expiring soon, refreshing...');
+      
+      try {
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            refresh_token: connection.refresh_token,
+            grant_type: 'refresh_token',
+          }),
+        });
+        
+        if (!refreshResponse.ok) {
+          console.error('✗ Token refresh failed:', await refreshResponse.text());
+          return res.status(401).json({ 
+            error: 'Google OAuth token expired and refresh failed',
+            code: 'TOKEN_EXPIRED',
+            message: 'Please reconnect Google Drive'
+          });
+        }
+        
+        const refreshData = await refreshResponse.json();
+        accessToken = refreshData.access_token;
+        
+        const newExpiresAt = refreshData.expires_in 
+          ? new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+          : null;
+        
+        await supabaseAdmin
+          .from('user_connections')
+          .update({
+            access_token: accessToken,
+            token_expires_at: newExpiresAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id)
+          .eq('source_type', 'google_drive');
+        
+        console.log('✅ Token refreshed successfully');
+      } catch (refreshError) {
+        console.error('✗ Token refresh error:', refreshError.message);
+        return res.status(401).json({ 
+          error: 'Google OAuth token refresh failed',
+          code: 'TOKEN_EXPIRED',
+          message: 'Please reconnect Google Drive'
+        });
+      }
+    }
+    
     // Validate OAuth token first (with timeout)
     console.log('🔍 Testing Google Drive token...');
     const controller = new AbortController();
@@ -933,7 +1012,7 @@ app.post('/api/sync/google-drive', async (req, res) => {
         'https://www.googleapis.com/drive/v3/about?fields=user',
         { 
           headers: { 
-            'Authorization': `Bearer ${connection.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           },
           signal: controller.signal
@@ -973,7 +1052,7 @@ app.post('/api/sync/google-drive', async (req, res) => {
     // Call incremental sync service
     const result = await googleDriveSync.syncGoogleDriveIncremental(
       user.id,
-      connection.access_token
+      accessToken
     );
     
     console.log(`✓ Sync complete: ${result.synced} documents, ${result.skipped} skipped`);
