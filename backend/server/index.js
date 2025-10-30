@@ -536,7 +536,7 @@ app.post('/api/sync/google-drive', async (req, res) => {
     
     // TEST MODE: Set to true to force token refresh (for testing only)
     // WARNING: Change back to false before deploying to production!
-    const TEST_FORCE_REFRESH = true;
+    const TEST_FORCE_REFRESH = false;
     
     // If TEST_FORCE_REFRESH is enabled, treat token as expired
     const fiveMinutesFromNow = TEST_FORCE_REFRESH 
