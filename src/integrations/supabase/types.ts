@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      waitlist_signups: {
+        Row: {
+          id: string
+          full_name: string
+          email: string
+          company_name: string
+          job_title: string
+          whatsapp_number: string | null
+          whatsapp_country_code: string | null
+          company_size: string
+          primary_use_case: string
+          pain_level: string
+          agree_to_contact: boolean
+          utm_source: string | null
+          utm_medium: string | null
+          utm_campaign: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          full_name: string
+          email: string
+          company_name: string
+          job_title: string
+          whatsapp_number?: string | null
+          whatsapp_country_code?: string | null
+          company_size: string
+          primary_use_case: string
+          pain_level: string
+          agree_to_contact: boolean
+          utm_source?: string | null
+          utm_medium?: string | null
+          utm_campaign?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          full_name?: string
+          email?: string
+          company_name?: string
+          job_title?: string
+          whatsapp_number?: string | null
+          whatsapp_country_code?: string | null
+          company_size?: string
+          primary_use_case?: string
+          pain_level?: string
+          agree_to_contact?: boolean
+          utm_source?: string | null
+          utm_medium?: string | null
+          utm_campaign?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null

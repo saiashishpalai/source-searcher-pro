@@ -12,6 +12,8 @@ import ConnectedSources from "./pages/ConnectedSources";
 import ProfileSettings from "./pages/ProfileSettings";
 import Documentation from "./pages/Documentation";
 import NotFound from "./pages/NotFound";
+import Waitlist from "./pages/Waitlist";
+import WaitlistDashboard from "./pages/admin/WaitlistDashboard";
 
 const App = () => {
   return (
@@ -23,6 +25,8 @@ const App = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/waitlist" element={<Waitlist />} />
+      <Route path="/admin/waitlist" element={<WaitlistDashboard />} />
       
       {/* Protected routes */}
       <Route path="/dashboard" element={
