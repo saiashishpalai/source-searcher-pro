@@ -517,10 +517,9 @@ Follow the format from the examples above. Write Answer sections as single unbro
     try {
       console.log(`🔍 Searching for: "${query}" (user: ${userId})`);
 
-      // Classify query type for tailored processing
+      // Get boost terms for re-ranking (optional, helps with relevance)
       const queryClassification = this.classifyQuery(query);
-      const queryType = queryClassification.type;
-      console.log(`📊 Query classified as: ${queryType} (boost terms: ${queryClassification.boostTerms.length})`);
+      console.log(`📊 Boost terms identified: ${queryClassification.boostTerms.length}`);
 
       // 1. Generate query embedding
       const queryEmbedding = await this.generateQueryEmbedding(query);
@@ -759,8 +758,8 @@ Follow the format from the examples above. Write Answer sections as single unbro
       const deduplicatedChunks = this.deduplicateVersions(boostedChunks);
       console.log(`🔄 Deduplicated versions: ${boostedChunks.length} → ${deduplicatedChunks.length} chunks`);
 
-      // 3. Generate AI summary using RAG with query-type-specific prompt
-      const aiSummary = await this.generateSummary(query, deduplicatedChunks, queryType);
+      // 3. Generate AI summary using RAG with flexible prompting
+      const aiSummary = await this.generateSummary(query, deduplicatedChunks);
 
       // 4. Format results
       const results = deduplicatedChunks.map(chunk => {
@@ -1192,7 +1191,7 @@ Follow the format from the examples above. Write Answer sections as single unbro
   /**
    * Regenerate summary with higher temperature for variation
    */
-  async regenerateSummary(query, results, queryType = 'general') {
+  async regenerateSummary(query, results) {
     try {
       // Convert results back to chunks format for summary generation
       const chunks = results.map(result => ({
@@ -1206,66 +1205,57 @@ Follow the format from the examples above. Write Answer sections as single unbro
 
       const maxChunks = 10;
       const contextChunks = chunks.slice(0, maxChunks);
-      
-      // Enhanced context formatting with separators
+
+      if (contextChunks.length === 0) {
+        return "No relevant documents found. Try rephrasing your question or check if documents are synced.";
+      }
+
+      // Format context with numbered references
       const context = contextChunks
-        .map(chunk => {
+        .map((chunk, idx) => {
           const sourceType = chunk.metadata?.source_type || 'unknown';
           const title = chunk.metadata?.title || 'Unknown Document';
-          return `Source: ${sourceType} - ${title}\nContent: ${chunk.content}`;
+          return `[${idx + 1}] ${sourceType} - ${title}\n${chunk.content}`;
         })
         .join('\n\n---\n\n');
 
-      const prompt = `User's question: "${query}"
+      const systemPrompt = `You answer questions by searching a product manager's documents (PRDs, Slack threads, meeting notes, metrics).
 
-Documents found:
+Your job: Extract the answer from the documents and present it clearly.
+
+Format guidelines:
+- Status questions → bullet list of current state
+- Metric questions → highlight numbers clearly
+- "What did we decide?" → quote the decision + who/when
+- "Where is X?" → point to specific doc/section
+- Process questions → numbered steps
+- Can't find it → "Not found in your documents"
+
+Always cite sources: "According to [doc name]..." or "In [doc name]..." or reference by number "[1]"
+
+Be specific. Use exact quotes, numbers, and names from the documents. Never add information not provided.`;
+
+      const prompt = `Question: "${query}"
+
+Documents:
+
 ${context}
 
-Answer the question using the format specified. Only use information from the documents. If you can't answer from these documents, say 'Not found in your documents.'`;
-
-      // Get system prompt for this query type
-      const systemPrompt = this.getSystemPrompt(queryType);
-
-      // Token limits by query type
-      const tokenLimits = {
-        strategic: 600,
-        status: 500,
-        client_context: 500,
-        comparison: 550,
-        metrics: 400,
-        process: 500,
-        definition: 350,
-        timeline: 500,
-        problem: 500,
-        recommendation: 550,
-        meeting: 500,
-        risk: 500,
-        ownership: 350,
-        historical: 500,
-        enumeration: 500,
-        general: 400
-      };
-      const maxTokens = tokenLimits[queryType] || 400;
+Answer using only these documents. Be specific and cite sources.`;
 
       const response = await this.openai.chat.completions.create({
         model: this.llmModel,
         messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
         ],
-        max_tokens: maxTokens,
+        max_tokens: 800,
         temperature: 0.7, // Higher temperature for more variation in regeneration
       });
 
       return response.choices[0].message.content;
     } catch (error) {
-      console.error('Error regenerating summary:', error);
+      console.error('❌ Summary regeneration failed:', error);
       
       if (error.code === 'insufficient_quota' || error.status === 429) {
         console.log('⚠️ OpenAI quota exceeded for summary regeneration');
@@ -1277,75 +1267,86 @@ Answer the question using the format specified. Only use information from the do
   }
 
   /**
-   * Generate AI summary using RAG with safety limits
+   * Generate AI summary using RAG with simplified, flexible prompting
    */
-  async generateSummary(query, chunks, queryType = 'general') {
+  async generateSummary(query, chunks) {
     try {
-      // SAFETY: Limit context to prevent high costs
+      // Cost control
       const maxChunks = 10;
       const contextChunks = chunks.slice(0, maxChunks);
-      
-      // Enhanced context formatting with separators
+
+      if (contextChunks.length === 0) {
+        return "No relevant documents found. Try rephrasing your question or check if documents are synced.";
+      }
+
+      // Format context with numbered references
       const context = contextChunks
-        .map(chunk => {
+        .map((chunk, idx) => {
           const sourceType = chunk.metadata?.source_type || 'unknown';
           const title = chunk.metadata?.title || 'Unknown Document';
-          return `Source: ${sourceType} - ${title}\nContent: ${chunk.content}`;
+          return `[${idx + 1}] ${sourceType} - ${title}\n${chunk.content}`;
         })
         .join('\n\n---\n\n');
 
-      const prompt = `User's question: "${query}"
+      const systemPrompt = `You answer questions by searching a product manager's documents (PRDs, Slack threads, meeting notes, metrics).
 
-Documents found:
+Your job: Extract the answer from the documents and present it clearly.
+
+Format guidelines:
+- Status questions → bullet list of current state
+- Metric questions → highlight numbers clearly
+- "What did we decide?" → quote the decision + who/when
+- "Where is X?" → point to specific doc/section
+- Process questions → numbered steps
+- Can't find it → "Not found in your documents"
+
+Always cite sources: "According to [doc name]..." or "In [doc name]..." or reference by number "[1]"
+
+Be specific. Use exact quotes, numbers, and names from the documents. Never add information not provided.`;
+
+      const prompt = `Question: "${query}"
+
+Documents:
+
 ${context}
 
-Answer the question using the format specified. Only use information from the documents. If you can't answer from these documents, say 'Not found in your documents.'`;
-
-      // Get system prompt for this query type
-      const systemPrompt = this.getSystemPrompt(queryType);
-
-      // Token limits by query type
-      const tokenLimits = {
-        strategic: 600,
-        status: 500,
-        client_context: 500,
-        comparison: 550,
-        metrics: 400,
-        process: 500,
-        definition: 350,
-        timeline: 500,
-        problem: 500,
-        recommendation: 550,
-        meeting: 500,
-        risk: 500,
-        ownership: 350,
-        historical: 500,
-        enumeration: 500,
-        general: 400
-      };
-      const maxTokens = tokenLimits[queryType] || 400;
+Answer using only these documents. Be specific and cite sources.`;
 
       const response = await this.openai.chat.completions.create({
         model: this.llmModel,
         messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
         ],
-        max_tokens: maxTokens,
-        temperature: 0.3, // Reduce randomness for accuracy
+        max_tokens: 800,
+        temperature: 0.5, // Balanced for natural, readable responses
       });
 
-      return response.choices[0].message.content;
+      const answer = response.choices[0].message.content;
+
+      // Quality check - warn if answer seems speculative
+      const genericPhrases = ['seems to', 'appears to', 'generally', 'typically'];
+      const speculativePhrases = ['might be', 'probably', 'likely', 'perhaps'];
+
+      const hasGenericLanguage = genericPhrases.some(p => 
+        answer.toLowerCase().includes(p)
+      );
+      const hasSpeculation = speculativePhrases.some(p =>
+        answer.toLowerCase().includes(p)
+      );
+
+      if (hasGenericLanguage || hasSpeculation) {
+        console.warn('⚠️  Answer may contain speculation:', {
+          genericLanguage: hasGenericLanguage,
+          speculation: hasSpeculation,
+          answerPreview: answer.substring(0, 100)
+        });
+      }
+
+      return answer;
     } catch (error) {
-      console.error('Error generating summary:', error);
+      console.error('❌ Summary generation failed:', error);
       
-      // Handle quota exceeded gracefully
       if (error.code === 'insufficient_quota' || error.status === 429) {
         console.log('⚠️ OpenAI quota exceeded for summary generation');
         return "I found relevant documents but couldn't generate an AI summary due to quota limits. Please try again later.";
