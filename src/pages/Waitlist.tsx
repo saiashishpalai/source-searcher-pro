@@ -1,10 +1,18 @@
 import { Link } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { WaitlistForm } from "@/components/WaitlistForm";
+import SEO from "@/components/SEO";
 
 const Waitlist = () => {
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-hidden">
+    <>
+      <SEO
+        title="Join Haven7 Waitlist - Limited Early Access"
+        description="Be among the first to experience Haven7's powerful AI-powered knowledge search. Get exclusive early access, priority support, and help shape our future features."
+        url="https://source-searcher-pro.vercel.app/waitlist"
+        image="https://source-searcher-pro.vercel.app/api/og-waitlist"
+      />
+      <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary/10 to-accent/5 rounded-full blur-3xl animate-background-drift" />
@@ -73,6 +81,7 @@ const Waitlist = () => {
         </div>
       </footer>
     </div>
+    </>
   );
 };
 

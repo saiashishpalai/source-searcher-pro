@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
+import SEO from "@/components/SEO";
 
 const Landing = () => {
   const { user, loading } = useAuth();
@@ -29,7 +30,14 @@ const Landing = () => {
     return null;
   }
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden">
+    <>
+      <SEO
+        title="Haven7 - Search Your Work Knowledge in Seconds"
+        description="AI-powered search across Slack, Google Drive, and Notion. Find what you need without switching apps. Join 500+ product managers already using Haven7."
+        url="https://source-searcher-pro.vercel.app/"
+        image="https://source-searcher-pro.vercel.app/api/og-landing"
+      />
+      <div className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden">
       {/* Radial gradient overlay from center */}
       <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
       
@@ -95,6 +103,7 @@ const Landing = () => {
       </footer>
 
     </div>
+    </>
   );
 };
 
