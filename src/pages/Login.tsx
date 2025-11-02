@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, LogIn } from 'lucide-react';
+import { ApiClient } from '@/lib/api-client';
 import authBg7 from '@/assets/auth-bg-7.png';
 
 const Login = () => {
@@ -20,6 +21,7 @@ const Login = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,10 +32,30 @@ const Login = () => {
       const result = await login(formData.email, formData.password);
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
-        // Redirect to main app
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1000);
+        
+        // Check if user has any connected sources
+        try {
+          const connectionsData = await ApiClient.get<{ connections: any[] }>('/api/connections/get');
+          const hasConnections = connectionsData.connections && connectionsData.connections.length > 0;
+          
+          // Redirect to connected-sources if no connections exist (first-time user)
+          if (!hasConnections) {
+            setTimeout(() => {
+              navigate('/connected-sources?onboarding=true');
+            }, 1000);
+          } else {
+            // Redirect to dashboard if connections exist
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 1000);
+          }
+        } catch (error) {
+          // If check fails, default to dashboard but log error
+          console.error('Error checking connections:', error);
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 1000);
+        }
       } else {
         setMessage({ type: 'error', text: result.message });
       }

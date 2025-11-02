@@ -12,10 +12,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { ApiClient } from '@/lib/api-client';
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
 import SearchResults from './SearchResults';
 import { SearchResultsData } from './SearchResults';
 import { simulateSearch } from '@/data/mockSearchResults';
+import { Sparkles, AlertCircle } from 'lucide-react';
 
 // SVG Icon Components
 const Haven7Icon = ({ className = "" }: { className?: string }) => (
@@ -301,6 +303,8 @@ const SearchInterface = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [hasConnections, setHasConnections] = useState<boolean | null>(null);
+  const [isCheckingConnections, setIsCheckingConnections] = useState(true);
 
   // Fetch profile data for avatar
   useEffect(() => {
@@ -386,6 +390,30 @@ const SearchInterface = () => {
   useEffect(() => {
     fetchRecentSearches();
   }, [user]);
+
+  // Check if user has connected sources
+  useEffect(() => {
+    const checkConnections = async () => {
+      if (!user || !session?.access_token) {
+        setIsCheckingConnections(false);
+        return;
+      }
+
+      try {
+        const connectionsData = await ApiClient.get<{ connections: any[] }>('/api/connections/get');
+        const hasConnections = connectionsData.connections && connectionsData.connections.length > 0;
+        setHasConnections(hasConnections);
+      } catch (error) {
+        console.error('Error checking connections:', error);
+        // Default to showing empty state if check fails
+        setHasConnections(false);
+      } finally {
+        setIsCheckingConnections(false);
+      }
+    };
+
+    checkConnections();
+  }, [user, session]);
 
   // Load threads from database on mount
   useEffect(() => {
@@ -2410,6 +2438,42 @@ const SearchInterface = () => {
           </div>
         ) : (
       <div className="w-full max-w-3xl space-y-10 animate-in fade-in-0 slide-in-from-top-4 duration-700 relative z-10">
+            {/* Empty State Banner - Show when no connections */}
+            {!isCheckingConnections && hasConnections === false && (
+              <div className="w-full animate-in fade-in-0 slide-in-from-top-4 duration-500">
+                <div className="flex items-start gap-4 p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 rounded-xl backdrop-blur-sm">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      Connect Your Data Sources to Get Started
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      You haven't connected any data sources yet. Connect Slack, Google Drive, or Notion to start searching across your content.
+                    </p>
+                    <Button
+                      onClick={() => navigate('/connected-sources')}
+                      variant="default"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Connect Sources
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setHasConnections(null)}
+                    className="text-muted-foreground hover:text-foreground flex-shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Heading and tagline */}
             <div className="text-center space-y-4 animate-fade-in">
               <h1 className="text-3xl lg:text-5xl font-light text-foreground tracking-tight group hover:cursor-pointer">

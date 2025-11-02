@@ -32,7 +32,8 @@ import {
   MessageSquare,
   BarChart3,
   Info,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import { getEnvVar } from '@/lib/env';
 import { ApiClient } from '@/lib/api-client';
@@ -619,6 +620,7 @@ const ConnectedSources = () => {
   const [limitReached, setLimitReached] = useState<Record<string, boolean>>({});
   const [limitInfo, setLimitInfo] = useState<Record<string, any>>({});
   const [limitDialogOpen, setLimitDialogOpen] = useState<Record<string, boolean>>({});
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(false);
 
   // Mock data for demonstration - in real app this would come from API
   const availableSources = [
@@ -702,10 +704,17 @@ const ConnectedSources = () => {
     }
   }, []);
 
-  // Detect OAuth completion and show success message
+  // Detect onboarding and OAuth completion
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    const onboarding = urlParams.get('onboarding');
     const connected = urlParams.get('connected');
+    
+    if (onboarding === 'true') {
+      setShowOnboardingBanner(true);
+      // Clear the onboarding param but keep the URL clean
+      window.history.replaceState({}, document.title, '/connected-sources');
+    }
     
     if (connected) {
       console.log('✅ OAuth success detected for:', connected);
@@ -713,8 +722,12 @@ const ConnectedSources = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
       // Refetch connections to show the new connection
       fetchConnections();
+      // Dismiss onboarding banner if showing
+      setShowOnboardingBanner(false);
       // Show success message
-      alert(`✅ Successfully connected ${connected}!`);
+      toast.success(`Successfully connected ${connected}!`, {
+        description: 'Your data source is now connected. You can sync documents to start searching.',
+      });
     }
   }, []);
 
@@ -1066,6 +1079,51 @@ const ConnectedSources = () => {
             </div>
           </div>
         </div>
+
+        {/* Onboarding Banner */}
+        {showOnboardingBanner && connections.length === 0 && (
+          <div className="border-b border-border/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+            <div className="max-w-6xl mx-auto px-6 py-6">
+              <div className="flex items-start gap-4 p-4 bg-card/60 backdrop-blur-sm border border-primary/20 rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    Welcome to Haven7! 🎉
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    To get started, connect at least one data source below. Once connected, you can sync your documents and start searching across your Slack messages, Google Drive files, and Notion pages.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setShowOnboardingBanner(false)}
+                      variant="default"
+                      size="sm"
+                    >
+                      Got it!
+                    </Button>
+                    <Button
+                      onClick={() => navigate('/docs')}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Learn more
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowOnboardingBanner(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Document Limits Info */}
         <div className="border-b border-border/30 bg-muted/20">
