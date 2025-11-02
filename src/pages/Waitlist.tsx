@@ -26,7 +26,7 @@ const Waitlist = () => {
           {/* Hero Section */}
           <div className="text-center space-y-4 animate-fade-in">
             <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-              Join 100+ Product Managers Getting <span className="text-gradient">Early Access</span>
+              Limited <span className="text-gradient">Early Access</span> Spots Available
             </h1>
             <p className="text-xl text-muted-foreground max-w-xl mx-auto">
               Be among the first to experience Haven7's powerful knowledge search
