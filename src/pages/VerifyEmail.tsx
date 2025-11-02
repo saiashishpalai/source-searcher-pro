@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, Mail, ArrowLeft, RefreshCw, Sparkles, LogIn } from 'lucide-react';
+import authBg3 from '@/assets/auth-bg-3.jpg';
 
 const VerifyEmail = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -184,25 +185,16 @@ const VerifyEmail = () => {
 
           {/* Right side - Visual */}
           <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
-            {/* CSS Gradient Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-fuchsia-900" />
-            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/20 via-transparent to-purple-600/20" />
+            {/* Background Image */}
+            <div 
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url(${authBg3})`
+              }}
+            />
             
-            {/* Animated gradient orbs */}
-            <div className="absolute top-1/3 left-1/4 w-72 h-72 bg-indigo-500/25 rounded-full blur-3xl animate-pulse" />
-            <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
-            <div className="absolute top-1/2 left-1/2 w-56 h-56 bg-fuchsia-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '3s' }} />
-            
-            {/* Wide soft gradient blend from left */}
-            <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
-            {/* Subtle vignette for depth */}
-            <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
-            
-            {/* Decorative elements */}
-            <div className="absolute top-24 left-24 w-28 h-28 border border-indigo-400/20 rounded-full" />
-            <div className="absolute bottom-24 right-24 w-20 h-20 border border-purple-400/20 rounded-full" />
-            <div className="absolute top-1/3 left-1/3 w-12 h-12 border border-fuchsia-400/30 rounded-full" />
-            <div className="absolute bottom-1/3 right-1/3 w-16 h-16 border border-indigo-400/25 rounded-full" />
+            {/* Overlay for better text contrast */}
+            <div className="absolute inset-0 bg-black/20" />
           </div>
         </div>
 
@@ -319,25 +311,16 @@ const VerifyEmail = () => {
 
       {/* Right side - Visual */}
       <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
-        {/* CSS Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-fuchsia-900" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/20 via-transparent to-purple-600/20" />
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url(${authBg3})`
+          }}
+        />
         
-        {/* Animated gradient orbs */}
-        <div className="absolute top-1/3 left-1/4 w-72 h-72 bg-indigo-500/25 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
-        <div className="absolute top-1/2 left-1/2 w-56 h-56 bg-fuchsia-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '3s' }} />
-        
-        {/* Wide soft gradient blend from left */}
-        <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
-        {/* Subtle vignette for depth */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/30 z-10" />
-        
-        {/* Decorative elements */}
-        <div className="absolute top-24 left-24 w-28 h-28 border border-indigo-400/20 rounded-full" />
-        <div className="absolute bottom-24 right-24 w-20 h-20 border border-purple-400/20 rounded-full" />
-        <div className="absolute top-1/3 left-1/3 w-12 h-12 border border-fuchsia-400/30 rounded-full" />
-        <div className="absolute bottom-1/3 right-1/3 w-16 h-16 border border-indigo-400/25 rounded-full" />
+        {/* Overlay for better text contrast */}
+        <div className="absolute inset-0 bg-black/20" />
       </div>
     </div>
   );
