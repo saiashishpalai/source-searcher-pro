@@ -11,7 +11,7 @@ interface SEOProps {
 const SEO = ({
   title = 'Haven7 - Search Your Work Knowledge in Seconds',
   description = 'AI-powered search across Slack, Google Drive, and Notion. Find what you need without switching apps.',
-  image = 'https://source-searcher-pro.vercel.app/og-image.png',
+  image = 'https://source-searcher-pro.vercel.app/main_preview.png',
   url = 'https://source-searcher-pro.vercel.app',
   type = 'website',
 }: SEOProps) => {
