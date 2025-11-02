@@ -5,7 +5,8 @@ export const config = {
 };
 
 export default async function handler(req: Request) {
-  return new ImageResponse(
+  try {
+    return new ImageResponse(
     (
       <div
         style={{
@@ -116,5 +117,8 @@ export default async function handler(req: Request) {
       height: 630,
     }
   );
+  } catch (error: any) {
+    return new Response(`Failed to generate image: ${error.message}`, { status: 500 });
+  }
 }
 

@@ -35,7 +35,7 @@ const Landing = () => {
         title="Haven7 - Search Your Work Knowledge in Seconds"
         description="AI-powered search across Slack, Google Drive, and Notion. Find what you need without switching apps. Join 500+ product managers already using Haven7."
         url="https://source-searcher-pro.vercel.app/"
-        image="https://source-searcher-pro.vercel.app/api/og-landing"
+        image="https://source-searcher-pro.vercel.app/api/og-landing.png"
       />
       <div className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden">
       {/* Radial gradient overlay from center */}

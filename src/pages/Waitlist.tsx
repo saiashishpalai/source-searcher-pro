@@ -10,7 +10,7 @@ const Waitlist = () => {
         title="Join Haven7 Waitlist - Limited Early Access"
         description="Be among the first to experience Haven7's powerful AI-powered knowledge search. Get exclusive early access, priority support, and help shape our future features."
         url="https://source-searcher-pro.vercel.app/waitlist"
-        image="https://source-searcher-pro.vercel.app/api/og-waitlist"
+        image="https://source-searcher-pro.vercel.app/api/og-waitlist.png"
       />
       <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-hidden">
       {/* Animated Background Elements */}
