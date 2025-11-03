@@ -212,7 +212,7 @@ const WaitlistDashboard = () => {
         .update({
           invite_email_sent: true,
           invite_email_sent_at: new Date().toISOString(),
-        })
+        } as any)
         .eq("id", signupId);
 
       if (error) throw error;
@@ -241,7 +241,7 @@ const WaitlistDashboard = () => {
         .update({
           maintenance_email_sent: true,
           maintenance_email_sent_at: new Date().toISOString(),
-        })
+        } as any)
         .eq("id", signupId);
 
       if (error) throw error;
