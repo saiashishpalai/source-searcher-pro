@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { exportToCSV, exportToJSON, WaitlistSignup } from "@/utils/exportWaitlist";
-import { Loader2, Download, FileJson, Search, Lock, TrendingUp } from "lucide-react";
+import { Loader2, Download, FileJson, Search, Lock, TrendingUp, Mail, Clock, CheckCircle2 } from "lucide-react";
 
 const ADMIN_PIN = "9979";
 
@@ -164,6 +164,123 @@ const WaitlistDashboard = () => {
     });
   };
 
+  // Email template functions
+  const getInviteEmailUrl = (signup: WaitlistSignup) => {
+    const subject = encodeURIComponent("You're in. Let's fix how we find things.");
+    const landingPageUrl = "https://source-searcher-pro.vercel.app";
+    const firstName = signup.full_name.split(' ')[0]; // Extract first name
+    const body = encodeURIComponent(
+      `Hi ${firstName},\n\n` +
+      `Welcome to Haven7 — the place where lost docs, buried Slack messages, and forgotten Notion pages finally resurface.\n\n` +
+      `You've joined the early waitlist for a reason: Storing is solved. Retrieving isn't.\n\n` +
+      `Before you dive in, a small ask — keep the temporary inboxes out.\n` +
+      `We're building Haven7 for real people solving real chaos, not for 10-minute emails testing the water.\n\n` +
+      `Here's how to get started (takes less than a minute):\n\n` +
+      `1. Create your account — your early access is now open.\n` +
+      `2. Verify your email — keeps the workspace real and secure.\n` +
+      `3. Login to your dashboard.\n` +
+      `4. Hit your profile (top right) and connect Google Drive, Notion, or Slack.\n\n` +
+      `Once connected, Haven7 will help you find what's been hiding in plain sight — across every tool you use.\n\n` +
+      `👉 Start here: ${landingPageUrl}\n\n` +
+      `Regards,\n` +
+      `Sai from Haven7\n` +
+      `Clarity, 7 days a week.`
+    );
+    return `mailto:${signup.email}?subject=${subject}&body=${body}`;
+  };
+
+  const getMaintenanceModeEmailUrl = (signup: WaitlistSignup) => {
+    const subject = encodeURIComponent("Thanks for Joining Haven7 Waitlist");
+    const landingPageUrl = "https://source-searcher-pro.vercel.app";
+    const body = encodeURIComponent(
+      `Hi ${signup.full_name},\n\n` +
+      `Thank you for joining the Haven7 waitlist! We really appreciate your interest.\n\n` +
+      `We're currently in maintenance mode and not accepting new testing users at this time. ` +
+      `We'll be sure to reach out as soon as we're ready to welcome new users.\n\n` +
+      `In the meantime, you can learn more about Haven7: ${landingPageUrl}\n\n` +
+      `Thank you for your patience!\n\n` +
+      `Best regards,\n` +
+      `The Haven7 Team`
+    );
+    return `mailto:${signup.email}?subject=${subject}&body=${body}`;
+  };
+
+  const markInviteEmailSent = async (signupId: string) => {
+    try {
+      const { error } = await supabase
+        .from("waitlist_signups")
+        .update({
+          invite_email_sent: true,
+          invite_email_sent_at: new Date().toISOString(),
+        })
+        .eq("id", signupId);
+
+      if (error) throw error;
+
+      // Update local state
+      setSignups((prev) =>
+        prev.map((s) =>
+          s.id === signupId
+            ? {
+                ...s,
+                invite_email_sent: true,
+                invite_email_sent_at: new Date().toISOString(),
+              }
+            : s
+        )
+      );
+    } catch (error) {
+      console.error("Error marking invite email as sent:", error);
+    }
+  };
+
+  const markMaintenanceEmailSent = async (signupId: string) => {
+    try {
+      const { error } = await supabase
+        .from("waitlist_signups")
+        .update({
+          maintenance_email_sent: true,
+          maintenance_email_sent_at: new Date().toISOString(),
+        })
+        .eq("id", signupId);
+
+      if (error) throw error;
+
+      // Update local state
+      setSignups((prev) =>
+        prev.map((s) =>
+          s.id === signupId
+            ? {
+                ...s,
+                maintenance_email_sent: true,
+                maintenance_email_sent_at: new Date().toISOString(),
+              }
+            : s
+        )
+      );
+    } catch (error) {
+      console.error("Error marking maintenance email as sent:", error);
+    }
+  };
+
+  const handleSendInvite = async (signup: WaitlistSignup) => {
+    window.open(getInviteEmailUrl(signup), '_blank');
+    await markInviteEmailSent(signup.id);
+    toast({
+      title: "Invite Email Opened",
+      description: `Email client opened for ${signup.email}`,
+    });
+  };
+
+  const handleSendMaintenanceMode = async (signup: WaitlistSignup) => {
+    window.open(getMaintenanceModeEmailUrl(signup), '_blank');
+    await markMaintenanceEmailSent(signup.id);
+    toast({
+      title: "Maintenance Email Opened",
+      description: `Email client opened for ${signup.email}`,
+    });
+  };
+
   // PIN entry screen
   if (!isAuthenticated) {
     return (
@@ -304,11 +421,15 @@ const WaitlistDashboard = () => {
                     <TableHead>Pain Level</TableHead>
                     <TableHead>Company Size</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredSignups.map((signup) => (
-                    <TableRow key={signup.id}>
+                    <TableRow 
+                      key={signup.id}
+                      className="group relative"
+                    >
                       <TableCell className="font-medium">{signup.full_name}</TableCell>
                       <TableCell>{signup.email}</TableCell>
                       <TableCell>{signup.company_name}</TableCell>
@@ -324,6 +445,44 @@ const WaitlistDashboard = () => {
                       <TableCell>{signup.company_size}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {formatDate(signup.created_at)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSendInvite(signup)}
+                              className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                              title="Send Invite Email"
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSendMaintenanceMode(signup)}
+                              className="h-8 w-8 p-0 hover:bg-muted hover:text-muted-foreground"
+                              title="Send Maintenance Mode Email"
+                            >
+                              <Clock className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-1 ml-2">
+                            {signup.invite_email_sent && (
+                              <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400" title={`Invite sent on ${signup.invite_email_sent_at ? new Date(signup.invite_email_sent_at).toLocaleString() : ''}`}>
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Invite</span>
+                              </div>
+                            )}
+                            {signup.maintenance_email_sent && (
+                              <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400" title={`Maintenance email sent on ${signup.maintenance_email_sent_at ? new Date(signup.maintenance_email_sent_at).toLocaleString() : ''}`}>
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Maintenance</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -351,6 +510,32 @@ const WaitlistDashboard = () => {
                     <span className="text-xs text-muted-foreground">
                       {formatDate(signup.created_at)}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendInvite(signup)}
+                      className="flex-1 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send Invite
+                      {signup.invite_email_sent && (
+                        <CheckCircle2 className="h-3 w-3 ml-2 text-green-600" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendMaintenanceMode(signup)}
+                      className="flex-1 hover:bg-muted"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Maintenance
+                      {signup.maintenance_email_sent && (
+                        <CheckCircle2 className="h-3 w-3 ml-2 text-blue-600" />
+                      )}
+                    </Button>
                   </div>
                 </div>
               </Card>

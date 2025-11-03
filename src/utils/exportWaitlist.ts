@@ -17,6 +17,10 @@ export interface WaitlistSignup {
   utm_campaign: string | null;
   user_agent: string | null;
   created_at: string;
+  invite_email_sent?: boolean;
+  invite_email_sent_at?: string | null;
+  maintenance_email_sent?: boolean;
+  maintenance_email_sent_at?: string | null;
 }
 
 /**
