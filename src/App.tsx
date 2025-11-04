@@ -14,6 +14,9 @@ import Documentation from "./pages/Documentation";
 import NotFound from "./pages/NotFound";
 import Waitlist from "./pages/Waitlist";
 import WaitlistDashboard from "./pages/admin/WaitlistDashboard";
+import PRDList from "./components/PRDList";
+import PRDViewer from "./components/PRDViewer";
+import PRDCompare from "./components/PRDCompare";
 
 const App = () => {
   return (
@@ -47,6 +50,21 @@ const App = () => {
       <Route path="/profile-settings" element={
         <ProtectedRoute>
           <ProfileSettings />
+        </ProtectedRoute>
+      } />
+      <Route path="/prds" element={
+        <ProtectedRoute>
+          <PRDList />
+        </ProtectedRoute>
+      } />
+      <Route path="/prd/:id" element={
+        <ProtectedRoute>
+          <PRDViewer />
+        </ProtectedRoute>
+      } />
+      <Route path="/prd/compare/:id1/:id2" element={
+        <ProtectedRoute>
+          <PRDCompare />
         </ProtectedRoute>
       } />
       <Route path="/docs" element={<Documentation />} />

@@ -3,7 +3,10 @@ import { getEnvVar } from './env';
 
 // Use relative URL in development to go through Vite proxy
 // In production, use the full API URL
-const API_BASE_URL = import.meta.env.DEV ? '' : (getEnvVar('VITE_API_URL') || 'https://source-searcher-pro.onrender.com');
+// If VITE_API_URL is set in dev, use it (for manual override)
+const API_BASE_URL = import.meta.env.DEV 
+  ? (import.meta.env.VITE_API_URL || '') 
+  : (getEnvVar('VITE_API_URL') || 'https://source-searcher-pro.onrender.com');
 
 export class ApiClient {
   private static async getAuthHeaders(): Promise<HeadersInit> {
@@ -67,6 +70,35 @@ export class ApiClient {
     }
 
     return response.json();
+  }
+
+  // PRD management
+  static async createPRD(title: string): Promise<{ prd: any }> {
+    return this.post('/api/prd/create', { title });
+  }
+
+  static async savePRDSection(prdVersionId: string, sectionId: string, content: string, metadata?: Record<string, any>): Promise<{ section: any }> {
+    return this.post('/api/prd/sections', { prd_version_id: prdVersionId, section_id: sectionId, content, metadata });
+  }
+
+  static async getPRD(prdId: string): Promise<{ prd: any }> {
+    return this.get(`/api/prd/${prdId}`);
+  }
+
+  static async listPRDs(): Promise<{ prds: any[] }> {
+    return this.get('/api/prd/list');
+  }
+
+  static async createPRDVersion(prdId: string, changeSummary?: string): Promise<{ prd: any }> {
+    return this.post(`/api/prd/${prdId}/version`, { change_summary: changeSummary });
+  }
+
+  static async getPRDVersions(prdId: string): Promise<{ versions: any[] }> {
+    return this.get(`/api/prd/${prdId}/versions`);
+  }
+
+  static async comparePRDs(v1Id: string, v2Id: string): Promise<{ v1: any; v2: any; diff: any }> {
+    return this.get(`/api/prd/compare?v1=${v1Id}&v2=${v2Id}`);
   }
 
   // Document version management

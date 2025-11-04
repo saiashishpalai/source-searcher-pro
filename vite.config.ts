@@ -35,6 +35,7 @@ export default defineConfig(({ command, mode }) => {
             target: 'https://localhost:8085',
             changeOrigin: true,
             secure: false,
+            rewrite: (path) => path,
           },
         },
       };
@@ -47,6 +48,7 @@ export default defineConfig(({ command, mode }) => {
             target: 'https://localhost:8085',
             changeOrigin: true,
             secure: false,
+            rewrite: (path) => path,
           },
         },
       };

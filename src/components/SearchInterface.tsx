@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ApiClient } from '@/lib/api-client';
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
 import SearchResults from './SearchResults';
+import PRDBuilder from './PRDBuilder';
 import { SearchResultsData } from './SearchResults';
 import { simulateSearch } from '@/data/mockSearchResults';
 import { Sparkles, AlertCircle } from 'lucide-react';
@@ -295,6 +296,8 @@ const SearchInterface = () => {
   const [profileData, setProfileData] = useState<{ name?: string; avatar_url?: string } | null>(null);
   
   const [searchValue, setSearchValue] = useState('');
+  const [isPRDMode, setIsPRDMode] = useState(false);
+  const [prdIntent, setPRDIntent] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [conversations, setConversations] = useState<typeof dummyConversations>([]);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
@@ -601,9 +604,27 @@ const SearchInterface = () => {
     },
   ];
 
+  const detectPRDIntent = (query: string): boolean => {
+    const prdKeywords = ['/prd', 'create prd', 'new prd', 'write prd', 'prd for', 'product requirement'];
+    return prdKeywords.some(keyword => query.toLowerCase().includes(keyword));
+  };
+
+  const extractPRDTitle = (query: string): string => {
+    return query
+      .replace(/^\s*\/prd\s*/i, '')
+      .replace(/create prd|new prd|write prd|prd for/gi, '')
+      .trim() || 'Untitled PRD';
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchValue.trim()) return;
+    if (detectPRDIntent(searchValue)) {
+      const title = extractPRDTitle(searchValue);
+      setPRDIntent(title);
+      setIsPRDMode(true);
+      return;
+    }
     
     setIsSearchLoading(true);
     setSearchError(null);
@@ -1361,15 +1382,20 @@ const SearchInterface = () => {
                     </div>
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-foreground group hover:cursor-pointer relative animate-subtle-glow">
-                      <span className="relative z-10 hover:bg-gradient-to-r hover:from-primary hover:via-accent hover:to-primary hover:bg-clip-text hover:text-transparent transition-all duration-700">
-                        Haven7
-                      </span>
-                      {/* Flowing color overlay on hover */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/30 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-sm -m-1" />
-                      {/* Animated underline */}
-                      <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-primary to-accent w-0 group-hover:w-full transition-all duration-1000 ease-out" />
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold text-foreground group hover:cursor-pointer relative animate-subtle-glow">
+                        <span className="relative z-10 hover:bg-gradient-to-r hover:from-primary hover:via-accent hover:to-primary hover:bg-clip-text hover:text-transparent transition-all duration-700">
+                          Haven7
+                        </span>
+                        {/* Flowing color overlay on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/30 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-sm -m-1" />
+                        {/* Animated underline */}
+                        <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-primary to-accent w-0 group-hover:w-full transition-all duration-1000 ease-out" />
+                      </h2>
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30 font-medium">
+                        BETA
+                      </Badge>
+                    </div>
                     <p className="text-xs text-muted-foreground">AI Search</p>
                   </div>
                 </div>
@@ -1586,6 +1612,15 @@ const SearchInterface = () => {
                 >
                   <Link className="w-4 h-4 mr-2" />
                   Connected Sources
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="hover:bg-accent/50 cursor-pointer"
+                  onClick={() => {
+                    navigate('/prds');
+                  }}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  My PRDs
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
@@ -2510,7 +2545,7 @@ const SearchInterface = () => {
                   onChange={(e) => setSearchValue(e.target.value)}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
-                  placeholder="Search across Slack, Google Drive, and Notion…"
+                  placeholder="Search or type /prd to create…"
                   className="flex-1 border-0 bg-transparent text-sm sm:text-base md:text-lg lg:text-xl placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-light"
                 />
                 <Button 
@@ -2535,6 +2570,15 @@ const SearchInterface = () => {
         </form>
 
         {/* Recent searches */}
+        {isPRDMode && prdIntent && (
+          <PRDBuilder
+            initialTitle={prdIntent}
+            onClose={() => {
+              setIsPRDMode(false);
+              setPRDIntent(null);
+            }}
+          />
+        )}
         <div className="space-y-6 animate-fade-in" style={{ animationDelay: '0.3s' }}>
           <p className="text-sm text-muted-foreground/80 font-medium">Recent searches</p>
           <div className="flex flex-wrap gap-3">
@@ -2609,64 +2653,55 @@ const SearchInterface = () => {
 
       {/* Floating Contact Support Button */}
       <div className="fixed bottom-6 right-6 z-50">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group relative"
-                    size="icon"
-                  >
-                    <svg 
-                      className="w-10 h-10 text-white" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      {/* Simple chat bubble */}
-                      <path 
-                        d="M20 2H4C2.9 2 2 2.9 2 4V16C2 17.1 2.9 18 4 18H6L8 20L10 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                      />
-                      {/* Three dots inside */}
-                      <circle cx="8" cy="8" r="1.2" fill="currentColor" />
-                      <circle cx="12" cy="8" r="1.2" fill="currentColor" />
-                      <circle cx="16" cy="8" r="1.2" fill="currentColor" />
-                    </svg>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  side="top" 
-                  align="end" 
-                  className="w-52 bg-card/95 backdrop-blur-sm border border-border/50 shadow-2xl animate-in slide-in-from-bottom-2 fade-in-0 zoom-in-95 duration-300"
-                  sideOffset={8}
-                >
-                  <DropdownMenuItem 
-                    onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Support%20Request', '_blank')}
-                    className="cursor-pointer hover:bg-accent/50 transition-all duration-200 hover:scale-[1.02] focus:bg-accent/50 focus:scale-[1.02] group"
-                  >
-                    <MessageSquare className="mr-3 h-4 w-4 text-blue-500 group-hover:text-blue-600 transition-colors duration-200" />
-                    <span className="font-medium">Contact Support</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Feature%20Request', '_blank')}
-                    className="cursor-pointer hover:bg-accent/50 transition-all duration-200 hover:scale-[1.02] focus:bg-accent/50 focus:scale-[1.02] group"
-                  >
-                    <Lightbulb className="mr-3 h-4 w-4 text-yellow-500 group-hover:text-yellow-600 transition-colors duration-200" />
-                    <span className="font-medium">Feature Request</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="bg-card/95 backdrop-blur-sm border border-border/50 text-foreground text-sm font-medium px-3 py-2 animate-in fade-in-0 slide-in-from-right-2 duration-200">
-              <p>Get Help</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group relative"
+              size="icon"
+              aria-label="Get Help"
+              title="Get Help"
+            >
+              <svg 
+                className="w-10 h-10 text-white" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  d="M20 2H4C2.9 2 2 2.9 2 4V16C2 17.1 2.9 18 4 18H6L8 20L10 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                />
+                <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                <circle cx="12" cy="8" r="1.2" fill="currentColor" />
+                <circle cx="16" cy="8" r="1.2" fill="currentColor" />
+              </svg>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent 
+            side="top" 
+            align="end" 
+            className="w-52 bg-card/95 backdrop-blur-sm border border-border/50 shadow-2xl animate-in slide-in-from-bottom-2 fade-in-0 zoom-in-95 duration-300"
+            sideOffset={8}
+          >
+            <DropdownMenuItem 
+              onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Support%20Request', '_blank')}
+              className="cursor-pointer hover:bg-accent/50 transition-all duration-200 hover:scale-[1.02] focus:bg-accent/50 focus:scale-[1.02] group"
+            >
+              <MessageSquare className="mr-3 h-4 w-4 text-blue-500 group-hover:text-blue-600 transition-colors duration-200" />
+              <span className="font-medium">Contact Support</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => window.open('mailto:saiashishpalai74@gmail.com?subject=Haven7%20Feature%20Request', '_blank')}
+              className="cursor-pointer hover:bg-accent/50 transition-all duration-200 hover:scale-[1.02] focus:bg-accent/50 focus:scale-[1.02] group"
+            >
+              <Lightbulb className="mr-3 h-4 w-4 text-yellow-500 group-hover:text-yellow-600 transition-colors duration-200" />
+              <span className="font-medium">Feature Request</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
