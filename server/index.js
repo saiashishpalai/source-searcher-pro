@@ -1584,113 +1584,7 @@ app.get('/api/prd/list', async (req, res) => {
   }
 });
 
-// PRD: Get specific PRD with sections (MUST come after /api/prd/list to avoid route collision)
-app.get('/api/prd/:id', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    const { data: prd, error } = await supabaseAdmin
-      .from('prd_versions')
-      .select('id, user_id, title, version, status, created_at, updated_at, prd_sections(*)')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single();
-    if (error || !prd) return res.status(404).json({ error: 'PRD not found' });
-    res.json({ prd });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to fetch PRD' });
-  }
-});
-
-// PRD: Create new version from existing PRD (using atomic database function)
-app.post('/api/prd/:id/version', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    const { change_summary } = req.body || {};
-    
-    // Use atomic database function to create version (prevents race conditions)
-    const { data: newPRD, error: createError } = await supabaseAdmin.rpc('create_prd_version', {
-      p_source_prd_id: id,
-      p_user_id: user.id,
-      p_change_summary: change_summary || null
-    });
-
-    if (createError || !newPRD || newPRD.length === 0) {
-      console.error('Create version error:', createError);
-      return res.status(500).json({ error: createError?.message || 'Failed to create version' });
-    }
-
-    // Fetch the complete new PRD with sections
-    const { data: completePRD, error: finalError } = await supabaseAdmin
-      .from('prd_versions')
-      .select('*, prd_sections(*)')
-      .eq('id', newPRD[0].id)
-      .single();
-
-    if (finalError) {
-      return res.status(500).json({ error: 'Failed to fetch new version' });
-    }
-
-    res.json({ prd: completePRD });
-  } catch (e) {
-    console.error('Create version error:', e);
-    res.status(500).json({ error: 'Failed to create version' });
-  }
-});
-
-// PRD: Get all versions of a PRD (by version_group_id)
-app.get('/api/prd/:id/versions', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    
-    // Get the version_group_id for this PRD
-    const { data: basePrd, error: baseError } = await supabaseAdmin
-      .from('prd_versions')
-      .select('version_group_id')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single();
-    
-    if (baseError || !basePrd || !basePrd.version_group_id) {
-      return res.status(404).json({ error: 'PRD not found' });
-    }
-
-    // Get ALL versions in this group (single query, no title matching)
-    const { data: versions, error } = await supabaseAdmin
-      .from('prd_versions')
-      .select('id, title, version, status, created_at, created_by, change_summary')
-      .eq('version_group_id', basePrd.version_group_id)
-      .order('version', { ascending: true });
-    
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ versions: versions || [] });
-  } catch (e) {
-    console.error('Get versions error:', e);
-    res.status(500).json({ error: 'Failed to fetch versions' });
-  }
-});
-
-// PRD: Compare two versions
+// PRD: Compare two versions (MUST come before /api/prd/:id to avoid route collision)
 app.get('/api/prd/compare', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -1738,6 +1632,224 @@ app.get('/api/prd/compare', async (req, res) => {
     res.status(500).json({ error: 'Failed to compare versions' });
   }
 });
+
+// PRD: Get specific PRD with sections (MUST come after /api/prd/list and /api/prd/compare to avoid route collision)
+app.get('/api/prd/:id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { data: prd, error } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id, user_id, title, version, status, created_at, updated_at, prd_sections(*)')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+    if (error || !prd) return res.status(404).json({ error: 'PRD not found' });
+    res.json({ prd });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch PRD' });
+  }
+});
+
+// PRD: Create new version from existing PRD (using atomic database function)
+app.post('/api/prd/:id/version', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { change_summary } = req.body || {};
+    
+    // Helper function for manual version creation (fallback)
+    const createVersionManually = async () => {
+      console.log('Creating version manually (fallback)...');
+      
+      // Get original PRD with sections
+      const { data: originalPRD, error: fetchError } = await supabaseAdmin
+        .from('prd_versions')
+        .select('*, prd_sections(*)')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (fetchError || !originalPRD) {
+        return res.status(404).json({ error: 'PRD not found' });
+      }
+
+      // Get next version number
+      const { data: versions } = await supabaseAdmin
+        .from('prd_versions')
+        .select('version')
+        .eq('version_group_id', originalPRD.version_group_id)
+        .order('version', { ascending: false })
+        .limit(1);
+      
+      const nextVersion = versions && versions.length > 0 ? versions[0].version + 1 : originalPRD.version + 1;
+
+      // Create new PRD version
+      const { data: createdPRD, error: insertError } = await supabaseAdmin
+        .from('prd_versions')
+        .insert({
+          user_id: user.id,
+          title: originalPRD.title,
+          version: nextVersion,
+          version_group_id: originalPRD.version_group_id,
+          status: 'draft',
+          change_summary: change_summary || null,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (insertError || !createdPRD) {
+        return res.status(500).json({ error: insertError?.message || 'Failed to create new version' });
+      }
+
+      // Copy all sections from original to new version
+      if (originalPRD.prd_sections && originalPRD.prd_sections.length > 0) {
+        const sectionsToInsert = originalPRD.prd_sections.map((section) => ({
+          prd_version_id: createdPRD.id,
+          section_id: section.section_id,
+          content: section.content,
+          metadata: section.metadata || {}
+        }));
+
+        const { error: sectionsError } = await supabaseAdmin
+          .from('prd_sections')
+          .insert(sectionsToInsert);
+
+        if (sectionsError) {
+          await supabaseAdmin.from('prd_versions').delete().eq('id', createdPRD.id);
+          return res.status(500).json({ error: 'Failed to copy sections' });
+        }
+      }
+
+      // Fetch the complete new PRD with sections
+      const { data: completePRD, error: finalError } = await supabaseAdmin
+        .from('prd_versions')
+        .select('*, prd_sections(*)')
+        .eq('id', createdPRD.id)
+        .single();
+
+      if (finalError) {
+        return res.status(500).json({ error: 'Failed to fetch new version' });
+      }
+
+      return res.json({ prd: completePRD });
+    };
+
+    // Try using atomic database function first (prevents race conditions)
+    let newPRD;
+    let createError;
+    
+    try {
+      const result = await supabaseAdmin.rpc('create_prd_version', {
+        p_source_prd_id: id,
+        p_user_id: user.id,
+        p_change_summary: change_summary || null
+      });
+      
+      createError = result.error;
+      newPRD = result.data;
+    } catch (rpcError) {
+      console.error('RPC call exception:', rpcError);
+      // If exception thrown, use fallback
+      return await createVersionManually();
+    }
+
+    if (createError) {
+      console.error('Create version RPC error:', JSON.stringify(createError, null, 2));
+      // Fallback to manual creation for ANY RPC error (function missing, SQL errors, etc.)
+      const shouldFallback = 
+        createError.code === '42883' || // Function doesn't exist
+        createError.code === '42702' || // Ambiguous column (SQL bug in function)
+        createError.message?.includes('does not exist') || 
+        createError.message?.includes('function') ||
+        createError.message?.includes('ambiguous') ||
+        (!createError.code && !createError.message) || // Empty error object
+        Object.keys(createError).length === 0; // Empty object
+      
+      if (shouldFallback) {
+        console.log('RPC function error detected, using fallback manual creation...');
+        return await createVersionManually();
+      }
+      // For other errors (like auth), return error but don't fallback
+      return res.status(500).json({ error: createError.message || 'Failed to create version' });
+    }
+
+    if (!newPRD || newPRD.length === 0) {
+      console.error('Create version error: RPC returned empty result', { newPRD, createError });
+      return res.status(500).json({ error: 'Failed to create version: No data returned' });
+    }
+
+    // Fetch the complete new PRD with sections
+    const { data: completePRD, error: finalError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('*, prd_sections(*)')
+      .eq('id', newPRD[0].id)
+      .single();
+
+    if (finalError) {
+      return res.status(500).json({ error: 'Failed to fetch new version' });
+    }
+
+    res.json({ prd: completePRD });
+  } catch (e) {
+    console.error('Create version error:', e);
+    console.error('Error details:', JSON.stringify(e, Object.getOwnPropertyNames(e)));
+    res.status(500).json({ error: e?.message || 'Failed to create version. Make sure the database migration has been run.' });
+  }
+});
+
+// PRD: Get all versions of a PRD (by version_group_id)
+app.get('/api/prd/:id/versions', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    
+    // Get the version_group_id for this PRD
+    const { data: basePrd, error: baseError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('version_group_id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+    
+    if (baseError || !basePrd || !basePrd.version_group_id) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    // Get ALL versions in this group (single query, no title matching)
+    const { data: versions, error } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id, title, version, status, created_at, created_by, change_summary')
+      .eq('version_group_id', basePrd.version_group_id)
+      .order('version', { ascending: true });
+    
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ versions: versions || [] });
+  } catch (e) {
+    console.error('Get versions error:', e);
+    res.status(500).json({ error: 'Failed to fetch versions' });
+  }
+});
+
 
 // Helper function to compute section-level diff
 function computeSectionDiff(sections1, sections2) {
