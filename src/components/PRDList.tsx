@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { FileText, Plus, Eye, GitBranch, Calendar, CheckCircle, Clock } from 'lucide-react';
+import { FileText, Plus, Eye, GitBranch, Calendar, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface PRD {
@@ -56,6 +56,26 @@ export default function PRDList() {
 
   const handleViewPRD = (prdId: string) => {
     navigate(`/prd/${prdId}`);
+  };
+
+  const handleDeleteGroup = async (groupId: string, title: string) => {
+    if (!confirm(`Delete all versions of "${title}"? This cannot be undone.`)) return;
+    try {
+      await ApiClient.deletePRDGroup(groupId);
+      await loadPRDs();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to delete PRD');
+    }
+  };
+
+  const handleDeleteVersion = async (prdId: string) => {
+    if (!confirm('Delete this PRD version? This cannot be undone.')) return;
+    try {
+      await ApiClient.deletePRDVersion(prdId);
+      await loadPRDs();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to delete version');
+    }
   };
 
   // Group PRDs by version_group_id (proper versioning, not title-based)
@@ -153,6 +173,14 @@ export default function PRDList() {
                     {creatingVersion === versions[0].id ? 'Creating...' : 'New Version'}
                   </Button>
                 )}
+                <Button
+                  onClick={() => handleDeleteGroup(groupId, title)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 border-red-500/40 text-red-400 hover:text-red-300 hover:border-red-500/60"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete PRD
+                </Button>
               </div>
             </div>
 
@@ -179,15 +207,26 @@ export default function PRDList() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleViewPRD(prd.id)}
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => handleViewPRD(prd.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View
+                    </Button>
+                    <Button
+                      onClick={() => handleDeleteVersion(prd.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="flex items-center gap-2 text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -1584,6 +1584,80 @@ app.get('/api/prd/list', async (req, res) => {
   }
 });
 
+// PRD: Recent PRDs for dashboard (latest per version group)
+// Place before parameterized routes to avoid collisions
+app.get('/api/prd/recent', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Fetch latest PRDs ordered by updated_at (limit broader set then dedupe)
+    const { data: prds, error } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id, title, version, version_group_id, updated_at')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(25);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    // Deduplicate by version_group_id keeping the first (latest)
+    const seen = new Set();
+    const unique = [];
+    for (const prd of prds || []) {
+      if (!seen.has(prd.version_group_id)) {
+        seen.add(prd.version_group_id);
+        unique.push(prd);
+      }
+    }
+
+    res.json({ prds: unique.slice(0, 3) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch recent PRDs' });
+  }
+});
+
+// PRD: Delete entire PRD group (all versions)
+// Place before parameterized id routes to avoid collisions
+app.delete('/api/prd/group/:groupId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { groupId } = req.params;
+
+    // Verify there are PRDs in this group for this user
+    const { data: prds, error: fetchError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('version_group_id', groupId);
+
+    if (fetchError) return res.status(500).json({ error: fetchError.message });
+    if (!prds || prds.length === 0) return res.status(404).json({ error: 'PRD group not found' });
+
+    // Delete all versions in this group (cascade removes sections/refs)
+    const { error: deleteError } = await supabaseAdmin
+      .from('prd_versions')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('version_group_id', groupId);
+
+    if (deleteError) return res.status(500).json({ error: deleteError.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete PRD group' });
+  }
+});
+
 // PRD: Compare two versions (MUST come before /api/prd/:id to avoid route collision)
 app.get('/api/prd/compare', async (req, res) => {
   try {
@@ -1654,6 +1728,71 @@ app.get('/api/prd/:id', async (req, res) => {
     res.json({ prd });
   } catch (e) {
     res.status(500).json({ error: 'Failed to fetch PRD' });
+  }
+});
+
+// PRD: Delete a single PRD version by id
+app.delete('/api/prd/:id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+
+    // Ensure PRD exists and belongs to user
+    const { data: prd, error: fetchError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !prd) return res.status(404).json({ error: 'PRD not found' });
+
+    // Delete PRD (cascade deletes sections/refs)
+    const { error: deleteError } = await supabaseAdmin
+      .from('prd_versions')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (deleteError) return res.status(500).json({ error: deleteError.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete PRD' });
+  }
+});
+
+// PRD: Update PRD title
+app.patch('/api/prd/:id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { title } = req.body || {};
+    if (!title || !title.trim()) return res.status(400).json({ error: 'Title required' });
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('prd_versions')
+      .update({ title: title.trim(), updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('id, title, version, updated_at')
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ prd: updated });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update PRD title' });
   }
 });
 

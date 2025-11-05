@@ -97,8 +97,36 @@ export class ApiClient {
     return this.get(`/api/prd/${prdId}/versions`);
   }
 
+  static async getRecentPRDs(): Promise<{ prds: any[] }> {
+    return this.get('/api/prd/recent');
+  }
+
+  static async updatePRDTitle(prdId: string, title: string): Promise<{ prd: any }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/prd/${prdId}`, {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ title }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(error.message || 'API request failed');
+    }
+    return response.json();
+  }
+
   static async comparePRDs(v1Id: string, v2Id: string): Promise<{ v1: any; v2: any; diff: any }> {
     return this.get(`/api/prd/compare?v1=${v1Id}&v2=${v2Id}`);
+  }
+
+  static async deletePRDVersion(prdId: string): Promise<{ success: boolean }> {
+    return this.delete(`/api/prd/${prdId}`);
+  }
+
+  static async deletePRDGroup(groupId: string): Promise<{ success: boolean }> {
+    return this.delete(`/api/prd/group/${groupId}`);
   }
 
   // Document version management
