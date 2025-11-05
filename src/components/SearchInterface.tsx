@@ -308,6 +308,7 @@ const SearchInterface = () => {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
   const [isCheckingConnections, setIsCheckingConnections] = useState(true);
+  const [recentPRDs, setRecentPRDs] = useState<any[]>([]);
 
   // Fetch profile data for avatar
   useEffect(() => {
@@ -392,6 +393,18 @@ const SearchInterface = () => {
   // Load recent searches on mount
   useEffect(() => {
     fetchRecentSearches();
+  }, [user]);
+
+  // Fetch recent PRDs
+  useEffect(() => {
+    (async () => {
+      try {
+        const { prds } = await ApiClient.getRecentPRDs();
+        setRecentPRDs(prds || []);
+      } catch {
+        setRecentPRDs([]);
+      }
+    })();
   }, [user]);
 
   // Check if user has connected sources
@@ -1540,6 +1553,50 @@ const SearchInterface = () => {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Recent PRDs */}
+        {!sidebarCollapsed && (
+          <div className="p-4 space-y-3 border-t border-border/30">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground/80 font-medium">Recent PRDs</p>
+              {recentPRDs.length > 0 && (
+                <button
+                  onClick={() => navigate('/prds')}
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  View All →
+                </button>
+              )}
+            </div>
+            {recentPRDs.length > 0 ? (
+              <div className="space-y-2">
+                {recentPRDs.map((prd, index) => (
+                  <div
+                    key={prd.id}
+                    className="group relative p-3 rounded-lg cursor-pointer transition-all duration-300 hover:scale-[1.02] animate-slide-in-from-left bg-secondary/40 hover:bg-secondary/60 border border-border/20 hover:border-border/40"
+                    style={{ animationDelay: `${(conversations.length + index) * 0.1}s` }}
+                    onClick={() => navigate(`/prd/${prd.id}`)}
+                  >
+                    <div className="flex items-start gap-2">
+                      <FileText className="w-4 h-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-purple-300 transition-colors duration-200">
+                          {prd.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          v{prd.version} • {new Date(prd.updated_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground/60 italic">No recent PRDs</p>
+            )}
           </div>
         )}
 
