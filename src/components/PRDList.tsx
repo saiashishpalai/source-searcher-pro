@@ -3,6 +3,7 @@ import { ApiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { FileText, GitBranch, Calendar, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PRD {
   id: string;
@@ -143,6 +144,7 @@ export default function PRDList() {
   }
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-white">My PRDs</h1>
@@ -159,22 +161,34 @@ export default function PRDList() {
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
                 {versions.length > 0 && (
-                  <button
-                    onClick={() => handleCreateVersion(versions[0].id)}
-                    disabled={creatingVersion === versions[0].id}
-                    className="p-2 rounded-md border border-gray-700 hover:border-purple-500/60 text-gray-300 hover:text-white disabled:opacity-50"
-                    title={creatingVersion === versions[0].id ? 'Creating…' : 'New Version'}
-                  >
-                    <GitBranch className="w-4 h-4" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => handleCreateVersion(versions[0].id)}
+                        disabled={creatingVersion === versions[0].id}
+                        className="p-2 rounded-md border border-gray-700 hover:border-purple-500/60 text-gray-300 hover:text-white disabled:opacity-50"
+                      >
+                        <GitBranch className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{creatingVersion === versions[0].id ? 'Creating…' : 'New Version'}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
-                <button
-                  onClick={() => handleDeleteGroup(groupId, title)}
-                  className="p-2 rounded-md border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-500/60"
-                  title="Delete PRD (all versions)"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => handleDeleteGroup(groupId, title)}
+                      className="p-2 rounded-md border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-500/60"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Delete PRD (all versions)</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
@@ -205,13 +219,19 @@ export default function PRDList() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteVersion(prd.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-2 rounded-md text-red-400 hover:text-red-300"
-                    title="Delete version"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteVersion(prd.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-2 rounded-md text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Delete version</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               ))}
             </div>
@@ -220,6 +240,7 @@ export default function PRDList() {
         })}
       </div>
     </div>
+    </TooltipProvider>
   );
 }
 
