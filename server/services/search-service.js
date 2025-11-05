@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import elasticlunr from 'elasticlunr';
 
 /**
  * SearchService - Performs vector similarity search and RAG answer generation
@@ -8,6 +9,53 @@ export class SearchService {
     this.openai = new OpenAI({ apiKey });
     this.embeddingModel = 'text-embedding-3-small';
     this.llmModel = 'gpt-4o-mini'; // Upgraded for better reasoning
+    // Simple in-memory cache for RRF results (10 min TTL)
+    this.rrfCache = new Map();
+    this.cacheTTL = 10 * 60 * 1000; // 10 minutes in milliseconds
+  }
+
+  /**
+   * Generate cache key for RRF results
+   */
+  getCacheKey(userId, query) {
+    return `${userId}:${query.toLowerCase().trim()}`;
+  }
+
+  /**
+   * Get cached RRF results if available
+   */
+  getCachedRRF(userId, query) {
+    const key = this.getCacheKey(userId, query);
+    const cached = this.rrfCache.get(key);
+    
+    if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
+      console.log(`💾 Using cached RRF results for query`);
+      return cached.results;
+    }
+    
+    // Clean up expired entries
+    if (cached) {
+      this.rrfCache.delete(key);
+    }
+    
+    return null;
+  }
+
+  /**
+   * Cache RRF results
+   */
+  setCachedRRF(userId, query, results) {
+    const key = this.getCacheKey(userId, query);
+    this.rrfCache.set(key, {
+      results,
+      timestamp: Date.now()
+    });
+    
+    // Clean up old cache entries (keep cache size manageable)
+    if (this.rrfCache.size > 100) {
+      const firstKey = this.rrfCache.keys().next().value;
+      this.rrfCache.delete(firstKey);
+    }
   }
 
   /**
@@ -511,11 +559,264 @@ Follow the format from the examples above. Write Answer sections as single unbro
   }
 
   /**
-   * Perform RAG search with safety limits
+   * Tokenize query into terms for BM25 search
+   */
+  tokenizeQuery(query) {
+    return query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(term => term.length > 0)
+      .map(term => term.replace(/[^\w]/g, ''))
+      .filter(term => term.length > 0);
+  }
+
+  /**
+   * BM25 keyword search using elasticlunr
+   */
+  async bm25Search(userId, query, supabaseAdmin) {
+    try {
+      const queryTerms = this.tokenizeQuery(query);
+      
+      if (queryTerms.length === 0) {
+        console.log('⚠️ BM25: No valid query terms after tokenization');
+        return [];
+      }
+
+      console.log(`🔍 BM25: Searching with terms: ${queryTerms.join(', ')}`);
+
+      // Build OR conditions for Supabase query
+      // Format: "column.ilike.value,column.ilike.value"
+      const orConditions = queryTerms
+        .map(term => `content.ilike.%${term}%`)
+        .join(',');
+
+      // Fetch lexical subset using ILIKE filters with OR
+      const { data: chunks, error } = await supabaseAdmin
+        .from('document_chunks')
+        .select('id, content, document_id, chunk_index, metadata')
+        .eq('user_id', userId)
+        .or(orConditions)
+        .limit(2000);
+
+      if (error) {
+        console.error('❌ BM25: Error fetching chunks:', error);
+        return [];
+      }
+
+      if (!chunks || chunks.length === 0) {
+        console.log('⚠️ BM25: No chunks found matching query terms');
+        return [];
+      }
+
+      console.log(`📊 BM25: Found ${chunks.length} candidate chunks (capped at 2000)`);
+
+      // Build in-memory BM25 index using elasticlunr
+      const index = elasticlunr(function() {
+        this.addField('content');
+        this.setRef('id');
+        this.saveDocument(false); // Don't store full documents to save memory
+      });
+
+      // Add documents to index
+      const chunkMap = new Map();
+      chunks.forEach(chunk => {
+        index.addDoc({
+          id: chunk.id,
+          content: chunk.content || ''
+        });
+        chunkMap.set(chunk.id, chunk);
+      });
+
+      // Search using BM25
+      const searchResults = index.search(query, {
+        fields: {
+          content: { boost: 1 }
+        }
+      });
+
+      // Map results to include full chunk data and scores
+      const bm25Results = searchResults.map((result, rank) => {
+        const chunk = chunkMap.get(result.ref);
+        if (!chunk) return null;
+
+        return {
+          id: chunk.id,
+          document_id: chunk.document_id,
+          content: chunk.content,
+          chunk_index: chunk.chunk_index,
+          metadata: chunk.metadata,
+          score: result.score,
+          rank: rank + 1,
+          snippet: this.createSnippet(chunk.content, query)
+        };
+      }).filter(Boolean);
+
+      console.log(`✅ BM25: Returned ${bm25Results.length} ranked results`);
+      return bm25Results;
+
+    } catch (error) {
+      console.error('❌ BM25 search error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Reciprocal Rank Fusion (RRF) to merge vector and BM25 results
+   */
+  reciprocalRankFusion(vectorResults, bm25Results, k = 60) {
+    const resultMap = new Map();
+
+    // Process vector results
+    vectorResults.forEach((result, index) => {
+      const chunkId = result.id || result.chunk_id;
+      const rank = index + 1;
+      const rrfScore = 1 / (k + rank);
+      
+      if (resultMap.has(chunkId)) {
+        resultMap.get(chunkId).rrfScore += rrfScore;
+      } else {
+        resultMap.set(chunkId, {
+          ...result,
+          rrfScore,
+          vectorRank: rank,
+          bm25Rank: null
+        });
+      }
+    });
+
+    // Process BM25 results
+    bm25Results.forEach((result, index) => {
+      const chunkId = result.id;
+      const rank = index + 1;
+      const rrfScore = 1 / (k + rank);
+      
+      if (resultMap.has(chunkId)) {
+        const existing = resultMap.get(chunkId);
+        existing.rrfScore += rrfScore;
+        existing.bm25Rank = rank;
+      } else {
+        resultMap.set(chunkId, {
+          ...result,
+          rrfScore,
+          vectorRank: null,
+          bm25Rank: rank
+        });
+      }
+    });
+
+    // Convert to array and sort by RRF score
+    const mergedResults = Array.from(resultMap.values())
+      .sort((a, b) => b.rrfScore - a.rrfScore);
+
+    // Normalize scores (0-1 range)
+    if (mergedResults.length > 0) {
+      const maxScore = mergedResults[0].rrfScore;
+      if (maxScore > 0) {
+        mergedResults.forEach(result => {
+          result.normalizedRRFScore = result.rrfScore / maxScore;
+        });
+      }
+    }
+
+    console.log(`🔄 RRF: Merged ${vectorResults.length} vector + ${bm25Results.length} BM25 = ${mergedResults.length} unique results`);
+    return mergedResults;
+  }
+
+  /**
+   * Maximal Marginal Relevance (MMR) for result diversity
+   */
+  async applyMMR(results, queryEmbedding, lambda = 0.6, maxResults = 20) {
+    if (!results || results.length === 0) {
+      return [];
+    }
+
+    if (results.length <= maxResults) {
+      return results;
+    }
+
+    try {
+      console.log(`🎯 MMR: Applying diversity filtering to ${results.length} results (λ=${lambda}, max=${maxResults})`);
+
+      // Fetch embeddings for all candidates
+      const chunkIds = results.map(r => r.id).filter(Boolean);
+      if (chunkIds.length === 0) {
+        return results.slice(0, maxResults);
+      }
+
+      // This will be done in the main search method where we have supabaseAdmin access
+      // For now, we'll assume embeddings are already available or will be fetched separately
+      // We'll need to modify this to accept embeddings or fetch them here
+
+      const selected = [];
+      const remaining = [...results];
+
+      // Select first result (highest relevance)
+      if (remaining.length > 0) {
+        selected.push(remaining.shift());
+      }
+
+      // Select remaining results using MMR
+      while (selected.length < maxResults && remaining.length > 0) {
+        let bestMMR = -Infinity;
+        let bestIndex = -1;
+
+        for (let i = 0; i < remaining.length; i++) {
+          const candidate = remaining[i];
+          const relevance = candidate.normalizedRRFScore || candidate.rrfScore || candidate.similarity || 0;
+
+          // Calculate max similarity to already selected results
+          let maxSimilarity = 0;
+          if (selected.length > 0 && candidate.embedding) {
+            for (const selectedResult of selected) {
+              if (selectedResult.embedding) {
+                try {
+                  const similarity = this.calculateCosineSimilarity(
+                    candidate.embedding,
+                    selectedResult.embedding
+                  );
+                  maxSimilarity = Math.max(maxSimilarity, similarity);
+                } catch (e) {
+                  // If embedding calculation fails, skip this similarity check
+                  console.warn('⚠️ MMR: Error calculating similarity, skipping:', e);
+                }
+              }
+            }
+          }
+
+          // MMR score = λ * relevance - (1 - λ) * max_similarity_to_selected
+          const mmrScore = lambda * relevance - (1 - lambda) * maxSimilarity;
+
+          if (mmrScore > bestMMR) {
+            bestMMR = mmrScore;
+            bestIndex = i;
+          }
+        }
+
+        if (bestIndex >= 0) {
+          selected.push(remaining.splice(bestIndex, 1)[0]);
+        } else {
+          break;
+        }
+      }
+
+      console.log(`✅ MMR: Selected ${selected.length} diverse results`);
+      return selected;
+
+    } catch (error) {
+      console.error('❌ MMR error:', error);
+      // Fallback to top results by relevance
+      return results.slice(0, maxResults);
+    }
+  }
+
+  /**
+   * Perform RAG search with safety limits - Hybrid Search (Vector + BM25 + MMR)
    */
   async search(userId, query, supabaseAdmin) {
+    const startTime = Date.now();
+    
     try {
-      console.log(`🔍 Searching for: "${query}" (user: ${userId})`);
+      console.log(`🔍 Hybrid Search for: "${query}" (user: ${userId})`);
 
       // Get boost terms for re-ranking (optional, helps with relevance)
       const queryClassification = this.classifyQuery(query);
@@ -524,121 +825,135 @@ Follow the format from the examples above. Write Answer sections as single unbro
       // 1. Generate query embedding
       const queryEmbedding = await this.generateQueryEmbedding(query);
 
-      // 2. First, check if there are any chunks with embeddings
-      const { data: allChunks, error: checkError } = await supabaseAdmin
-        .from('document_chunks')
-        .select('id, metadata, embedding')
-        .eq('user_id', userId)
-        .not('embedding', 'is', null)
-        .limit(50);  // Higher limit to see all sources
+      // 2. Run vector search and BM25 search in parallel
+      console.log('🚀 Running vector and BM25 searches in parallel...');
       
-      const sourceCounts = {};
-      allChunks?.forEach(c => {
-        const src = c.metadata?.source_type || 'unknown';
-        sourceCounts[src] = (sourceCounts[src] || 0) + 1;
-      });
-      
-      console.log('📊 Embedding check:', {
-        totalChunksWithEmbeddings: allChunks?.length || 0,
-        bySource: sourceCounts
-      });
-
-      // 3. Vector similarity search using Supabase RPC function
-      console.log('🔍 Using vector similarity search across all sources...');
-      let { data: chunks, error } = await supabaseAdmin
-        .rpc('search_document_chunks', {
+      const [vectorResult, bm25Result] = await Promise.allSettled([
+        // Vector search
+        supabaseAdmin.rpc('search_document_chunks', {
           query_embedding: queryEmbedding,
-          match_threshold: 0.3,  // Much lower threshold for better recall
-          match_count: 20,        // More results
+          match_threshold: 0.3,
+          match_count: 20,
           user_id_param: userId
-        });
+        }),
+        // BM25 search
+        this.bm25Search(userId, query, supabaseAdmin)
+      ]);
 
-      console.log('🔍 Vector search response:', { 
-        hasError: !!error, 
-        hasData: !!chunks, 
-        chunkCount: chunks?.length || 0,
-        errorDetails: error || 'none'
+      // Extract results from fulfilled promises
+      let vectorResults = [];
+      if (vectorResult.status === 'fulfilled' && vectorResult.value?.data) {
+        vectorResults = vectorResult.value.data || [];
+        console.log(`✅ Vector search: ${vectorResults.length} results`);
+      } else {
+        console.error('❌ Vector search failed:', vectorResult.reason);
+      }
+
+      let bm25Results = [];
+      if (bm25Result.status === 'fulfilled') {
+        bm25Results = bm25Result.value || [];
+        console.log(`✅ BM25 search: ${bm25Results.length} results`);
+      } else {
+        console.error('❌ BM25 search failed:', bm25Result.reason);
+      }
+
+      // 3. Handle fallbacks if one search fails
+      if (vectorResults.length === 0 && bm25Results.length === 0) {
+        console.log('❌ Both searches failed, returning empty results');
+        return {
+          query,
+          results: [],
+          aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
+          totalResults: 0,
+          searchTime: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // If only one search succeeded, use its results
+      if (vectorResults.length === 0) {
+        console.log('⚠️ Vector search failed, using BM25-only results');
+        vectorResults = bm25Results.map(r => ({
+          ...r,
+          similarity: r.score || 0.5
+        }));
+        bm25Results = [];
+      } else if (bm25Results.length === 0) {
+        console.log('⚠️ BM25 search failed, using vector-only results');
+        // vectorResults already has data
+      }
+
+      // 4. Merge results using RRF (Reciprocal Rank Fusion)
+      // Check cache first
+      let mergedResults = this.getCachedRRF(userId, query);
+      
+      if (!mergedResults) {
+        console.log('🔄 Merging results using RRF...');
+        mergedResults = this.reciprocalRankFusion(vectorResults, bm25Results, 60);
+        // Cache the merged results
+        this.setCachedRRF(userId, query, mergedResults);
+      } else {
+        console.log('💾 Using cached RRF results');
+      }
+
+      if (mergedResults.length === 0) {
+        console.log('❌ RRF merge produced no results');
+        return {
+          query,
+          results: [],
+          aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
+          totalResults: 0,
+          searchTime: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // 5. Fetch embeddings for MMR (need embeddings for diversity calculation)
+      const candidateIds = mergedResults.map(r => r.id).filter(Boolean).slice(0, 40); // Limit to top 40 for MMR
+      const { data: chunksWithEmbeddings } = await supabaseAdmin
+        .from('document_chunks')
+        .select('id, embedding')
+        .in('id', candidateIds);
+
+      // Create embedding map
+      const embeddingMap = new Map();
+      chunksWithEmbeddings?.forEach(chunk => {
+        if (chunk.embedding) {
+          embeddingMap.set(chunk.id, chunk.embedding);
+        }
       });
 
-      if (error) {
-        console.error('❌ Vector search RPC error:', error);
-        console.log('⚠️ Falling back to text search...');
-        
-        // Fallback to text search if vector search fails
-        const { data: textChunks, error: textError } = await supabaseAdmin
-          .from('document_chunks')
-          .select(`
-            id,
-            document_id,
-            content,
-            chunk_index,
-            metadata
-          `)
-          .eq('user_id', userId)
-          .ilike('content', `%${query}%`)
-          .limit(10);
-        
-        if (textError || !textChunks || textChunks.length === 0) {
-          console.log('❌ No relevant documents found (text search also failed)');
-          return {
-            query,
-            results: [],
-            aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
-            totalResults: 0,
-            searchTime: 0,
-            timestamp: new Date().toISOString(),
-          };
-        }
-        
-        // Use text search results
-        chunks = textChunks;
-        console.log(`📊 Found ${chunks.length} relevant chunks (text search fallback)`);
-      }
+      // Attach embeddings to merged results
+      mergedResults = mergedResults.map(result => ({
+        ...result,
+        embedding: embeddingMap.get(result.id)
+      }));
 
-      // If vector search returns no results, fall back to text search
-      if (!chunks || chunks.length === 0) {
-        console.log('⚠️ Vector search returned 0 results, falling back to text search...');
-        
-        const { data: textChunks, error: textError } = await supabaseAdmin
-          .from('document_chunks')
-          .select(`
-            id,
-            document_id,
-            content,
-            chunk_index,
-            metadata
-          `)
-          .eq('user_id', userId)
-          .ilike('content', `%${query}%`)
-          .limit(10);
-        
-        if (!textChunks || textChunks.length === 0) {
-          console.log('❌ No relevant documents found (both vector and text search failed)');
-          return {
-            query,
-            results: [],
-            aiSummary: "No relevant documents found for your search. Try different keywords or check if documents have been synced.",
-            totalResults: 0,
-            searchTime: 0,
-            timestamp: new Date().toISOString(),
-          };
-        }
-        
-        chunks = textChunks;
-        console.log(`📊 Found ${chunks.length} relevant chunks (text search fallback)`);
-      }
+      // 6. Apply MMR for diversity (lambda=0.6, maxResults=20)
+      console.log('🎯 Applying MMR for diversity...');
+      let mmrResults = await this.applyMMR(mergedResults, queryEmbedding, 0.6, 20);
 
-      console.log(`📊 Found ${chunks.length} relevant chunks (vector similarity search)`);
+      // 7. Apply recency boost AFTER MMR
+      console.log('📈 Applying recency boost...');
+      let chunks = this.applyRecencyBoost(mmrResults);
+      console.log(`📊 After recency boost: ${chunks.length} chunks`);
 
-      // Re-rank chunks based on boost terms if available
+      // 8. Deduplicate versions
+      const deduplicatedChunks = this.deduplicateVersions(chunks);
+      console.log(`🔄 Deduplicated versions: ${chunks.length} → ${deduplicatedChunks.length} chunks`);
+
+      // 9. Limit to top 8-10 chunks for model input (token control)
+      const finalChunks = deduplicatedChunks.slice(0, 10);
+      console.log(`📊 Final chunks for model: ${finalChunks.length}`);
+
+      // 10. Re-rank with boost terms if available (optional enhancement)
       if (queryClassification.boostTerms.length > 0) {
-        chunks = this.reRankChunks(chunks, queryClassification.boostTerms);
-        console.log(`🔄 Re-ranked chunks using boost terms: ${queryClassification.boostTerms.slice(0, 3).join(', ')}...`);
+        const boostedChunks = this.reRankChunks(finalChunks, queryClassification.boostTerms);
+        // Keep top 10 after boost
+        chunks = boostedChunks.slice(0, 10);
+      } else {
+        chunks = finalChunks;
       }
-
-      // Log sources of results
-      const sources = [...new Set(chunks.map(c => c.metadata?.source_type))];
-      console.log(`📁 Results from sources: ${sources.join(', ')}`);
 
       // Fetch document metadata for potential_duplicates
       const documentIds = [...new Set(chunks.map(c => c.document_id).filter(Boolean))];
@@ -750,19 +1065,11 @@ Follow the format from the examples above. Write Answer sections as single unbro
       
       chunks = chunksWithDuplicates;
 
-      // Apply recency boost to search results
-      const boostedChunks = this.applyRecencyBoost(chunks);
-      console.log(`📈 Applied recency boost to ${boostedChunks.length} chunks`);
+      // 11. Generate AI summary using RAG with flexible prompting
+      const aiSummary = await this.generateSummary(query, chunks);
 
-      // Deduplicate versions - show only latest version of each document group
-      const deduplicatedChunks = this.deduplicateVersions(boostedChunks);
-      console.log(`🔄 Deduplicated versions: ${boostedChunks.length} → ${deduplicatedChunks.length} chunks`);
-
-      // 3. Generate AI summary using RAG with flexible prompting
-      const aiSummary = await this.generateSummary(query, deduplicatedChunks);
-
-      // 4. Format results
-      const results = deduplicatedChunks.map(chunk => {
+      // 12. Format results
+      const results = chunks.map(chunk => {
         const metadata = chunk.metadata || {};
         const documentMetadata = chunk.document_metadata || {};
         const sourceType = metadata.source_type || 'google_drive';
@@ -823,7 +1130,7 @@ Follow the format from the examples above. Write Answer sections as single unbro
         return result;
       });
 
-      const searchTime = Math.floor(Math.random() * 500 + 200); // Simulate search time
+      const searchTime = Date.now() - startTime;
 
       // Debug: Check if any results have potential_duplicates
       const resultsWithDuplicates = results.filter(r => r.potential_duplicates && r.potential_duplicates.length > 0);
