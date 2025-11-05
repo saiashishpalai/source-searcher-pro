@@ -15,7 +15,9 @@ import NotFound from "./pages/NotFound";
 import Waitlist from "./pages/Waitlist";
 import WaitlistDashboard from "./pages/admin/WaitlistDashboard";
 import PRDList from "./components/PRDList";
-import PRDViewer from "./components/PRDViewer";
+import PRDView from "./pages/PRDView";
+import PRDNew from "./pages/PRDNew";
+import PRDHubPage from "./pages/PRDHubPage";
 import PRDCompare from "./components/PRDCompare";
 
 const App = () => {
@@ -54,12 +56,17 @@ const App = () => {
       } />
       <Route path="/prds" element={
         <ProtectedRoute>
-          <PRDList />
+          <PRDHubPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/prd/new" element={
+        <ProtectedRoute>
+          <PRDNew />
         </ProtectedRoute>
       } />
       <Route path="/prd/:id" element={
         <ProtectedRoute>
-          <PRDViewer />
+          <PRDView />
         </ProtectedRoute>
       } />
       <Route path="/prd/compare/:id1/:id2" element={

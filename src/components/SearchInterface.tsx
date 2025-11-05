@@ -604,9 +604,9 @@ const SearchInterface = () => {
     },
   ];
 
-  const detectPRDIntent = (query: string): boolean => {
-    const prdKeywords = ['/prd', 'create prd', 'new prd', 'write prd', 'prd for', 'product requirement'];
-    return prdKeywords.some(keyword => query.toLowerCase().includes(keyword));
+  const detectPRDIntent = (_query: string): boolean => {
+    // PRD creation via slash command is deprecated; use dashboard button instead
+    return false;
   };
 
   const extractPRDTitle = (query: string): string => {
@@ -1327,8 +1327,8 @@ const SearchInterface = () => {
         shadow-2xl shadow-black/20
         ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-80'}
       `}>
-        {/* Sidebar Header - Enhanced */}
-        <div className={`border-b border-border/20 bg-gradient-to-r from-card/40 to-transparent ${sidebarCollapsed ? 'p-4 lg:p-6' : 'p-6'}`}>
+        {/* Sidebar Header - Enhanced (reduced top padding to remove visual gap) */}
+        <div className={`border-b border-border/20 bg-gradient-to-r from-card/40 to-transparent ${sidebarCollapsed ? 'p-3 lg:p-3' : 'p-3'}`}>
           {sidebarCollapsed ? (
             <div className="flex flex-col items-center gap-4">
               {/* Toggle sidebar icon - centered */}
@@ -1421,7 +1421,7 @@ const SearchInterface = () => {
                 <Plus className="w-4 h-4 group-hover:text-primary group-hover:rotate-90 transition-all duration-500 relative z-10" />
                 
                 {/* Text with flowing color */}
-                <span className="relative z-10 group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-accent group-hover:bg-clip-text group-hover:text-transparent transition-all duration-500">
+                <span className="relative z-10 transition-all duration-500 text-foreground group-hover:text-white">
                   New Conversation
                 </span>
                 
@@ -1429,6 +1429,19 @@ const SearchInterface = () => {
                 <div className="absolute right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                   <div className="w-1 h-1 bg-primary/60 rounded-full animate-ping" />
                 </div>
+              </Button>
+              {/* New PRD quick action */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-accent/5 hover:border-purple-400/40 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500 py-3 rounded-xl border-border/50 group relative overflow-hidden"
+                onClick={() => navigate('/prd/new')}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                <FileText className="w-4 h-4 text-foreground group-hover:text-purple-200 transition-all duration-500 relative z-10" />
+                <span className="relative z-10 transition-all duration-500 text-foreground group-hover:text-white">
+                  New PRD
+                </span>
               </Button>
             </div>
           )}
@@ -2545,7 +2558,7 @@ const SearchInterface = () => {
                   onChange={(e) => setSearchValue(e.target.value)}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
-                  placeholder="Search or type /prd to create…"
+                  placeholder="Search across your workspace…"
                   className="flex-1 border-0 bg-transparent text-sm sm:text-base md:text-lg lg:text-xl placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-light"
                 />
                 <Button 

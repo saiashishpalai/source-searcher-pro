@@ -69,6 +69,7 @@ const generatePRDMarkdown = (title: string, answers: Record<SectionId, string>):
 };
 
 export default function PRDBuilder({ initialTitle, onClose }: PRDBuilderProps) {
+  // Deprecated component retained temporarily to avoid breaking imports; not used in UI
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<SectionId, string>>({
     objective: '', scope: '', metrics: '', dependencies: '', timeline: ''
