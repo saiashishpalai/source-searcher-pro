@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { FileText, Plus, Eye, GitBranch, Calendar, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { FileText, GitBranch, Calendar, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface PRD {
@@ -156,28 +156,25 @@ export default function PRDList() {
           <div key={groupId} className="border border-gray-700 rounded-lg p-4 bg-[#1f1f23]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-white">{title}</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
                 {versions.length > 0 && (
-                  <Button
+                  <button
                     onClick={() => handleCreateVersion(versions[0].id)}
                     disabled={creatingVersion === versions[0].id}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
+                    className="p-2 rounded-md border border-gray-700 hover:border-purple-500/60 text-gray-300 hover:text-white disabled:opacity-50"
+                    title={creatingVersion === versions[0].id ? 'Creating…' : 'New Version'}
                   >
                     <GitBranch className="w-4 h-4" />
-                    {creatingVersion === versions[0].id ? 'Creating...' : 'New Version'}
-                  </Button>
+                  </button>
                 )}
-                <Button
+                <button
                   onClick={() => handleDeleteGroup(groupId, title)}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 border-red-500/40 text-red-400 hover:text-red-300 hover:border-red-500/60"
+                  className="p-2 rounded-md border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-500/60"
+                  title="Delete PRD (all versions)"
                 >
-                  <Trash2 className="w-4 h-4" /> Delete PRD
-                </Button>
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -185,7 +182,11 @@ export default function PRDList() {
               {versions.map((prd) => (
                 <div
                   key={prd.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-[#0f0f11] border border-gray-800 hover:border-purple-500/50 transition-colors"
+                  onClick={() => handleViewPRD(prd.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleViewPRD(prd.id); }}
+                  role="button"
+                  tabIndex={0}
+                  className="group flex items-center justify-between p-3 rounded-lg bg-[#0f0f11] border border-gray-800 hover:border-purple-500/50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     {getStatusIcon(prd.status)}
@@ -204,26 +205,13 @@ export default function PRDList() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => handleViewPRD(prd.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="flex items-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      View
-                    </Button>
-                    <Button
-                      onClick={() => handleDeleteVersion(prd.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="flex items-center gap-2 text-red-400 hover:text-red-300"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
-                    </Button>
-                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteVersion(prd.id); }}
+                    className="opacity-0 group-hover:opacity-100 p-2 rounded-md text-red-400 hover:text-red-300"
+                    title="Delete version"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
