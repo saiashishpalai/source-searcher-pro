@@ -1423,6 +1423,71 @@ app.post('/api/connections/disconnect', async (req, res) => {
   }
 });
 
+// PRD: Dual-phase search for sections (BM25 instant → Hybrid delayed)
+// MUST be before /api/search to avoid route collision
+app.post('/api/search/sections', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { query, prd_version_id, section_id, user_context = {}, hybrid = false } = req.body || {};
+
+    if (!query || !query.trim()) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    // Perform dual-phase search
+    const searchResult = await searchService.searchForSections(
+      user.id,
+      query.trim(),
+      supabaseAdmin,
+      {
+        prd_version_id,
+        section_id,
+        user_context,
+        limit: 8
+      }
+    );
+
+    // If hybrid=true, perform both phases and return hybrid results
+    if (hybrid) {
+      const phase2Result = await searchResult.performHybridSearch();
+      return res.json({
+        phase: 'hybrid',
+        query_hash: phase2Result.query_hash,
+        results: phase2Result.results,
+        search_time_ms: phase2Result.search_time_ms,
+        bm25_count: phase2Result.bm25_count,
+        vector_count: phase2Result.vector_count,
+        merged_count: phase2Result.merged_count,
+        timestamp: phase2Result.timestamp
+      });
+    }
+
+    // Default: Return Phase 1 (BM25) immediately
+    // Client can make a follow-up request with hybrid=true and query_hash to get Phase 2
+    res.json(searchResult.phase1);
+
+    // Optionally start Phase 2 in background (non-blocking)
+    // Store in cache for potential follow-up request
+    searchResult.performHybridSearch().then(phase2Result => {
+      // Store in a simple cache for follow-up requests (optional)
+      // For now, client will make a second request with hybrid=true
+      console.log(`✅ Phase 2 hybrid search completed for query_hash: ${phase2Result.query_hash}`);
+    }).catch(err => {
+      console.error('❌ Background Phase 2 search error:', err);
+    });
+
+  } catch (e) {
+    console.error('Search sections error:', e);
+    res.status(500).json({ error: 'Failed to search sections' });
+  }
+});
+
 // SEARCH ENDPOINT
 app.post('/api/search', async (req, res) => {
   try {

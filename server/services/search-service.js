@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import elasticlunr from 'elasticlunr';
+import crypto from 'crypto';
 
 /**
  * SearchService - Performs vector similarity search and RAG answer generation
@@ -658,6 +659,201 @@ Follow the format from the examples above. Write Answer sections as single unbro
       console.error('❌ BM25 search error:', error);
       return [];
     }
+  }
+
+  /**
+   * Generate query hash for intent change detection
+   */
+  generateQueryHash(query, userContext = {}) {
+    const contextStr = JSON.stringify(userContext);
+    const hash = crypto.createHash('sha256').update(`${query}:${contextStr}`).digest('hex');
+    return hash.substring(0, 16); // Short hash for efficiency
+  }
+
+  /**
+   * Dual-phase retrieval for PRD sections: BM25 instant → Hybrid delayed
+   * Returns BM25 results immediately, then hybrid RRF+MMR results
+   */
+  async searchForSections(userId, query, supabaseAdmin, options = {}) {
+    const {
+      prd_version_id,
+      section_id,
+      user_context = {},
+      limit = 8
+    } = options;
+
+    const startTime = Date.now();
+    const queryHash = this.generateQueryHash(query, user_context);
+
+    try {
+      console.log(`🔍 Dual-phase search for PRD section: "${query}" (user: ${userId}, section: ${section_id})`);
+
+      // PHASE 1: Instant BM25 search (~300ms)
+      console.log('⚡ Phase 1: Running instant BM25 search...');
+      const bm25StartTime = Date.now();
+      const bm25Results = await this.bm25Search(userId, query, supabaseAdmin);
+      const bm25Time = Date.now() - bm25StartTime;
+      console.log(`✅ BM25 completed in ${bm25Time}ms: ${bm25Results.length} results`);
+
+      // Format BM25 results for response
+      const formattedBM25 = await this.formatResultsForSections(bm25Results, query, limit, supabaseAdmin);
+
+      // Return BM25 results immediately (Phase 1 response)
+      const phase1Response = {
+        phase: 'bm25',
+        query_hash: queryHash,
+        results: formattedBM25,
+        search_time_ms: bm25Time,
+        timestamp: new Date().toISOString()
+      };
+
+      // PHASE 2: Delayed hybrid search (RRF + MMR) - runs asynchronously
+      // This will be called separately by the endpoint after sending Phase 1
+      const performHybridSearch = async () => {
+        try {
+          console.log('🔄 Phase 2: Starting hybrid search (RRF + MMR)...');
+          const hybridStartTime = Date.now();
+
+          // Generate query embedding
+          const queryEmbedding = await this.generateQueryEmbedding(query);
+
+          // Run vector search
+          const { data: vectorResults } = await supabaseAdmin.rpc('search_document_chunks', {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.3,
+            match_count: 20,
+            user_id_param: userId
+          }) || { data: [] };
+
+          console.log(`✅ Vector search: ${vectorResults?.length || 0} results`);
+
+          // Merge with RRF
+          const mergedResults = this.reciprocalRankFusion(vectorResults || [], bm25Results, 60);
+
+          // Fetch embeddings for MMR
+          const candidateIds = mergedResults.map(r => r.id).filter(Boolean).slice(0, 40);
+          const { data: chunksWithEmbeddings } = await supabaseAdmin
+            .from('document_chunks')
+            .select('id, embedding')
+            .in('id', candidateIds);
+
+          const embeddingMap = new Map();
+          chunksWithEmbeddings?.forEach(chunk => {
+            if (chunk.embedding) {
+              embeddingMap.set(chunk.id, chunk.embedding);
+            }
+          });
+
+          const mergedWithEmbeddings = mergedResults.map(result => ({
+            ...result,
+            embedding: embeddingMap.get(result.id)
+          }));
+
+          // Apply MMR for diversity
+          const mmrResults = await this.applyMMR(mergedWithEmbeddings, queryEmbedding, 0.6, limit);
+
+          // Format results
+          const formattedHybrid = await this.formatResultsForSections(mmrResults, query, limit, supabaseAdmin);
+
+          const hybridTime = Date.now() - hybridStartTime;
+          console.log(`✅ Hybrid search completed in ${hybridTime}ms: ${formattedHybrid.length} results`);
+
+          return {
+            phase: 'hybrid',
+            query_hash: queryHash,
+            results: formattedHybrid,
+            search_time_ms: hybridTime,
+            bm25_count: bm25Results.length,
+            vector_count: vectorResults?.length || 0,
+            merged_count: mergedResults.length,
+            timestamp: new Date().toISOString()
+          };
+        } catch (error) {
+          console.error('❌ Hybrid search error:', error);
+          // Fallback to BM25 results if hybrid fails
+          const fallbackResults = await this.formatResultsForSections(bm25Results, query, limit, supabaseAdmin);
+          return {
+            phase: 'hybrid',
+            query_hash: queryHash,
+            error: error.message,
+            results: fallbackResults,
+            timestamp: new Date().toISOString()
+          };
+        }
+      };
+
+      return {
+        phase1: phase1Response,
+        performHybridSearch
+      };
+
+    } catch (error) {
+      console.error('❌ Dual-phase search error:', error);
+      return {
+        phase1: {
+          phase: 'bm25',
+          query_hash: queryHash,
+          results: [],
+          error: error.message,
+          search_time_ms: Date.now() - startTime,
+          timestamp: new Date().toISOString()
+        },
+        performHybridSearch: async () => ({
+          phase: 'hybrid',
+          query_hash: queryHash,
+          results: [],
+          error: error.message,
+          timestamp: new Date().toISOString()
+        })
+      };
+    }
+  }
+
+  /**
+   * Format search results for PRD sections
+   * Fetches document metadata for proper display
+   */
+  async formatResultsForSections(results, query, limit = 8, supabaseAdmin = null) {
+    const limitedResults = results.slice(0, limit);
+    
+    // Fetch document metadata if supabaseAdmin is provided
+    let documentMap = new Map();
+    if (supabaseAdmin && limitedResults.length > 0) {
+      const documentIds = [...new Set(limitedResults.map(r => r.document_id).filter(Boolean))];
+      if (documentIds.length > 0) {
+        const { data: documents } = await supabaseAdmin
+          .from('documents')
+          .select('id, title, source_type, synced_at')
+          .in('id', documentIds);
+        
+        if (documents) {
+          documents.forEach(doc => {
+            documentMap.set(doc.id, doc);
+          });
+        }
+      }
+    }
+
+    return limitedResults.map((result, index) => {
+      const doc = documentMap.get(result.document_id);
+      const documentTitle = doc?.title || result.document_title || result.metadata?.title || 'Document';
+      const sourceType = doc?.source_type || result.source_type || result.metadata?.source_type || 'unknown';
+      const timestamp = doc?.synced_at || result.timestamp || result.metadata?.synced_at || new Date().toISOString();
+
+      return {
+        id: result.id || result.chunk_id,
+        chunk_id: result.id || result.chunk_id,
+        document_id: result.document_id,
+        title: documentTitle,
+        source: sourceType === 'slack' ? 'Slack' : sourceType === 'google_drive' ? 'Google Drive' : sourceType === 'notion' ? 'Notion' : 'Unknown',
+        content: result.content || '',
+        snippet: result.snippet || this.createSnippet(result.content || '', query),
+        relevance: result.normalizedRRFScore || result.rrfScore || result.similarity || result.score || 0,
+        rank: index + 1,
+        timestamp: timestamp,
+        metadata: result.metadata || {}
+      };
+    });
   }
 
   /**

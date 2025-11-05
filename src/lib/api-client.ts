@@ -20,7 +20,7 @@ export class ApiClient {
     };
   }
 
-  static async post<T = any>(endpoint: string, data: any): Promise<T> {
+  static async post<T = any>(endpoint: string, data: any, signal?: AbortSignal): Promise<T> {
     const headers = await this.getAuthHeaders();
     
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -28,6 +28,7 @@ export class ApiClient {
       headers,
       body: JSON.stringify(data),
       credentials: 'include',
+      signal, // Support abort signal
     });
 
     if (!response.ok) {
@@ -127,6 +128,10 @@ export class ApiClient {
 
   static async deletePRDGroup(groupId: string): Promise<{ success: boolean }> {
     return this.delete(`/api/prd/group/${groupId}`);
+  }
+
+  static async searchSections(query: string, prdVersionId?: string, sectionId?: string, userContext?: any, hybrid = false, signal?: AbortSignal): Promise<{ phase: string; query_hash: string; results: any[]; search_time_ms?: number; bm25_count?: number; vector_count?: number; merged_count?: number; timestamp: string }> {
+    return this.post('/api/search/sections', { query, prd_version_id: prdVersionId, section_id: sectionId, user_context: userContext, hybrid }, signal);
   }
 
   // Document version management

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2 } from 'lucide-react';
 import { ApiClient } from '@/lib/api-client';
 
 type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
@@ -22,8 +22,14 @@ export default function PRDNew() {
   const [prdId, setPrdId] = useState<string | null>(null);
   const [contextSuggestions, setContextSuggestions] = useState<any[]>([]);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
+  const [pinnedChunks, setPinnedChunks] = useState<Set<string>>(new Set());
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentQueryHash, setCurrentQueryHash] = useState<string | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hybridTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const current = useMemo(() => PRD_QUESTIONS[currentStep], [currentStep]);
 
@@ -39,21 +45,127 @@ export default function PRDNew() {
     })();
   }, []);
 
-  // Fetch context for current question
+  // Debounced dual-phase search based on user input
   useEffect(() => {
-    (async () => {
-      if (!current) return;
+    const currentAnswer = answers[current.id] || '';
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Only search if user has typed something (minimum 3 chars) and we have a PRD ID
+    if (!currentAnswer.trim() || currentAnswer.trim().length < 3) {
+      setContextSuggestions([]);
+      setIsLoadingContext(false);
+      setIsRefining(false);
+      return;
+    }
+
+    // Wait for PRD to be created
+    if (!prdId) {
+      return;
+    }
+
+    // Cancel any pending Phase 2 hybrid search
+    if (hybridTimeoutRef.current) {
+      clearTimeout(hybridTimeoutRef.current);
+      hybridTimeoutRef.current = null;
+    }
+
+    // Abort any in-flight requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    // Debounce search (400ms)
+    setIsLoadingContext(true);
+    setIsRefining(false);
+    
+    searchTimeoutRef.current = setTimeout(async () => {
+      // Check if request was aborted
+      if (abortControllerRef.current?.signal.aborted) return;
+
       try {
-        setIsLoadingContext(true);
-        const result = await ApiClient.post('/api/search', { query: current.contextQuery, limit: 3 } as any);
-        setContextSuggestions((result as any)?.results || []);
-      } catch {
-        setContextSuggestions([]);
-      } finally {
+        // Phase 1: Instant BM25 search
+        const phase1Result = await ApiClient.searchSections(
+          currentAnswer.trim(),
+          prdId,
+          current.id,
+          { pinned_chunks: Array.from(pinnedChunks) },
+          false, // hybrid=false for Phase 1
+          abortControllerRef.current?.signal
+        );
+
+        // Check again if aborted
+        if (abortControllerRef.current?.signal.aborted) return;
+
+        const queryHash = phase1Result.query_hash;
+        setCurrentQueryHash(queryHash);
+        setContextSuggestions(phase1Result.results || []);
         setIsLoadingContext(false);
+        setIsRefining(true);
+
+        // Phase 2: Hybrid search (delayed, optimized to 2s since hybrid is faster)
+        hybridTimeoutRef.current = setTimeout(async () => {
+          // Check if aborted before starting Phase 2
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsRefining(false);
+            return;
+          }
+
+          try {
+            const phase2Result = await ApiClient.searchSections(
+              currentAnswer.trim(),
+              prdId,
+              current.id,
+              { pinned_chunks: Array.from(pinnedChunks) },
+              true, // hybrid=true for Phase 2
+              abortControllerRef.current?.signal
+            );
+
+            // Check if aborted before updating state
+            if (abortControllerRef.current?.signal.aborted) return;
+
+            // Only update if query hash matches (query hasn't changed)
+            setCurrentQueryHash(prevHash => {
+              if (phase2Result.query_hash === queryHash && prevHash === queryHash) {
+                setContextSuggestions(phase2Result.results || []);
+                setIsRefining(false);
+              }
+              return prevHash;
+            });
+          } catch (err) {
+            // Ignore abort errors
+            if (err instanceof Error && err.name === 'AbortError') return;
+            console.error('Hybrid search error:', err);
+            setIsRefining(false);
+          }
+        }, 2000); // Reduced from 3.5s to 2s (hybrid is faster than expected)
+
+      } catch (err) {
+        // Ignore abort errors
+        if (err instanceof Error && err.name === 'AbortError') return;
+        console.error('Search error:', err);
+        setContextSuggestions([]);
+        setIsLoadingContext(false);
+        setIsRefining(false);
       }
-    })();
-  }, [currentStep]);
+    }, 400);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      if (hybridTimeoutRef.current) {
+        clearTimeout(hybridTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [answers, current.id, prdId, pinnedChunks]);
 
   // Auto-save
   useEffect(() => {
@@ -81,8 +193,27 @@ export default function PRDNew() {
     return () => clearInterval(timer);
   }, [prdId, answers, title, isSaving]);
 
-  const insertContext = (text: string) => {
+  const insertContext = (chunk: any) => {
+    const text = chunk.snippet || chunk.content || '';
     setAnswers(prev => ({ ...prev, [current.id]: ((prev[current.id] as string) || '') + (prev[current.id] ? '\n\n' : '') + text }));
+    
+    // Store citation in prd_source_refs (optional, for tracking)
+    if (prdId && chunk.chunk_id) {
+      // This will be handled by the backend when saving the section
+      // For now, we just insert the text
+    }
+  };
+
+  const togglePin = (chunkId: string) => {
+    setPinnedChunks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(chunkId)) {
+        newSet.delete(chunkId);
+      } else {
+        newSet.add(chunkId);
+      }
+      return newSet;
+    });
   };
 
   const handleNext = () => {
@@ -133,26 +264,60 @@ export default function PRDNew() {
           <h2 className="text-2xl font-semibold mb-2">Question {currentStep + 1} of {PRD_QUESTIONS.length}: {current.question}</h2>
         </div>
 
-        {!!contextSuggestions.length && (
+        {(isLoadingContext || contextSuggestions.length > 0 || isRefining) && (
           <div className="mb-6 p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <p className="text-sm font-medium text-gray-300">I found relevant context from your documents:</p>
+              <p className="text-sm font-medium text-gray-300">
+                {isLoadingContext ? 'Searching...' : isRefining ? 'Refining results with AI...' : 'I found relevant context from your documents:'}
+              </p>
+              {isRefining && <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />}
             </div>
-            <div className="space-y-4">
-              {contextSuggestions.map((s, i) => (
-                <div key={i} className="p-4 bg-[#0f0f11] border border-gray-700 rounded-lg">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="font-medium text-sm">{s.title || 'Document'}</p>
-                      <p className="text-xs text-gray-400">{s.source} • {s.timestamp}</p>
+            {isLoadingContext && contextSuggestions.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+                <span className="ml-2 text-sm text-gray-400">Finding relevant context...</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {contextSuggestions.map((s, i) => (
+                  <div key={s.chunk_id || s.id || i} className="p-4 bg-[#0f0f11] border border-gray-700 rounded-lg hover:border-purple-500/50 transition-colors">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm text-white">{s.title || 'Document'}</p>
+                        <p className="text-xs text-gray-400 mt-1">{s.source} • {new Date(s.timestamp).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => togglePin(s.chunk_id || s.id)}
+                          className={`p-2 ${pinnedChunks.has(s.chunk_id || s.id) ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'}`}
+                          title={pinnedChunks.has(s.chunk_id || s.id) ? 'Unpin' : 'Pin'}
+                        >
+                          <Pin className={`w-4 h-4 ${pinnedChunks.has(s.chunk_id || s.id) ? 'fill-current' : ''}`} />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => insertContext(s)} 
+                          className="text-purple-400 hover:text-purple-300"
+                        >
+                          Insert →
+                        </Button>
+                      </div>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => insertContext(s.snippet || s.content || '')} className="text-purple-400 hover:text-purple-300">Insert →</Button>
+                    <p className="text-sm text-gray-300 line-clamp-3">{s.snippet || s.content}</p>
+                    {pinnedChunks.has(s.chunk_id || s.id) && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-yellow-400">
+                        <Pin className="w-3 h-3 fill-current" />
+                        <span>Pinned</span>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-300 line-clamp-2">{s.snippet || s.content}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
