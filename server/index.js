@@ -17,12 +17,16 @@ import express from 'express';
 import cors from 'cors';
 import https from 'https';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { DocumentSync } from './services/document-sync.js';
 import { GoogleDriveSync } from './services/google-drive-sync.js';
 import { SearchService } from './services/search-service.js';
 import { NotionSync } from './services/notion-sync.js';
 import { SlackSync } from './services/slack-sync.js';
+import multer from 'multer';
+import OpenAI from 'openai';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,9 +86,92 @@ const googleDriveSync = new GoogleDriveSync(process.env.OPENAI_API_KEY, supabase
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Multer setup for audio uploads
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '') || '.webm';
+      cb(null, `stt_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+    }
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+});
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Speech-to-Text (Whisper) - Push-to-Talk transcription
+app.post('/api/speech/transcribe', upload.single('audio'), async (req, res) => {
+  const start = Date.now();
+  let tempPath = null;
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'invalid_audio', message: 'No audio file provided' });
+    }
+
+    tempPath = req.file.path;
+    const language = req.body?.language;
+
+    // Validate mime type
+    const allowed = ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/m4a'];
+    if (req.file.mimetype && !allowed.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'invalid_audio', message: `Unsupported file type: ${req.file.mimetype}` });
+    }
+
+    // Create transcription
+    const fileStream = fs.createReadStream(tempPath);
+    let result;
+    try {
+      // Prefer whisper-1 for broad availability
+      result = await openai.audio.transcriptions.create({
+        file: fileStream,
+        model: 'whisper-1',
+        ...(language ? { language } : {})
+      });
+    } catch (e) {
+      // Map upstream errors to structured taxonomy
+      const msg = (e?.message || '').toLowerCase();
+      if (msg.includes('too large') || msg.includes('payload')) {
+        return res.status(413).json({ error: 'payload_too_large', message: 'Audio too large' });
+      }
+      if (msg.includes('length') || msg.includes('too long')) {
+        return res.status(400).json({ error: 'transcription_failed', message: 'Audio too long' });
+      }
+      if (msg.includes('unsupported') || msg.includes('file type')) {
+        return res.status(400).json({ error: 'invalid_audio', message: 'Unsupported audio format' });
+      }
+      if (e?.status === 401) {
+        return res.status(502).json({ error: 'upstream_error', message: 'OpenAI auth failed' });
+      }
+      console.error('Whisper upstream error:', e);
+      return res.status(502).json({ error: 'upstream_error', message: 'OpenAI service unavailable' });
+    }
+
+    const text = result?.text || result?.data?.text || '';
+    return res.json({ text, duration_ms: Date.now() - start });
+  } catch (e) {
+    console.error('Transcription error:', e);
+    return res.status(500).json({ error: 'transcription_failed', message: 'Unexpected error' });
+  } finally {
+    if (tempPath) {
+      fs.unlink(tempPath, () => {});
+    }
+  }
 });
 
 // Debug endpoint to check environment variables

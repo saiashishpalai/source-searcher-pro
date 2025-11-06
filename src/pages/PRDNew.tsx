@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square } from 'lucide-react';
 import { ApiClient } from '@/lib/api-client';
 
 type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
@@ -30,6 +30,10 @@ export default function PRDNew() {
   const [draftMode, setDraftMode] = useState<'insert' | 'replace'>('insert');
   const [sectionCitations, setSectionCitations] = useState<Record<SectionId, string[]>>({ objective: [], scope: [], metrics: [], dependencies: [], timeline: [] });
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hybridTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -271,6 +275,56 @@ export default function PRDNew() {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/ogg;codecs=opus',
+        'audio/webm',
+        'audio/ogg'
+      ];
+      const mimeType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        setIsRecording(false);
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size === 0) return;
+        setIsTranscribing(true);
+        try {
+          const { text } = await ApiClient.transcribeSpeech(blob);
+          if (draftMode === 'replace') {
+            setAnswers(prev => ({ ...prev, [current.id]: text }));
+          } else {
+            const existingText = answers[current.id] || '';
+            const separator = existingText ? '\n\n' : '';
+            setAnswers(prev => ({ ...prev, [current.id]: existingText + separator + text }));
+          }
+        } catch (err) {
+          console.error('Transcription failed', err);
+          alert((err as Error).message || 'Transcription failed');
+        } finally {
+          setIsTranscribing(false);
+          stream.getTracks().forEach(t => t.stop());
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch (e) {
+      console.error('Mic error', e);
+      alert('Microphone permission denied or unavailable');
+    }
+  };
+
+  const stopRecording = () => {
+    try {
+      mediaRecorderRef.current?.stop();
+    } catch {}
+  };
+
   const togglePin = (chunkId: string) => {
     setPinnedChunks(prev => {
       const newSet = new Set(prev);
@@ -431,6 +485,30 @@ export default function PRDNew() {
                     <>
                       <Sparkles className="w-3 h-3 mr-1" />
                       Draft from Context
+                    </>
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => (isRecording ? stopRecording() : startRecording())}
+                  disabled={isTranscribing}
+                  className={`h-7 px-3 text-xs ${isRecording ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+                  title={isRecording ? 'Stop recording' : 'Click to record'}
+                >
+                  {isRecording ? (
+                    <>
+                      <Square className="w-3 h-3 mr-1" />
+                      Stop
+                    </>
+                  ) : isTranscribing ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Transcribing…
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-3 h-3 mr-1" />
+                      Talk
                     </>
                   )}
                 </Button>

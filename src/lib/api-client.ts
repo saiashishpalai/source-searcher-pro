@@ -86,6 +86,24 @@ export class ApiClient {
     return this.post('/api/prd/sections/suggest', { prd_version_id: prdVersionId, section_id: sectionId, user_text: userText, chunk_ids: chunkIds || [] });
   }
 
+  static async transcribeSpeech(file: File | Blob, language?: string): Promise<{ text: string; duration_ms?: number }> {
+    const form = new FormData();
+    form.append('audio', file);
+    if (language) form.append('language', language);
+    const token = await this.getAuthToken();
+    const response = await fetch('/api/speech/transcribe', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form as any,
+    });
+    if (!response.ok) {
+      let err: any = {};
+      try { err = await response.json(); } catch {}
+      throw new Error(err?.message || 'Transcription failed');
+    }
+    return response.json();
+  }
+
   static async getPRD(prdId: string): Promise<{ prd: any }> {
     return this.get(`/api/prd/${prdId}`);
   }
