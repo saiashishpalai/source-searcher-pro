@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { ApiClient } from '@/lib/api-client';
 import {
   AlertDialog,
@@ -54,7 +63,7 @@ export default function PRDNew() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentQueryHash, setCurrentQueryHash] = useState<string | null>(null);
-  const [draftMode, setDraftMode] = useState<'insert' | 'replace'>('insert');
+  const [draftMode, setDraftMode] = useState<'insert' | 'replace'>('replace');
   const [sectionCitations, setSectionCitations] = useState<Record<SectionId, string[]>>({ objective: [], scope: [], metrics: [], dependencies: [], timeline: [] });
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -817,34 +826,52 @@ export default function PRDNew() {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={useAccumulatedContext}
-                    onChange={(e) => setUseAccumulatedContext(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-600 bg-[#1f1f23] text-purple-500 focus:ring-purple-500"
-                  />
-                  Use context
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={useDependencyHints}
-                    onChange={(e) => setUseDependencyHints(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-600 bg-[#1f1f23] text-blue-500 focus:ring-blue-500"
-                  />
-                  Use hints
-                </label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAccumulatedContext}
-                  className="text-xs text-gray-400 hover:text-white"
-                  title="Clear accumulated context"
-                >
-                  <RotateCcw className="w-3 h-3 mr-1" />
-                  Clear
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-gray-400 hover:text-white h-7 px-2"
+                    >
+                      <Settings className="w-3 h-3 mr-1" />
+                      Settings
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-[#1f1f23] border-gray-700">
+                    <DropdownMenuLabel className="text-gray-300">Search Settings</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-gray-700" />
+                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-[#0f0f11]">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-300">Use context</span>
+                        <span className="text-xs text-gray-500">Accumulate pinned items across sections</span>
+                      </div>
+                      <Switch
+                        checked={useAccumulatedContext}
+                        onCheckedChange={setUseAccumulatedContext}
+                        className="ml-2"
+                      />
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-[#0f0f11]">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-300">Use hints</span>
+                        <span className="text-xs text-gray-500">Cross-question dependency hints</span>
+                      </div>
+                      <Switch
+                        checked={useDependencyHints}
+                        onCheckedChange={setUseDependencyHints}
+                        className="ml-2"
+                      />
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-gray-700" />
+                    <DropdownMenuItem
+                      onClick={clearAccumulatedContext}
+                      className="text-red-400 focus:text-red-300 focus:bg-[#0f0f11] cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3 mr-2" />
+                      Clear accumulated context
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>
@@ -913,33 +940,49 @@ export default function PRDNew() {
             {(contextSuggestions.length > 0 || pinnedChunks.size > 0) && (
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-[#1f1f23] border border-gray-700 rounded-lg p-1">
-                  <Button
-                    size="sm"
-                    variant={draftMode === 'insert' ? 'default' : 'ghost'}
-                    onClick={() => setDraftMode('insert')}
-                    className={`h-7 px-2 text-xs ${draftMode === 'insert' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
-                    title="Insert mode: Append draft below existing text"
-                  >
-                    <Plus className="w-3 h-3 mr-1" />
-                    Insert
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={draftMode === 'replace' ? 'default' : 'ghost'}
-                    onClick={() => setDraftMode('replace')}
-                    className={`h-7 px-2 text-xs ${draftMode === 'replace' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
-                    title="Replace mode: Overwrite textarea content"
-                  >
-                    <RotateCcw className="w-3 h-3 mr-1" />
-                    Replace
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant={draftMode === 'insert' ? 'default' : 'ghost'}
+                          onClick={() => setDraftMode('insert')}
+                          className={`h-7 px-2 text-xs ${draftMode === 'insert' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
+                        >
+                          <Plus className="w-3 h-3 mr-0.5" />
+                          Insert
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Insert: Keeps your existing content and adds the AI-generated draft below it</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant={draftMode === 'replace' ? 'default' : 'ghost'}
+                          onClick={() => setDraftMode('replace')}
+                          className={`h-7 px-2 text-xs ${draftMode === 'replace' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
+                        >
+                          <RotateCcw className="w-3 h-3 mr-0.5" />
+                          Replace
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Replace: Overwrites your current text with the AI-generated draft</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <Button
                   size="sm"
                   onClick={handleGenerateDraft}
                   disabled={isGeneratingDraft}
                   className="bg-purple-500 hover:bg-purple-600 text-white h-7 px-3 text-xs"
-                  title="Generate draft from context using AI"
+                  title="Use AI to improve and enhance your answer based on context"
                 >
                   {isGeneratingDraft ? (
                     <>
@@ -949,7 +992,7 @@ export default function PRDNew() {
                   ) : (
                     <>
                       <Sparkles className="w-3 h-3 mr-1" />
-                      Draft from Context
+                      Improve via AI
                     </>
                   )}
                 </Button>
