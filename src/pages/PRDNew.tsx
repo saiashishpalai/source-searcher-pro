@@ -4,6 +4,16 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ApiClient } from '@/lib/api-client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import nlp from 'compromise';
 
 type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
@@ -40,6 +50,9 @@ export default function PRDNew() {
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [tempTitle, setTempTitle] = useState('');
+  const [exitError, setExitError] = useState('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<any>(null);
@@ -645,7 +658,7 @@ export default function PRDNew() {
     <div className="min-h-screen bg-[#0f0f11] text-white">
       <div className="border-b border-gray-800 bg-[#1f1f23] sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-8 py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-gray-400 hover:text-white" aria-label="Back to Dashboard" title="Back to Dashboard">
+          <Button variant="ghost" onClick={() => { setExitError(''); setTempTitle(''); setShowExitDialog(true); }} className="text-gray-400 hover:text-white" aria-label="Back to Dashboard" title="Back to Dashboard">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </Button>
@@ -900,6 +913,84 @@ export default function PRDNew() {
           </div>
         )}
       </div>
+      {/* Exit confirmation dialog */}
+      <AlertDialog open={showExitDialog} onOpenChange={(open) => setShowExitDialog(open)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave PRD builder?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You can discard this draft or save it and return later. {(!title || title === 'Untitled PRD') && 'Please enter a title to save this PRD.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {(!title || title === 'Untitled PRD') && (
+            <div className="mt-3">
+              <label className="block text-sm text-gray-400 mb-1">PRD Title</label>
+              <input
+                type="text"
+                value={tempTitle}
+                onChange={(e) => setTempTitle(e.target.value)}
+                placeholder="Enter a title"
+                className="w-full bg-[#1f1f23] border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-purple-500"
+              />
+              {exitError && <p className="text-xs text-red-400 mt-1">{exitError}</p>}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowExitDialog(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-gray-800 hover:bg-gray-700"
+              onClick={async () => {
+                try {
+                  if (prdId) {
+                    await ApiClient.deletePRDVersion(prdId);
+                  }
+                } catch (e) {
+                  // ignore errors on discard
+                } finally {
+                  setShowExitDialog(false);
+                  navigate('/dashboard');
+                }
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={async () => {
+                try {
+                  setExitError('');
+                  if (!prdId) {
+                    setShowExitDialog(false);
+                    navigate('/dashboard');
+                    return;
+                  }
+                  const effectiveTitle = (title && title !== 'Untitled PRD') ? title : tempTitle.trim();
+                  if (!effectiveTitle) {
+                    setExitError('Title is required to save.');
+                    return;
+                  }
+                  if (effectiveTitle !== title) {
+                    await ApiClient.updatePRDTitle(prdId, effectiveTitle);
+                  }
+                  // Quick save sections
+                  for (const [sid, content] of Object.entries(answers)) {
+                    const sectionId = sid as SectionId;
+                    if (content && content.trim()) {
+                      const citations = sectionCitations[sectionId] || [];
+                      await ApiClient.savePRDSection(prdId, sectionId, content, undefined, citations);
+                    }
+                  }
+                  setShowExitDialog(false);
+                  navigate('/dashboard');
+                } catch (e) {
+                  setExitError('Failed to save. Please try again.');
+                }
+              }}
+            >
+              Save & Exit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
