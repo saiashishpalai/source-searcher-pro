@@ -13,6 +13,8 @@ export class SearchService {
     // Simple in-memory cache for RRF results (10 min TTL)
     this.rrfCache = new Map();
     this.cacheTTL = 10 * 60 * 1000; // 10 minutes in milliseconds
+    // Cache for snippet centroid embeddings (per user+sessionId)
+    this.snippetCentroidCache = new Map();
   }
 
   /**
@@ -679,11 +681,17 @@ Follow the format from the examples above. Write Answer sections as single unbro
       prd_version_id,
       section_id,
       user_context = {},
+      expanded_context,
       limit = 8
     } = options;
 
     const startTime = Date.now();
     const queryHash = this.generateQueryHash(query, user_context);
+    
+    // Track expanded context metrics
+    const expandedContextCount = expanded_context 
+      ? ((expanded_context.pinned_chunk_ids?.length || 0) + (expanded_context.prior_answer_snippets?.length || 0))
+      : 0;
 
     try {
       console.log(`🔍 Dual-phase search for PRD section: "${query}" (user: ${userId}, section: ${section_id})`);
@@ -728,7 +736,18 @@ Follow the format from the examples above. Write Answer sections as single unbro
           console.log(`✅ Vector search: ${vectorResults?.length || 0} results`);
 
           // Merge with RRF
-          const mergedResults = this.reciprocalRankFusion(vectorResults || [], bm25Results, 60);
+          let mergedResults = this.reciprocalRankFusion(vectorResults || [], bm25Results, 60);
+
+          // Apply iterative grounding boosts if expanded_context is provided
+          if (expanded_context) {
+            mergedResults = await this.applyIterativeGroundingBoosts(
+              mergedResults,
+              expanded_context,
+              userId,
+              queryEmbedding,
+              supabaseAdmin
+            );
+          }
 
           // Fetch embeddings for MMR
           const candidateIds = mergedResults.map(r => r.id).filter(Boolean).slice(0, 40);
@@ -758,6 +777,10 @@ Follow the format from the examples above. Write Answer sections as single unbro
           const hybridTime = Date.now() - hybridStartTime;
           console.log(`✅ Hybrid search completed in ${hybridTime}ms: ${formattedHybrid.length} results`);
 
+          // Log telemetry
+          const avgBoostApplied = expanded_context ? this.calculateAvgBoost(mergedResults) : 0;
+          console.log(`📊 Telemetry: expanded_context_count=${expandedContextCount}, avg_boost_applied=${avgBoostApplied.toFixed(2)}, query_latency_ms=${hybridTime}`);
+
           return {
             phase: 'hybrid',
             query_hash: queryHash,
@@ -766,6 +789,8 @@ Follow the format from the examples above. Write Answer sections as single unbro
             bm25_count: bm25Results.length,
             vector_count: vectorResults?.length || 0,
             merged_count: mergedResults.length,
+            expanded_context_count: expandedContextCount,
+            avg_boost_applied: avgBoostApplied,
             timestamp: new Date().toISOString()
           };
         } catch (error) {
@@ -854,6 +879,106 @@ Follow the format from the examples above. Write Answer sections as single unbro
         metadata: result.metadata || {}
       };
     });
+  }
+
+  /**
+   * Apply iterative grounding boosts to search results
+   * - +2.0 boost for pinned chunk IDs
+   * - +0.5 boost for chunks similar to prior answer snippets (similarity > 0.7)
+   * - Small penalty for already-cited chunks
+   */
+  async applyIterativeGroundingBoosts(results, expandedContext, userId, queryEmbedding, supabaseAdmin) {
+    if (!expandedContext || results.length === 0) return results;
+
+    const pinnedIds = new Set(expandedContext.pinned_chunk_ids || []);
+    const priorSnippets = expandedContext.prior_answer_snippets || [];
+    const PINNED_BOOST = 2.0;
+    const SIMILARITY_BOOST = 0.5;
+    const SIMILARITY_THRESHOLD = 0.7;
+
+    // Get snippet centroid embedding (cached per user+sessionId)
+    let snippetCentroid = null;
+    if (priorSnippets.length > 0) {
+      const cacheKey = `${userId}:${priorSnippets.join('|').substring(0, 100)}`;
+      if (this.snippetCentroidCache.has(cacheKey)) {
+        snippetCentroid = this.snippetCentroidCache.get(cacheKey);
+      } else {
+        // Compute centroid from prior snippets
+        const snippetText = priorSnippets.join(' ');
+        snippetCentroid = await this.generateQueryEmbedding(snippetText);
+        this.snippetCentroidCache.set(cacheKey, snippetCentroid);
+        // Limit cache size
+        if (this.snippetCentroidCache.size > 100) {
+          const firstKey = this.snippetCentroidCache.keys().next().value;
+          this.snippetCentroidCache.delete(firstKey);
+        }
+      }
+    }
+
+    // Get chunk embeddings for similarity comparison
+    const chunkIds = results.map(r => r.id).filter(Boolean);
+    const { data: chunksWithEmbeddings } = await supabaseAdmin
+      .from('document_chunks')
+      .select('id, embedding')
+      .in('id', chunkIds);
+
+    const embeddingMap = new Map();
+    chunksWithEmbeddings?.forEach(chunk => {
+      if (chunk.embedding) {
+        embeddingMap.set(chunk.id, chunk.embedding);
+      }
+    });
+
+    // Helper: Cosine similarity
+    const cosineSimilarity = (vec1, vec2) => {
+      if (!vec1 || !vec2 || vec1.length !== vec2.length) return 0;
+      let dot = 0, norm1 = 0, norm2 = 0;
+      for (let i = 0; i < vec1.length; i++) {
+        dot += vec1[i] * vec2[i];
+        norm1 += vec1[i] * vec1[i];
+        norm2 += vec2[i] * vec2[i];
+      }
+      return dot / (Math.sqrt(norm1) * Math.sqrt(norm2));
+    };
+
+    // Apply boosts
+    return results.map(result => {
+      let boost = 0;
+      const chunkId = result.id;
+
+      // Boost pinned chunks
+      if (pinnedIds.has(chunkId)) {
+        boost += PINNED_BOOST;
+      }
+
+      // Soft boost for similarity to prior snippets
+      if (snippetCentroid) {
+        const chunkEmbedding = embeddingMap.get(chunkId);
+        if (chunkEmbedding) {
+          const similarity = cosineSimilarity(snippetCentroid, chunkEmbedding);
+          if (similarity > SIMILARITY_THRESHOLD) {
+            boost += SIMILARITY_BOOST;
+          }
+        }
+      }
+
+      // Apply boost to RRF score
+      return {
+        ...result,
+        rrfScore: (result.rrfScore || 0) + boost,
+        groundingBoost: boost
+      };
+    }).sort((a, b) => (b.rrfScore || 0) - (a.rrfScore || 0)); // Re-sort by boosted score
+  }
+
+  /**
+   * Calculate average boost applied to results (for telemetry)
+   */
+  calculateAvgBoost(results) {
+    if (!results || results.length === 0) return 0;
+    const boosts = results.map(r => r.groundingBoost || 0).filter(b => b > 0);
+    if (boosts.length === 0) return 0;
+    return boosts.reduce((sum, b) => sum + b, 0) / boosts.length;
   }
 
   /**

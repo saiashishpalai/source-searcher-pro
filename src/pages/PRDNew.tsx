@@ -24,6 +24,10 @@ export default function PRDNew() {
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [pinnedChunks, setPinnedChunks] = useState<Set<string>>(new Set());
+  const [pinnedChunksGlobal, setPinnedChunksGlobal] = useState<Set<string>>(new Set()); // Accumulated across all sections
+  const [priorAnswerSummaries, setPriorAnswerSummaries] = useState<string[]>([]); // Prior answer snippets
+  const [useAccumulatedContext, setUseAccumulatedContext] = useState(true); // Toggle for iterative grounding
+  const [consecutiveLowResults, setConsecutiveLowResults] = useState(0); // Track for auto-clear
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentQueryHash, setCurrentQueryHash] = useState<string | null>(null);
@@ -43,6 +47,32 @@ export default function PRDNew() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const current = useMemo(() => PRD_QUESTIONS[currentStep], [currentStep]);
+
+  // Helper: Truncate text at last full stop before 300 chars
+  const truncateAtLastPeriod = (text: string, maxChars: number = 300): string => {
+    if (text.length <= maxChars) return text;
+    const truncated = text.substring(0, maxChars);
+    const lastPeriod = truncated.lastIndexOf('.');
+    if (lastPeriod > maxChars * 0.5) { // Only use if period is in second half
+      return truncated.substring(0, lastPeriod + 1);
+    }
+    return truncated; // Fallback to hard cut
+  };
+
+  // Helper: Get prior answer summaries (capped at 4, max 320 chars each)
+  // Memoize to avoid recalculating on every render
+  const priorAnswerSummariesMemo = useMemo(() => {
+    const summaries: string[] = [];
+    for (let i = 0; i < currentStep; i++) {
+      const sectionId = PRD_QUESTIONS[i].id;
+      const answer = answers[sectionId]?.trim();
+      if (answer && answer.length > 0) {
+        const summary = truncateAtLastPeriod(answer, 320);
+        summaries.push(summary);
+      }
+    }
+    return summaries.slice(0, 4); // Cap at 4
+  }, [currentStep, answers]);
 
   // Create PRD draft on mount
   useEffect(() => {
@@ -99,12 +129,20 @@ export default function PRDNew() {
       if (abortControllerRef.current?.signal.aborted) return;
 
       try {
+        // Build expanded context if enabled
+        // Token guard: Skip prior snippets if query is very long (>200 chars)
+        const shouldIncludePriorSnippets = currentAnswer.trim().length <= 200;
+        const expandedContext = useAccumulatedContext ? {
+          pinned_chunk_ids: Array.from(pinnedChunksGlobal).slice(0, 12), // Cap at 12
+          prior_answer_snippets: shouldIncludePriorSnippets ? priorAnswerSummariesMemo : []
+        } : undefined;
+
         // Phase 1: Instant BM25 search
         const phase1Result = await ApiClient.searchSections(
           currentAnswer.trim(),
           prdId,
           current.id,
-          { pinned_chunks: Array.from(pinnedChunks) },
+          { pinned_chunks: Array.from(pinnedChunks), expanded_context: expandedContext },
           false, // hybrid=false for Phase 1
           abortControllerRef.current?.signal
         );
@@ -114,9 +152,26 @@ export default function PRDNew() {
 
         const queryHash = phase1Result.query_hash;
         setCurrentQueryHash(queryHash);
-        setContextSuggestions(phase1Result.results || []);
+        const results = phase1Result.results || [];
+        setContextSuggestions(results);
         setIsLoadingContext(false);
         setIsRefining(true);
+
+        // Track consecutive low results for auto-clear
+        if (results.length < 3) {
+          setConsecutiveLowResults(prev => {
+            const newCount = prev + 1;
+            // Auto-clear if > 3 consecutive low results
+            if (newCount > 3) {
+              console.log('⚠️ Auto-clearing accumulated context due to consecutive low results');
+              clearAccumulatedContext();
+              return 0;
+            }
+            return newCount;
+          });
+        } else {
+          setConsecutiveLowResults(0); // Reset on good results
+        }
 
         // Phase 2: Hybrid search (delayed, optimized to 2s since hybrid is faster)
         hybridTimeoutRef.current = setTimeout(async () => {
@@ -127,11 +182,19 @@ export default function PRDNew() {
           }
 
           try {
+            // Build expanded context if enabled
+            // Token guard: Skip prior snippets if query is very long (>200 chars)
+            const shouldIncludePriorSnippets = currentAnswer.trim().length <= 200;
+            const expandedContext = useAccumulatedContext ? {
+              pinned_chunk_ids: Array.from(pinnedChunksGlobal).slice(0, 12), // Cap at 12
+              prior_answer_snippets: shouldIncludePriorSnippets ? priorAnswerSummariesMemo : []
+            } : undefined;
+
             const phase2Result = await ApiClient.searchSections(
               currentAnswer.trim(),
               prdId,
               current.id,
-              { pinned_chunks: Array.from(pinnedChunks) },
+              { pinned_chunks: Array.from(pinnedChunks), expanded_context: expandedContext },
               true, // hybrid=true for Phase 2
               abortControllerRef.current?.signal
             );
@@ -176,7 +239,7 @@ export default function PRDNew() {
         abortControllerRef.current.abort();
       }
     };
-  }, [answers, current.id, prdId, pinnedChunks]);
+  }, [answers, current.id, prdId, pinnedChunks, pinnedChunksGlobal, priorAnswerSummariesMemo, useAccumulatedContext]);
 
   // Auto-save
   useEffect(() => {
@@ -421,11 +484,40 @@ export default function PRDNew() {
       }
       return newSet;
     });
+    // Also update global pinned chunks (capped at 12)
+    setPinnedChunksGlobal(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(chunkId)) {
+        newSet.delete(chunkId);
+      } else {
+        if (newSet.size < 12) { // Cap at 12
+          newSet.add(chunkId);
+        }
+      }
+      return newSet;
+    });
+  };
+
+  const clearAccumulatedContext = () => {
+    setPinnedChunksGlobal(new Set());
+    setPriorAnswerSummaries([]);
+    setConsecutiveLowResults(0);
   };
 
   const handleNext = () => {
+    // Accumulate prior answer before moving to next step
     if (currentStep < PRD_QUESTIONS.length - 1) {
+      const currentAnswer = answers[current.id]?.trim();
+      if (currentAnswer && currentAnswer.length > 0) {
+        const summary = truncateAtLastPeriod(currentAnswer, 320);
+        setPriorAnswerSummaries(prev => {
+          const updated = [...prev, summary].slice(0, 4); // Cap at 4
+          return updated;
+        });
+      }
       setCurrentStep(s => s + 1);
+      // Reset current section pinned chunks (they're now in global)
+      setPinnedChunks(new Set());
     } else if (prdId) {
       navigate(`/prd/${prdId}`);
     }
@@ -468,7 +560,36 @@ export default function PRDNew() {
         </div>
 
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold mb-2">Question {currentStep + 1} of {PRD_QUESTIONS.length}: {current.question}</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-2xl font-semibold">Question {currentStep + 1} of {PRD_QUESTIONS.length}: {current.question}</h2>
+            {(pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) && (
+              <div className="flex items-center gap-2">
+                <div className="px-3 py-1 bg-purple-900/30 border border-purple-500/30 rounded-md text-sm text-gray-300">
+                  Using {pinnedChunksGlobal.size} pinned {pinnedChunksGlobal.size === 1 ? 'item' : 'items'}
+                  {priorAnswerSummariesMemo.length > 0 && `, ${priorAnswerSummariesMemo.length} prior ${priorAnswerSummariesMemo.length === 1 ? 'answer' : 'answers'}`}
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useAccumulatedContext}
+                    onChange={(e) => setUseAccumulatedContext(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-600 bg-[#1f1f23] text-purple-500 focus:ring-purple-500"
+                  />
+                  Use context
+                </label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAccumulatedContext}
+                  className="text-xs text-gray-400 hover:text-white"
+                  title="Clear accumulated context"
+                >
+                  <RotateCcw className="w-3 h-3 mr-1" />
+                  Clear
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         {(isLoadingContext || contextSuggestions.length > 0 || isRefining) && (

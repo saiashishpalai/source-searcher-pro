@@ -1521,13 +1521,13 @@ app.post('/api/search/sections', async (req, res) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { query, prd_version_id, section_id, user_context = {}, hybrid = false } = req.body || {};
+    const { query, prd_version_id, section_id, user_context = {}, expanded_context, hybrid = false } = req.body || {};
 
     if (!query || !query.trim()) {
       return res.status(400).json({ error: 'Query is required' });
     }
 
-    // Perform dual-phase search
+    // Perform dual-phase search with expanded context
     const searchResult = await searchService.searchForSections(
       user.id,
       query.trim(),
@@ -1536,6 +1536,7 @@ app.post('/api/search/sections', async (req, res) => {
         prd_version_id,
         section_id,
         user_context,
+        expanded_context, // Pass expanded context for iterative grounding
         limit: 8
       }
     );

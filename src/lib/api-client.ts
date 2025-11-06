@@ -161,7 +161,16 @@ export class ApiClient {
   }
 
   static async searchSections(query: string, prdVersionId?: string, sectionId?: string, userContext?: any, hybrid = false, signal?: AbortSignal): Promise<{ phase: string; query_hash: string; results: any[]; search_time_ms?: number; bm25_count?: number; vector_count?: number; merged_count?: number; timestamp: string }> {
-    return this.post('/api/search/sections', { query, prd_version_id: prdVersionId, section_id: sectionId, user_context: userContext, hybrid }, signal);
+    // Extract expanded_context from userContext if present
+    const { expanded_context, ...restContext } = userContext || {};
+    return this.post('/api/search/sections', { 
+      query, 
+      prd_version_id: prdVersionId, 
+      section_id: sectionId, 
+      user_context: restContext, 
+      expanded_context: expanded_context,
+      hybrid 
+    }, signal);
   }
 
   // Document version management
