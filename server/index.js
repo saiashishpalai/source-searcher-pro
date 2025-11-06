@@ -127,7 +127,7 @@ app.post('/api/speech/transcribe', upload.single('audio'), async (req, res) => {
     }
 
     tempPath = req.file.path;
-    const language = req.body?.language;
+    const language = req.body?.language || 'en'; // Default to English if not specified
 
     // Validate mime type
     const allowed = ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/m4a'];
@@ -140,10 +140,11 @@ app.post('/api/speech/transcribe', upload.single('audio'), async (req, res) => {
     let result;
     try {
       // Prefer whisper-1 for broad availability
+      // Always set language to ensure consistent English transcription
       result = await openai.audio.transcriptions.create({
         file: fileStream,
         model: 'whisper-1',
-        ...(language ? { language } : {})
+        language: language // Explicitly set language (defaults to 'en')
       });
     } catch (e) {
       // Map upstream errors to structured taxonomy
@@ -2091,17 +2092,68 @@ app.get('/api/prd/:id', async (req, res) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+    if (authError || !user) {
+      console.error('PRD fetch auth error:', authError);
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     const { id } = req.params;
+    console.log(`🔍 Fetching PRD ${id} for user ${user.id}`);
+    
+    // Query WITHOUT assembled_text (column may not exist)
     const { data: prd, error } = await supabaseAdmin
       .from('prd_versions')
-      .select('id, user_id, title, version, status, created_at, updated_at, prd_sections(*)')
+      .select('id, user_id, title, version, status, created_at, updated_at, created_by, prd_sections(*)')
       .eq('id', id)
       .eq('user_id', user.id)
       .single();
-    if (error || !prd) return res.status(404).json({ error: 'PRD not found' });
-    res.json({ prd });
+    
+    if (error) {
+      console.error(`❌ PRD fetch error for ${id}:`, error);
+      return res.status(404).json({ error: 'PRD not found', details: error.message });
+    }
+    
+    if (!prd) {
+      console.error(`❌ PRD ${id} not found for user ${user.id}`);
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+    
+    console.log(`✅ Found PRD ${id}: ${prd.title}`);
+    
+    // Try to fetch assembled_text separately (if column exists)
+    let assembledText = null;
+    try {
+      const { data: textData } = await supabaseAdmin
+        .from('prd_versions')
+        .select('assembled_text')
+        .eq('id', id)
+        .single();
+      assembledText = textData?.assembled_text || null;
+    } catch (e) {
+      // Column doesn't exist - that's fine, frontend will generate from sections
+      console.log('assembled_text column not available, using sections');
+    }
+    
+    // Fetch user profile for Created By
+    let createdByName = null;
+    if (prd.created_by) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('name, email')
+        .eq('id', prd.created_by)
+        .single();
+      if (profile) {
+        createdByName = profile.name || profile.email || 'Unknown';
+      }
+    }
+    
+    res.json({ 
+      prd: {
+        ...prd,
+        assembled_text: assembledText,
+        created_by_name: createdByName
+      }
+    });
   } catch (e) {
     res.status(500).json({ error: 'Failed to fetch PRD' });
   }

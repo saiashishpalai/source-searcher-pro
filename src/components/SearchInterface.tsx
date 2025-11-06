@@ -696,6 +696,7 @@ const SearchInterface = () => {
           lastInterimRef.current = '';
           
           const recognition = new SpeechRecognition();
+          recognition.lang = 'en-US'; // Explicitly set to English
           recognition.interimResults = true;
           recognition.continuous = true;
           recognition.onresult = (event: any) => {

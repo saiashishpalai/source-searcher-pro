@@ -94,10 +94,10 @@ export class ApiClient {
     });
   }
 
-  static async transcribeSpeech(file: File | Blob, language?: string): Promise<{ text: string; duration_ms?: number }> {
+  static async transcribeSpeech(file: File | Blob, language: string = 'en'): Promise<{ text: string; duration_ms?: number }> {
     const form = new FormData();
     form.append('audio', file);
-    if (language) form.append('language', language);
+    form.append('language', language); // Always send language (defaults to 'en')
     
     const { data: { session } } = await supabase.auth.getSession();
     const headers: HeadersInit = {};

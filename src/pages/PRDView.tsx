@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check } from 'lucide-react';
+import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, FileText, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApiClient } from '@/lib/api-client';
 
-type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
+type SectionId = 'objective' | 'background' | 'scope' | 'requirements' | 'metrics' | 'access_permissions' | 'notifications' | 'reporting' | 'analytics_events' | 'filters' | 'dependencies' | 'backward_compatibility' | 'release_plan' | 'timeline';
 
 export default function PRDView() {
   const { id } = useParams();
@@ -19,6 +19,7 @@ export default function PRDView() {
   const [versions, setVersions] = useState<any[]>([]);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isGeneratingAssembled, setIsGeneratingAssembled] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -28,12 +29,123 @@ export default function PRDView() {
     })();
   }, [id]);
 
+  const parseAssembledText = (text: string): Record<string, string> => {
+    const sections: Record<string, string> = {
+      'objective': '',
+      'background': '',
+      'scope': '',
+      'requirements': '',
+      'metrics': '',
+      'access_permissions': '',
+      'notifications': '',
+      'reporting': '',
+      'analytics_events': '',
+      'filters': '',
+      'dependencies': '',
+      'backward_compatibility': '',
+      'release_plan': '',
+      'timeline': ''
+    };
+
+    // Map section numbers to IDs
+    const sectionNumberMap: Record<number, string> = {
+      1: 'objective',
+      2: 'background',
+      3: 'scope',
+      4: 'requirements',
+      5: 'metrics',
+      6: 'access_permissions',
+      7: 'notifications',
+      8: 'reporting',
+      9: 'analytics_events',
+      10: 'filters',
+      11: 'dependencies',
+      12: 'backward_compatibility',
+      13: 'release_plan',
+      14: 'timeline'
+    };
+
+    // Try to parse by numbered sections: **1. Objective**
+    const sectionPattern = /\*\*(\d+)\.\s*([^*]+?)\*\*\s*\n\n([^*]+?)(?=\n\n\*\*\d+\.|$)/gs;
+    let match;
+    while ((match = sectionPattern.exec(text)) !== null) {
+      const sectionNum = parseInt(match[1]);
+      const sectionId = sectionNumberMap[sectionNum];
+      if (sectionId) {
+        sections[sectionId] = match[3].trim();
+      }
+    }
+
+    // Fallback: try to match by title keywords
+    const titleKeywords: Record<string, string[]> = {
+      'objective': ['Objective'],
+      'background': ['Background'],
+      'scope': ['Scope'],
+      'requirements': ['Requirements'],
+      'metrics': ['Success Metrics', 'Metrics'],
+      'access_permissions': ['Access Permissions', 'Permissions'],
+      'notifications': ['Notifications'],
+      'reporting': ['Reporting'],
+      'analytics_events': ['Analytics Events', 'Analytics'],
+      'filters': ['Filters'],
+      'dependencies': ['Dependencies'],
+      'backward_compatibility': ['Backward Compatibility', 'Compatibility'],
+      'release_plan': ['Release Plan'],
+      'timeline': ['Timeline']
+    };
+
+    for (const [id, keywords] of Object.entries(titleKeywords)) {
+      if (!sections[id]) {
+        for (const keyword of keywords) {
+          const regex = new RegExp(`\\*\\*[^\\*]*${keyword}[^\\*]*\\*\\*\\s*\\n\\n([^*]+?)(?=\\n\\n\\*\\*|$)`, 'is');
+          const match = text.match(regex);
+          if (match) {
+            sections[id] = match[1].trim();
+            break;
+          }
+        }
+      }
+    }
+
+    return sections;
+  };
+
   const fetchPRD = async () => {
     if (!id) return;
     const { prd } = await ApiClient.getPRD(id);
     setPrd(prd);
-    const sections: Record<string, string> = {};
-    (prd.prd_sections || []).forEach((s: any) => { sections[s.section_id] = s.content; });
+    
+    // Initialize all 14 sections
+    const sections: Record<string, string> = {
+      'objective': '',
+      'background': '',
+      'scope': '',
+      'requirements': '',
+      'metrics': '',
+      'access_permissions': '',
+      'notifications': '',
+      'reporting': '',
+      'analytics_events': '',
+      'filters': '',
+      'dependencies': '',
+      'backward_compatibility': '',
+      'release_plan': '',
+      'timeline': ''
+    };
+
+    // If assembled_text exists, parse it to get all sections
+    if (prd.assembled_text) {
+      const parsed = parseAssembledText(prd.assembled_text);
+      Object.assign(sections, parsed);
+    }
+
+    // Also merge in any existing prd_sections (in case some sections were saved individually)
+    (prd.prd_sections || []).forEach((s: any) => {
+      if (s.section_id && s.content) {
+        sections[s.section_id] = s.content;
+      }
+    });
+
     setEditedSections(sections);
   };
 
@@ -47,8 +159,37 @@ export default function PRDView() {
   const handleCancel = () => {
     setIsEditing(false);
     setChangeSummary('');
-    const sections: Record<string, string> = {};
-    (prd?.prd_sections || []).forEach((s: any) => { sections[s.section_id] = s.content; });
+    // Reset to original sections
+    const sections: Record<string, string> = {
+      'objective': '',
+      'background': '',
+      'scope': '',
+      'requirements': '',
+      'metrics': '',
+      'access_permissions': '',
+      'notifications': '',
+      'reporting': '',
+      'analytics_events': '',
+      'filters': '',
+      'dependencies': '',
+      'backward_compatibility': '',
+      'release_plan': '',
+      'timeline': ''
+    };
+    
+    // If assembled_text exists, parse it
+    if (prd?.assembled_text) {
+      const parsed = parseAssembledText(prd.assembled_text);
+      Object.assign(sections, parsed);
+    }
+    
+    // Also merge existing prd_sections
+    (prd?.prd_sections || []).forEach((s: any) => {
+      if (s.section_id && s.content) {
+        sections[s.section_id] = s.content;
+      }
+    });
+    
     setEditedSections(sections);
   };
 
@@ -89,6 +230,30 @@ export default function PRDView() {
   };
 
   const generateMarkdown = (p: any) => {
+    // Use assembled_text if available, otherwise fall back to sections
+    if (p.assembled_text) {
+      let text = p.assembled_text;
+      const createdDate = new Date(p.created_at).toLocaleDateString();
+      const updatedDate = new Date(p.updated_at).toLocaleDateString();
+      const createdByName = p.created_by_name || 'Unknown';
+      
+      // Replace PRD Created On - catch ALL variations (case-insensitive, any format)
+      text = text.replace(/PRD Created On:\s*\([^)]*\)/gi, `PRD Created On: ${createdDate}`);
+      text = text.replace(/PRD Created On:\s*\[[^\]]*\]/gi, `PRD Created On: ${createdDate}`);
+      text = text.replace(/PRD Created On:\s*(Filled automatically|auto-filled)[^\n]*/gi, `PRD Created On: ${createdDate}`);
+      // Replace PRD Updated On
+      text = text.replace(/PRD Updated On:\s*\([^)]*\)/gi, `PRD Updated On: ${updatedDate}`);
+      text = text.replace(/PRD Updated On:\s*\[[^\]]*\]/gi, `PRD Updated On: ${updatedDate}`);
+      text = text.replace(/PRD Updated On:\s*(Filled automatically|auto-filled)[^\n]*/gi, `PRD Updated On: ${updatedDate}`);
+      // Replace Created By
+      text = text.replace(/Created By:\s*\([^)]*\)/gi, `Created By: ${createdByName}`);
+      text = text.replace(/Created By:\s*\[[^\]]*\]/gi, `Created By: ${createdByName}`);
+      text = text.replace(/Created By:\s*(Fetched from user|Filled automatically|auto-filled)[^\n]*/gi, `Created By: ${createdByName}`);
+      
+      return text;
+    }
+    
+    // Fallback to individual sections
     let md = `# ${p.title}\n\n`;
     md += `**Version:** ${p.version}\n`;
     md += `**Updated:** ${new Date(p.updated_at).toLocaleDateString()}\n\n`;
@@ -183,20 +348,159 @@ export default function PRDView() {
           </div>
         )}
 
-        <div className="space-y-8">
-          {(prd.prd_sections || []).map((section: any) => (
-            <div key={section.id} className="p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
-              <h2 className="text-xl font-semibold mb-4 text-purple-400">{formatSectionTitle(section.section_id)}</h2>
-              {isEditing ? (
-                <textarea value={editedSections[section.section_id] || ''} onChange={(e) => setEditedSections({ ...editedSections, [section.section_id]: e.target.value })} className="w-full h-48 bg-[#0f0f11] border border-gray-700 rounded-lg p-4 text-white resize-none focus:outline-none focus:border-purple-500" />
-              ) : (
-                <div className="prose prose-invert max-w-none">
-                  <ReactMarkdown>{section.content}</ReactMarkdown>
-                </div>
-              )}
+        {/* Show button to generate assembled PRD if it doesn't exist */}
+        {!prd.assembled_text && !isEditing && (prd.prd_sections || []).length >= 5 && (
+          <div className="mb-8 p-6 bg-[#1f1f23] border border-purple-500/30 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-purple-400 mb-2">Generate Complete PRD Document</h3>
+                <p className="text-sm text-gray-400">This PRD only has 5 sections. Generate the full 14-section PRD document with all sections filled.</p>
+              </div>
+              <Button 
+                onClick={async () => {
+                  setIsGeneratingAssembled(true);
+                  try {
+                    const sections: Record<string, string> = {};
+                    (prd.prd_sections || []).forEach((s: any) => { sections[s.section_id] = s.content; });
+                    const allCitationIds: string[] = [];
+                    // Collect citations if available
+                    await ApiClient.assemblePRD(prd.id, {
+                      objective: sections.objective || '',
+                      scope: sections.scope || '',
+                      metrics: sections.metrics || '',
+                      dependencies: sections.dependencies || '',
+                      timeline: sections.timeline || ''
+                    }, allCitationIds);
+                    await fetchPRD(); // Refresh to show assembled text
+                  } catch (err) {
+                    console.error('Failed to generate assembled PRD:', err);
+                    alert('Failed to generate PRD document. Please try again.');
+                  } finally {
+                    setIsGeneratingAssembled(false);
+                  }
+                }}
+                disabled={isGeneratingAssembled}
+                className="bg-purple-500 hover:bg-purple-600 text-white"
+              >
+                {isGeneratingAssembled ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate Full PRD
+                  </>
+                )}
+              </Button>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* Show assembled PRD if it exists, otherwise show individual sections */}
+        {prd.assembled_text && !isEditing ? (
+          <div className="p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
+            <div className="prose prose-invert max-w-none text-gray-300">
+              <ReactMarkdown>{(() => {
+                let text = prd.assembled_text || '';
+                const createdDate = new Date(prd.created_at).toLocaleDateString();
+                const updatedDate = new Date(prd.updated_at).toLocaleDateString();
+                const createdByName = prd.created_by_name || 'Unknown';
+                
+                // Replace PRD Created On - catch ALL variations (case-insensitive, any format)
+                // Match anything in parentheses or brackets after the label
+                text = text.replace(/PRD Created On:\s*\([^)]*\)/gi, `PRD Created On: ${createdDate}`);
+                text = text.replace(/PRD Created On:\s*\[[^\]]*\]/gi, `PRD Created On: ${createdDate}`);
+                // Also catch if there's no brackets/parentheses but has placeholder text
+                text = text.replace(/PRD Created On:\s*(Filled automatically|auto-filled)[^\n]*/gi, `PRD Created On: ${createdDate}`);
+                // Replace PRD Updated On
+                text = text.replace(/PRD Updated On:\s*\([^)]*\)/gi, `PRD Updated On: ${updatedDate}`);
+                text = text.replace(/PRD Updated On:\s*\[[^\]]*\]/gi, `PRD Updated On: ${updatedDate}`);
+                text = text.replace(/PRD Updated On:\s*(Filled automatically|auto-filled)[^\n]*/gi, `PRD Updated On: ${updatedDate}`);
+                // Replace Created By
+                text = text.replace(/Created By:\s*\([^)]*\)/gi, `Created By: ${createdByName}`);
+                text = text.replace(/Created By:\s*\[[^\]]*\]/gi, `Created By: ${createdByName}`);
+                text = text.replace(/Created By:\s*(Fetched from user|Filled automatically|auto-filled)[^\n]*/gi, `Created By: ${createdByName}`);
+                
+                // Debug: log if replacements didn't work
+                if (text.includes('Filled automatically') || text.includes('auto-filled') || text.includes('Fetched from user')) {
+                  console.warn('Some metadata placeholders were not replaced:', text.match(/(PRD Created On|PRD Updated On|Created By):\s*[^\n]*/gi));
+                }
+                
+                return text;
+              })()}</ReactMarkdown>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {(() => {
+              // Define all 14 sections in order
+              const allSections = [
+                { id: 'objective', title: 'Objective' },
+                { id: 'background', title: 'Background' },
+                { id: 'scope', title: 'Scope' },
+                { id: 'requirements', title: 'Requirements' },
+                { id: 'metrics', title: 'Success Metrics' },
+                { id: 'access_permissions', title: 'Access Permissions' },
+                { id: 'notifications', title: 'Notifications' },
+                { id: 'reporting', title: 'Reporting' },
+                { id: 'analytics_events', title: 'Analytics Events' },
+                { id: 'filters', title: 'Filters' },
+                { id: 'dependencies', title: 'Dependencies' },
+                { id: 'backward_compatibility', title: 'Backward Compatibility' },
+                { id: 'release_plan', title: 'Release Plan' },
+                { id: 'timeline', title: 'Timeline' }
+              ];
+
+              // Create a map of existing sections from prd_sections
+              const existingSectionsMap = new Map();
+              (prd.prd_sections || []).forEach((section: any) => {
+                existingSectionsMap.set(section.section_id, section.content);
+              });
+
+              // If assembled_text exists, parse it to extract all sections
+              let parsedSections: Record<string, string> = {};
+              if (prd.assembled_text) {
+                parsedSections = parseAssembledText(prd.assembled_text);
+              }
+
+              // Merge: use parsed sections if available, otherwise use existing sections
+              const allSectionsContent: Record<string, string> = {};
+              allSections.forEach(section => {
+                allSectionsContent[section.id] = parsedSections[section.id] || existingSectionsMap.get(section.id) || '';
+              });
+
+              return allSections.map((section) => {
+                const content = isEditing 
+                  ? (editedSections[section.id] !== undefined ? editedSections[section.id] : allSectionsContent[section.id])
+                  : allSectionsContent[section.id];
+
+                return (
+                  <div key={section.id} className="p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
+                    <h2 className="text-xl font-semibold mb-4 text-purple-400">{section.title}</h2>
+                    {isEditing ? (
+                      <textarea 
+                        value={content} 
+                        onChange={(e) => setEditedSections({ ...editedSections, [section.id]: e.target.value })} 
+                        className="w-full h-48 bg-[#0f0f11] border border-gray-700 rounded-lg p-4 text-white resize-none focus:outline-none focus:border-purple-500" 
+                        placeholder={`Enter ${section.title.toLowerCase()}...`}
+                      />
+                    ) : (
+                      <div className="prose prose-invert max-w-none">
+                        {content ? (
+                          <ReactMarkdown>{content}</ReactMarkdown>
+                        ) : (
+                          <p className="text-gray-500 italic">No content for this section yet.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        )}
 
         {!isEditing && (
           <div className="mt-8 flex gap-4">
