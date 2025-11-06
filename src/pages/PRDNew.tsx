@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ApiClient } from '@/lib/api-client';
 import {
@@ -14,6 +14,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import ReactMarkdown from 'react-markdown';
 import nlp from 'compromise';
 
 type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
@@ -53,6 +62,10 @@ export default function PRDNew() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
   const [exitError, setExitError] = useState('');
+  const [assembledPRD, setAssembledPRD] = useState<string | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isAssembling, setIsAssembling] = useState(false);
+  const [assemblyError, setAssemblyError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<any>(null);
@@ -645,9 +658,82 @@ export default function PRDNew() {
       setCurrentStep(s => s + 1);
       // Reset current section pinned chunks (they're now in global)
       setPinnedChunks(new Set());
-    } else if (prdId) {
+    }
+    // Note: "Complete PRD" button is now replaced by "Generate PRD Document" button
+  };
+
+  // Check if all 5 sections have non-empty answers
+  const allSectionsFilled = useMemo(() => {
+    return PRD_QUESTIONS.every(q => {
+      const answer = answers[q.id]?.trim();
+      return answer && answer.length > 0;
+    });
+  }, [answers]);
+
+  // Collect all citation chunk IDs from all sections
+  const allCitationIds = useMemo(() => {
+    const allIds: string[] = [];
+    PRD_QUESTIONS.forEach(q => {
+      const citations = sectionCitations[q.id] || [];
+      allIds.push(...citations);
+    });
+    return [...new Set(allIds)]; // Deduplicate
+  }, [sectionCitations]);
+
+  const handleAssemblePRD = async () => {
+    if (!prdId || !allSectionsFilled) return;
+
+    setIsAssembling(true);
+    setAssemblyError(null);
+
+    try {
+      // Collect all sections
+      const sections = {
+        objective: answers.objective || '',
+        scope: answers.scope || '',
+        metrics: answers.metrics || '',
+        dependencies: answers.dependencies || '',
+        timeline: answers.timeline || ''
+      };
+
+      // Call assembly API
+      const result = await ApiClient.assemblePRD(prdId, sections, allCitationIds);
+
+      setAssembledPRD(result.prd_text);
+      setShowPreviewModal(true);
+      // Success is shown in the modal, no need for separate toast
+    } catch (err) {
+      console.error('PRD assembly failed:', err);
+      setAssemblyError((err as Error).message || 'Failed to generate PRD document');
+    } finally {
+      setIsAssembling(false);
+    }
+  };
+
+  const handleSaveAssembledPRD = async () => {
+    if (!prdId || !assembledPRD) return;
+
+    try {
+      // The assembled text is already saved in the database by the backend
+      // Just navigate to the PRD view
+      navigate(`/prd/${prdId}`);
+    } catch (err) {
+      console.error('Failed to save PRD:', err);
+      alert('Failed to save PRD. Please try again.');
+    }
+  };
+
+  const handleEditManually = () => {
+    setShowPreviewModal(false);
+    // Navigate to PRD view where user can edit
+    if (prdId) {
       navigate(`/prd/${prdId}`);
     }
+  };
+
+  const handleRegenerate = async () => {
+    setAssembledPRD(null);
+    await handleAssemblePRD();
   };
 
   const handleBack = () => {
@@ -901,10 +987,31 @@ export default function PRDNew() {
               <ArrowLeft className="w-4 h-4 mr-2" /> Previous Question
             </Button>
           )}
-          <Button onClick={handleNext} className="bg-purple-500 hover:bg-purple-600 text-white" aria-label={currentStep === PRD_QUESTIONS.length - 1 ? 'Complete PRD' : 'Next question'}>
-            {currentStep === PRD_QUESTIONS.length - 1 ? 'Complete PRD' : 'Next Question'}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+          {currentStep === PRD_QUESTIONS.length - 1 ? (
+            <Button 
+              onClick={handleAssemblePRD} 
+              disabled={!allSectionsFilled || isAssembling || !prdId}
+              className="bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed" 
+              aria-label="Generate PRD Document"
+            >
+              {isAssembling ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Assembling final PRD...
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Generate PRD Document
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button onClick={handleNext} className="bg-purple-500 hover:bg-purple-600 text-white" aria-label="Next question">
+              Next Question
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          )}
         </div>
 
         {lastSaved && (
@@ -912,7 +1019,66 @@ export default function PRDNew() {
             <p className="text-sm text-gray-500">💾 Draft auto-saved {formatTimeAgo(lastSaved)}</p>
           </div>
         )}
+
+        {assemblyError && (
+          <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded-lg">
+            <p className="text-sm text-red-400">{assemblyError}</p>
+          </div>
+        )}
+
+        {currentStep === PRD_QUESTIONS.length - 1 && !allSectionsFilled && (
+          <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-700 rounded-lg">
+            <p className="text-sm text-yellow-400">Please fill all 5 sections before generating the PRD document.</p>
+          </div>
+        )}
       </div>
+
+      {/* PRD Preview Modal */}
+      <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#1a1a1e] border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">PRD Document Preview</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Review the generated PRD document. You can save it, edit manually, or regenerate.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 p-4 bg-[#1f1f23] rounded-lg border border-gray-700">
+            {assembledPRD ? (
+              <div className="prose prose-invert max-w-none text-gray-300">
+                <ReactMarkdown>{assembledPRD}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-gray-500">No PRD content available.</p>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRegenerate}
+              disabled={isAssembling}
+              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Regenerate
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleEditManually}
+              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Manually
+            </Button>
+            <Button
+              onClick={handleSaveAssembledPRD}
+              className="bg-purple-500 hover:bg-purple-600 text-white"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save as Version
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Exit confirmation dialog */}
       <AlertDialog open={showExitDialog} onOpenChange={(open) => setShowExitDialog(open)}>
         <AlertDialogContent className="max-w-md">

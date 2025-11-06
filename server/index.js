@@ -23,6 +23,7 @@ import { createClient } from '@supabase/supabase-js';
 import { DocumentSync } from './services/document-sync.js';
 import { GoogleDriveSync } from './services/google-drive-sync.js';
 import { SearchService } from './services/search-service.js';
+import { PRDAssemblyService } from './services/prd-assembly.js';
 import { NotionSync } from './services/notion-sync.js';
 import { SlackSync } from './services/slack-sync.js';
 import multer from 'multer';
@@ -84,6 +85,7 @@ const supabaseAdmin = createClient(
 const documentSync = new DocumentSync(process.env.OPENAI_API_KEY);
 const googleDriveSync = new GoogleDriveSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
+const prdAssemblyService = new PRDAssemblyService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -1714,6 +1716,78 @@ app.post('/api/prd/sections/suggest', async (req, res) => {
   } catch (e) {
     console.error('Suggest section error:', e);
     res.status(500).json({ error: e.message || 'Failed to generate draft' });
+  }
+});
+
+// PRD: Assemble final PRD document from all sections
+app.post('/api/prd/assemble', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { prd_version_id, sections = {}, citations = [] } = req.body || {};
+
+    if (!prd_version_id) {
+      return res.status(400).json({ error: 'prd_version_id is required' });
+    }
+
+    // Verify PRD ownership
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id, title, user_id')
+      .eq('id', prd_version_id)
+      .eq('user_id', user.id)
+      .single();
+    
+    if (prdError || !prd) {
+      return res.status(403).json({ error: 'PRD not found or access denied' });
+    }
+
+    // Fetch citation chunk contents if provided
+    let citationContents = [];
+    if (citations && citations.length > 0) {
+      citationContents = await prdAssemblyService.fetchCitationContents(
+        citations,
+        supabaseAdmin,
+        user.id
+      );
+    }
+
+    // Generate final PRD
+    const result = await prdAssemblyService.generateFinalPRD({
+      sections: {
+        objective: sections.objective || '',
+        scope: sections.scope || '',
+        metrics: sections.metrics || '',
+        dependencies: sections.dependencies || '',
+        timeline: sections.timeline || ''
+      },
+      citations: citationContents,
+      supabaseAdmin,
+      userId: user.id
+    });
+
+    // Store assembled text in database (update prd_versions)
+    await supabaseAdmin
+      .from('prd_versions')
+      .update({ 
+        assembled_text: result.prd_text,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', prd_version_id);
+
+    res.json({
+      prd_text: result.prd_text,
+      citations_used: result.citations_used
+    });
+
+  } catch (e) {
+    console.error('PRD assembly error:', e);
+    res.status(500).json({ error: e.message || 'Failed to assemble PRD' });
   }
 });
 
