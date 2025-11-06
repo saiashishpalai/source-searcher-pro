@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApiClient } from '@/lib/api-client';
 
@@ -19,7 +19,6 @@ export default function PRDView() {
   const [versions, setVersions] = useState<any[]>([]);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isGeneratingAssembled, setIsGeneratingAssembled] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -305,8 +304,8 @@ export default function PRDView() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-8 py-8">
-        <div className="flex items-center justify-between mb-8 p-4 bg-[#1f1f23] border border-gray-700 rounded-lg">
+      <div className="max-w-5xl mx-auto px-8 py-8">
+        <div className="flex items-center justify-between mb-8 p-6 bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl hover:bg-card/80 transition-all duration-300">
           <div className="flex items-center gap-3">
             <Clock className="w-4 h-4 text-gray-400" />
             <span className="text-sm text-gray-400">{isEditing ? `Editing v${prd.version}...` : `v${prd.version} • Updated ${new Date(prd.updated_at).toLocaleDateString()}`}</span>
@@ -320,19 +319,43 @@ export default function PRDView() {
         </div>
 
         {showVersionHistory && !isEditing && (
-          <div className="mb-8 p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
-            <h3 className="font-semibold mb-4">Version History</h3>
+          <div className="mb-8 p-6 bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+            <h3 className="font-semibold mb-4 text-foreground">Version History</h3>
             <div className="space-y-3">
-              {versions.map((v) => (
-                <div key={v.id} className={`p-4 rounded-lg border ${v.id === prd.id ? 'bg-purple-900/20 border-purple-500/30' : 'bg-[#0f0f11] border-gray-700 hover:border-gray-600 cursor-pointer'}`} onClick={() => v.id !== prd.id && navigate(`/prd/${v.id}`)}>
+              {versions.map((v, idx) => (
+                <div
+                  key={v.id}
+                  className={`p-4 rounded-lg border transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg ${
+                    v.id === prd.id
+                      ? 'bg-primary/10 border-primary/30 shadow-primary/5'
+                      : 'bg-background/50 border-border/50 hover:border-primary/30 hover:bg-background/70'
+                  }`}
+                  onClick={() => v.id !== prd.id && navigate(`/prd/${v.id}`)}
+                  style={{
+                    animationDelay: `${idx * 50}ms`,
+                    animationFillMode: 'both'
+                  }}
+                >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-sm">v{v.version} {v.id === prd.id && (<span className="ml-2 text-xs text-purple-400">Current</span>)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{new Date(v.created_at).toLocaleDateString()}</p>
-                      {v.change_summary && (<p className="text-xs text-gray-500 mt-1">{v.change_summary}</p>)}
+                      <p className="font-medium text-sm text-foreground">
+                        v{v.version} {v.id === prd.id && (<span className="ml-2 text-xs text-primary font-semibold">Current</span>)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{new Date(v.created_at).toLocaleDateString()}</p>
+                      {v.change_summary && (<p className="text-xs text-muted-foreground/80 mt-1">{v.change_summary}</p>)}
                     </div>
                     {v.id !== prd.id && (
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); navigate(`/prd/compare/${prd.id}/${v.id}`); }} className="text-purple-400 hover:text-purple-300">Compare</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/prd/compare/${prd.id}/${v.id}`);
+                        }}
+                        className="text-primary hover:text-primary/80 hover:bg-primary/10"
+                      >
+                        Compare
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -342,165 +365,132 @@ export default function PRDView() {
         )}
 
         {isEditing && (
-          <div className="mb-8 p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
-            <label className="block text-sm font-medium text-gray-400 mb-2">💬 What changed? (optional but recommended)</label>
-            <input type="text" value={changeSummary} onChange={(e) => setChangeSummary(e.target.value)} placeholder="e.g., Clarified success metrics, added Q2 timeline" className="w-full bg-[#0f0f11] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500" />
+          <div className="mb-8 p-6 bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+            <label className="block text-sm font-medium text-foreground mb-2">💬 What changed? (optional but recommended)</label>
+            <input
+              type="text"
+              value={changeSummary}
+              onChange={(e) => setChangeSummary(e.target.value)}
+              placeholder="e.g., Clarified success metrics, added Q2 timeline"
+              className="w-full bg-background/50 border border-border/50 rounded-lg p-3 text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50"
+            />
           </div>
         )}
 
-        {/* Show button to generate assembled PRD if it doesn't exist */}
-        {!prd.assembled_text && !isEditing && (prd.prd_sections || []).length >= 5 && (
-          <div className="mb-8 p-6 bg-[#1f1f23] border border-purple-500/30 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-purple-400 mb-2">Generate Complete PRD Document</h3>
-                <p className="text-sm text-gray-400">This PRD only has 5 sections. Generate the full 14-section PRD document with all sections filled.</p>
-              </div>
-              <Button 
-                onClick={async () => {
-                  setIsGeneratingAssembled(true);
-                  try {
-                    const sections: Record<string, string> = {};
-                    (prd.prd_sections || []).forEach((s: any) => { sections[s.section_id] = s.content; });
-                    const allCitationIds: string[] = [];
-                    // Collect citations if available
-                    await ApiClient.assemblePRD(prd.id, {
-                      objective: sections.objective || '',
-                      scope: sections.scope || '',
-                      metrics: sections.metrics || '',
-                      dependencies: sections.dependencies || '',
-                      timeline: sections.timeline || ''
-                    }, allCitationIds);
-                    await fetchPRD(); // Refresh to show assembled text
-                  } catch (err) {
-                    console.error('Failed to generate assembled PRD:', err);
-                    alert('Failed to generate PRD document. Please try again.');
-                  } finally {
-                    setIsGeneratingAssembled(false);
-                  }
-                }}
-                disabled={isGeneratingAssembled}
-                className="bg-purple-500 hover:bg-purple-600 text-white"
-              >
-                {isGeneratingAssembled ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4 mr-2" />
-                    Generate Full PRD
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
 
-        {/* Show assembled PRD if it exists, otherwise show individual sections */}
-        {prd.assembled_text && !isEditing ? (
-          <div className="p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
-            <div className="prose prose-invert max-w-none text-gray-300">
-              <ReactMarkdown>{(() => {
-                let text = prd.assembled_text || '';
-                const createdDate = new Date(prd.created_at).toLocaleDateString();
-                const updatedDate = new Date(prd.updated_at).toLocaleDateString();
-                const createdByName = prd.created_by_name || 'Unknown';
-                
-                // Replace PRD Created On - catch ALL variations (case-insensitive, any format)
-                // Match anything in parentheses or brackets after the label
-                text = text.replace(/PRD Created On:\s*\([^)]*\)/gi, `PRD Created On: ${createdDate}`);
-                text = text.replace(/PRD Created On:\s*\[[^\]]*\]/gi, `PRD Created On: ${createdDate}`);
-                // Also catch if there's no brackets/parentheses but has placeholder text
-                text = text.replace(/PRD Created On:\s*(Filled automatically|auto-filled)[^\n]*/gi, `PRD Created On: ${createdDate}`);
-                // Replace PRD Updated On
-                text = text.replace(/PRD Updated On:\s*\([^)]*\)/gi, `PRD Updated On: ${updatedDate}`);
-                text = text.replace(/PRD Updated On:\s*\[[^\]]*\]/gi, `PRD Updated On: ${updatedDate}`);
-                text = text.replace(/PRD Updated On:\s*(Filled automatically|auto-filled)[^\n]*/gi, `PRD Updated On: ${updatedDate}`);
-                // Replace Created By
-                text = text.replace(/Created By:\s*\([^)]*\)/gi, `Created By: ${createdByName}`);
-                text = text.replace(/Created By:\s*\[[^\]]*\]/gi, `Created By: ${createdByName}`);
-                text = text.replace(/Created By:\s*(Fetched from user|Filled automatically|auto-filled)[^\n]*/gi, `Created By: ${createdByName}`);
-                
-                // Debug: log if replacements didn't work
-                if (text.includes('Filled automatically') || text.includes('auto-filled') || text.includes('Fetched from user')) {
-                  console.warn('Some metadata placeholders were not replaced:', text.match(/(PRD Created On|PRD Updated On|Created By):\s*[^\n]*/gi));
-                }
-                
-                return text;
-              })()}</ReactMarkdown>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {(() => {
-              // Define all 14 sections in order
-              const allSections = [
-                { id: 'objective', title: 'Objective' },
-                { id: 'background', title: 'Background' },
-                { id: 'scope', title: 'Scope' },
-                { id: 'requirements', title: 'Requirements' },
-                { id: 'metrics', title: 'Success Metrics' },
-                { id: 'access_permissions', title: 'Access Permissions' },
-                { id: 'notifications', title: 'Notifications' },
-                { id: 'reporting', title: 'Reporting' },
-                { id: 'analytics_events', title: 'Analytics Events' },
-                { id: 'filters', title: 'Filters' },
-                { id: 'dependencies', title: 'Dependencies' },
-                { id: 'backward_compatibility', title: 'Backward Compatibility' },
-                { id: 'release_plan', title: 'Release Plan' },
-                { id: 'timeline', title: 'Timeline' }
-              ];
+        {/* Always use the same rendering structure - parse assembled_text if available, otherwise use individual sections */}
+        <div className="space-y-6">
+          {(() => {
+            // Define all 14 sections in order (same as edit mode)
+            const allSections = [
+              { id: 'objective', title: 'Objective' },
+              { id: 'background', title: 'Background' },
+              { id: 'scope', title: 'Scope' },
+              { id: 'requirements', title: 'Requirements' },
+              { id: 'metrics', title: 'Success Metrics' },
+              { id: 'access_permissions', title: 'Access Permissions' },
+              { id: 'notifications', title: 'Notifications' },
+              { id: 'reporting', title: 'Reporting' },
+              { id: 'analytics_events', title: 'Analytics Events' },
+              { id: 'filters', title: 'Filters' },
+              { id: 'dependencies', title: 'Dependencies' },
+              { id: 'backward_compatibility', title: 'Backward Compatibility' },
+              { id: 'release_plan', title: 'Release Plan' },
+              { id: 'timeline', title: 'Timeline' }
+            ];
 
-              // Create a map of existing sections from prd_sections
-              const existingSectionsMap = new Map();
-              (prd.prd_sections || []).forEach((section: any) => {
-                existingSectionsMap.set(section.section_id, section.content);
-              });
+            // Create a map of existing sections from prd_sections
+            const existingSectionsMap = new Map();
+            (prd.prd_sections || []).forEach((section: any) => {
+              existingSectionsMap.set(section.section_id, section.content);
+            });
 
-              // If assembled_text exists, parse it to extract all sections
-              let parsedSections: Record<string, string> = {};
-              if (prd.assembled_text) {
-                parsedSections = parseAssembledText(prd.assembled_text);
-              }
+            // If assembled_text exists, parse it to extract all sections
+            let parsedSections: Record<string, string> = {};
+            if (prd.assembled_text && !isEditing) {
+              parsedSections = parseAssembledText(prd.assembled_text);
+            }
 
-              // Merge: use parsed sections if available, otherwise use existing sections
-              const allSectionsContent: Record<string, string> = {};
-              allSections.forEach(section => {
-                allSectionsContent[section.id] = parsedSections[section.id] || existingSectionsMap.get(section.id) || '';
-              });
+            // Merge: use parsed sections if available, otherwise use existing sections
+            const allSectionsContent: Record<string, string> = {};
+            allSections.forEach(section => {
+              allSectionsContent[section.id] = parsedSections[section.id] || existingSectionsMap.get(section.id) || '';
+            });
 
-              return allSections.map((section) => {
-                const content = isEditing 
-                  ? (editedSections[section.id] !== undefined ? editedSections[section.id] : allSectionsContent[section.id])
-                  : allSectionsContent[section.id];
+            // Get content for each section (use editedSections if editing)
+            return allSections.map((section, index) => {
+              const content = isEditing 
+                ? (editedSections[section.id] !== undefined ? editedSections[section.id] : allSectionsContent[section.id])
+                : allSectionsContent[section.id];
 
-                return (
-                  <div key={section.id} className="p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
-                    <h2 className="text-xl font-semibold mb-4 text-purple-400">{section.title}</h2>
+              // EXACT same rendering as edit mode
+              return (
+                <div
+                  key={section.id}
+                  className="group relative bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl p-6 hover:bg-card/80 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 ease-in-out hover:scale-[1.01] hover:-translate-y-0.5 animate-in fade-in-0 slide-in-from-bottom-2 duration-500"
+                  style={{ 
+                    animationDelay: `${index * 50}ms`,
+                    animationFillMode: 'both'
+                  }}
+                >
+                  {/* Hover glow effect */}
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/0 via-primary/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  
+                  {/* Section Header - EXACT same as edit mode */}
+                  <div className="relative z-10 mb-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/20 text-primary font-bold text-sm">
+                        {index + 1}
+                      </div>
+                      <h2 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-200">
+                        {section.title}
+                      </h2>
+                    </div>
+                    <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent ml-11" />
+                  </div>
+                  
+                  {/* Section Content - EXACT same as edit mode */}
+                  <div className="relative z-10">
                     {isEditing ? (
                       <textarea 
                         value={content} 
                         onChange={(e) => setEditedSections({ ...editedSections, [section.id]: e.target.value })} 
-                        className="w-full h-48 bg-[#0f0f11] border border-gray-700 rounded-lg p-4 text-white resize-none focus:outline-none focus:border-purple-500" 
+                        className="w-full min-h-[200px] bg-background/50 border border-border/50 rounded-lg p-4 text-foreground resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50" 
                         placeholder={`Enter ${section.title.toLowerCase()}...`}
                       />
                     ) : (
-                      <div className="prose prose-invert max-w-none">
+                      <div className="prose prose-invert max-w-none text-foreground/90">
                         {content ? (
-                          <ReactMarkdown>{content}</ReactMarkdown>
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => <p className="mb-4 leading-7">{children}</p>,
+                              ul: ({ children }) => <ul className="mb-4 ml-6 space-y-2 list-disc">{children}</ul>,
+                              ol: ({ children }) => <ol className="mb-4 ml-6 space-y-2 list-decimal">{children}</ol>,
+                              li: ({ children }) => <li className="leading-7">{children}</li>,
+                              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                              em: ({ children }) => <em className="italic text-foreground/80">{children}</em>,
+                              code: ({ children }) => (
+                                <code className="px-2 py-1 bg-muted/50 rounded text-sm font-mono text-primary">
+                                  {children}
+                                </code>
+                              ),
+                              h3: ({ children }) => <h3 className="text-lg font-semibold mt-6 mb-3 text-foreground">{children}</h3>,
+                              h4: ({ children }) => <h4 className="text-base font-semibold mt-4 mb-2 text-foreground">{children}</h4>,
+                            }}
+                          >
+                            {content}
+                          </ReactMarkdown>
                         ) : (
-                          <p className="text-gray-500 italic">No content for this section yet.</p>
+                          <p className="text-muted-foreground italic py-4">No content for this section yet.</p>
                         )}
                       </div>
                     )}
                   </div>
-                );
-              });
-            })()}
-          </div>
-        )}
+                </div>
+              );
+            });
+          })()}
+        </div>
 
         {!isEditing && (
           <div className="mt-8 flex gap-4">
