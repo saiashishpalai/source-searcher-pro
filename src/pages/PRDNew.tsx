@@ -34,6 +34,10 @@ export default function PRDNew() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<any>(null);
+  const finalTranscriptRef = useRef<string>(''); // Track final transcript to avoid duplicates
+  const startingTextRef = useRef<string>(''); // Track text at start of recording
+  const lastInterimRef = useRef<string>(''); // Track last interim to replace it
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hybridTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -292,19 +296,29 @@ export default function PRDNew() {
         setIsRecording(false);
         const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         if (blob.size === 0) return;
+        
+        // Get current text from real-time transcription (if available)
+        const currentText = answers[current.id] || '';
+        
         setIsTranscribing(true);
         try {
           const { text } = await ApiClient.transcribeSpeech(blob);
-          if (draftMode === 'replace') {
-            setAnswers(prev => ({ ...prev, [current.id]: text }));
-          } else {
-            const existingText = answers[current.id] || '';
-            const separator = existingText ? '\n\n' : '';
-            setAnswers(prev => ({ ...prev, [current.id]: existingText + separator + text }));
+          // Only update if server transcription is different (more accurate) or if we don't have real-time text
+          if (text && text.trim() !== currentText.trim()) {
+            if (draftMode === 'replace') {
+              setAnswers(prev => ({ ...prev, [current.id]: text }));
+            } else {
+              const existingText = answers[current.id] || '';
+              const separator = existingText ? '\n\n' : '';
+              setAnswers(prev => ({ ...prev, [current.id]: existingText + separator + text }));
+            }
           }
         } catch (err) {
           console.error('Transcription failed', err);
-          alert((err as Error).message || 'Transcription failed');
+          // Don't show alert if we already have real-time transcription
+          if (!currentText || currentText.trim().length === 0) {
+            alert((err as Error).message || 'Transcription failed');
+          }
         } finally {
           setIsTranscribing(false);
           stream.getTracks().forEach(t => t.stop());
@@ -313,6 +327,66 @@ export default function PRDNew() {
       mediaRecorderRef.current = recorder;
       recorder.start();
       setIsRecording(true);
+
+      // Start in-browser live transcription if available (Web Speech API)
+      const SpeechRecognition: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          // Capture starting text based on mode
+          startingTextRef.current = draftMode === 'replace' ? '' : (answers[current.id] || '');
+          finalTranscriptRef.current = '';
+          lastInterimRef.current = '';
+          
+          const recognition = new SpeechRecognition();
+          recognition.interimResults = true;
+          recognition.continuous = true;
+          recognition.onresult = (event: any) => {
+            let interim = '';
+            let final = '';
+            
+            // Process all results since last event
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const transcript = event.results[i][0].transcript;
+              if (event.results[i].isFinal) {
+                final += transcript + ' ';
+              } else {
+                interim += transcript;
+              }
+            }
+            
+            // Update final transcript
+            if (final) {
+              finalTranscriptRef.current += final;
+              lastInterimRef.current = ''; // Clear interim when we get final
+            }
+            
+            // Update interim (replace previous interim)
+            if (interim) {
+              lastInterimRef.current = interim;
+            }
+            
+            // Build display text: starting text + final transcript + current interim
+            const displayText = startingTextRef.current + 
+              (startingTextRef.current && finalTranscriptRef.current ? (draftMode === 'replace' ? ' ' : '\n\n') : '') + 
+              finalTranscriptRef.current.trim() + 
+              (lastInterimRef.current ? ' ' + lastInterimRef.current : '');
+            
+            setAnswers(prev => ({ ...prev, [current.id]: displayText }));
+          };
+          recognition.onerror = (_e: any) => {};
+          recognition.onend = () => {
+            // When recognition ends, show final transcript (no interim)
+            const displayText = startingTextRef.current + 
+              (startingTextRef.current && finalTranscriptRef.current ? (draftMode === 'replace' ? ' ' : '\n\n') : '') + 
+              finalTranscriptRef.current.trim();
+            setAnswers(prev => ({ ...prev, [current.id]: displayText }));
+          };
+          speechRecognitionRef.current = recognition;
+          recognition.start();
+        } catch (_) {
+          // If SpeechRecognition fails, just rely on server transcription
+        }
+      }
     } catch (e) {
       console.error('Mic error', e);
       alert('Microphone permission denied or unavailable');
@@ -321,7 +395,19 @@ export default function PRDNew() {
 
   const stopRecording = () => {
     try {
+      // Stop speech recognition first to get final transcript
+      if (speechRecognitionRef.current) {
+        try { 
+          speechRecognitionRef.current.stop(); 
+          speechRecognitionRef.current = null;
+        } catch {}
+      }
+      // Then stop media recorder
       mediaRecorderRef.current?.stop();
+      // Reset for next recording
+      finalTranscriptRef.current = '';
+      startingTextRef.current = '';
+      lastInterimRef.current = '';
     } catch {}
   };
 
@@ -488,39 +574,33 @@ export default function PRDNew() {
                     </>
                   )}
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={() => (isRecording ? stopRecording() : startRecording())}
-                  disabled={isTranscribing}
-                  className={`h-7 px-3 text-xs ${isRecording ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
-                  title={isRecording ? 'Stop recording' : 'Click to record'}
-                >
-                  {isRecording ? (
-                    <>
-                      <Square className="w-3 h-3 mr-1" />
-                      Stop
-                    </>
-                  ) : isTranscribing ? (
-                    <>
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      Transcribing…
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-3 h-3 mr-1" />
-                      Talk
-                    </>
-                  )}
-                </Button>
               </div>
             )}
           </div>
-          <textarea
-            value={answers[current.id] || ''}
-            onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
-            placeholder={current.placeholder}
-            className="w-full h-64 bg-[#1f1f23] border border-gray-700 rounded-lg p-4 text-white resize-none focus:outline-none focus:border-purple-500"
-          />
+          <div className="relative">
+            <textarea
+              value={answers[current.id] || ''}
+              onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
+              placeholder={current.placeholder}
+              className="w-full h-64 bg-[#1f1f23] border border-gray-700 rounded-lg p-4 pr-12 text-white resize-none focus:outline-none focus:border-purple-500"
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => (isRecording ? stopRecording() : startRecording())}
+              disabled={isTranscribing}
+              className={`absolute bottom-3 right-3 p-2 z-10 bg-[#1f1f23]/80 backdrop-blur-sm rounded-lg ${isRecording ? 'text-red-500 hover:text-red-400' : 'text-gray-400 hover:text-gray-300'}`}
+              title={isRecording ? 'Stop recording' : 'Click to record'}
+            >
+              {isRecording ? (
+                <Square className="w-4 h-4 animate-pulse" />
+              ) : isTranscribing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Mic className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className={`flex items-center ${currentStep === 0 ? 'justify-end' : 'justify-between'}`}>

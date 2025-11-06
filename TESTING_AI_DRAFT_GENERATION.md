@@ -320,3 +320,51 @@ ORDER BY created_at DESC;
 - [ ] Auto-save includes citations
 - [ ] Pinned chunks are prioritized
 
+---
+
+## Push-to-Talk (Whisper) Testing
+
+### Prerequisites
+- Backend running on https://localhost:8085 with `OPENAI_API_KEY` set
+- Frontend running on https://localhost:8081
+- Browser mic permission granted for localhost
+
+### Test A: Record and Transcribe (Insert)
+1. Open `/prd/new`
+2. Ensure Insert mode is active
+3. Click “Talk” mic button → speak a 5–10s sentence
+4. Click “Stop”
+
+Expected:
+- Button shows “Transcribing…” then returns to normal
+- Transcript text is appended to the current textarea (no deletion)
+
+### Test B: Record and Transcribe (Replace)
+1. Switch to Replace mode
+2. Type some placeholder text
+3. Click “Talk”, speak, then stop
+
+Expected:
+- Placeholder text is replaced fully by transcript
+
+### Test C: Permission Denied
+1. Block mic permission in browser
+2. Click “Talk”
+
+Expected:
+- User-friendly alert: microphone permission denied
+
+### Test D: Long/Unsupported Audio (Edge)
+1. Record >60s (or simulate large file) where possible
+2. Stop to trigger upload
+
+Expected (from server structured errors):
+- `{ "error": "payload_too_large", "message": "Audio too large" }` or `{ "error": "transcription_failed", "message": "Audio too long" }`
+
+### Network & Console Checks
+- Network: `POST /api/speech/transcribe` (multipart), response `{ text }`
+- Console: no unhandled errors; graceful alerts on failures
+
+### Performance
+- Recording stop → transcript in < 4–8s for 10s clips
+

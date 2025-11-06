@@ -90,12 +90,20 @@ export class ApiClient {
     const form = new FormData();
     form.append('audio', file);
     if (language) form.append('language', language);
-    const token = await this.getAuthToken();
-    const response = await fetch('/api/speech/transcribe', {
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: HeadersInit = {};
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/speech/transcribe`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form as any,
+      headers,
+      body: form,
+      credentials: 'include',
     });
+    
     if (!response.ok) {
       let err: any = {};
       try { err = await response.json(); } catch {}

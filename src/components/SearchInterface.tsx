@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users, HelpCircle, Lightbulb, ChevronUp } from 'lucide-react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users, HelpCircle, Lightbulb, ChevronUp, Mic, Square, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -557,6 +557,15 @@ const SearchInterface = () => {
   });
 
   // Dropdown states
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<any>(null);
+  const finalTranscriptRef = useRef<string>(''); // Track final transcript to avoid duplicates
+  const startingTextRef = useRef<string>(''); // Track text at start of recording
+  const lastInterimRef = useRef<string>(''); // Track last interim to replace it
+
   const [openDropdowns, setOpenDropdowns] = useState({
     applications: false,
     authors: false,
@@ -627,6 +636,145 @@ const SearchInterface = () => {
       .replace(/^\s*\/prd\s*/i, '')
       .replace(/create prd|new prd|write prd|prd for/gi, '')
       .trim() || 'Untitled PRD';
+  };
+
+  const startRecording = async (target: 'search' | 'followup' = 'search') => {
+    try {
+      const localTarget = target; // capture target for callbacks
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/ogg;codecs=opus',
+        'audio/webm',
+        'audio/ogg'
+      ];
+      const mimeType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        setIsRecording(false);
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size === 0) return;
+        
+        // Get current text from real-time transcription (if available)
+        const currentText = localTarget === 'followup' ? followUpQuery : searchValue;
+        
+        setIsTranscribing(true);
+        try {
+          const { text } = await ApiClient.transcribeSpeech(blob);
+          // Only update if server transcription is different (more accurate) or if we don't have real-time text
+          if (text && text.trim() !== currentText.trim()) {
+            if (localTarget === 'followup') {
+              setFollowUpQuery(text);
+            } else {
+              setSearchValue(text);
+            }
+          }
+        } catch (err) {
+          console.error('Transcription failed', err);
+          // Don't show alert if we already have real-time transcription
+          if (!currentText || currentText.trim().length === 0) {
+            alert((err as Error).message || 'Transcription failed');
+          }
+        } finally {
+          setIsTranscribing(false);
+          stream.getTracks().forEach(t => t.stop());
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+
+      // Start in-browser live transcription if available (Web Speech API)
+      const SpeechRecognition: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          // Capture starting text and reset tracking
+          startingTextRef.current = localTarget === 'followup' ? followUpQuery : searchValue;
+          finalTranscriptRef.current = '';
+          lastInterimRef.current = '';
+          
+          const recognition = new SpeechRecognition();
+          recognition.interimResults = true;
+          recognition.continuous = true;
+          recognition.onresult = (event: any) => {
+            let interim = '';
+            let final = '';
+            
+            // Process all results since last event
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const transcript = event.results[i][0].transcript;
+              if (event.results[i].isFinal) {
+                final += transcript + ' ';
+              } else {
+                interim += transcript;
+              }
+            }
+            
+            // Update final transcript
+            if (final) {
+              finalTranscriptRef.current += final;
+              lastInterimRef.current = ''; // Clear interim when we get final
+            }
+            
+            // Update interim (replace previous interim)
+            if (interim) {
+              lastInterimRef.current = interim;
+            }
+            
+            // Update display: starting text + final transcript + current interim
+            const displayText = startingTextRef.current + 
+              (startingTextRef.current && finalTranscriptRef.current ? ' ' : '') + 
+              finalTranscriptRef.current.trim() + 
+              (lastInterimRef.current ? ' ' + lastInterimRef.current : '');
+            
+            if (localTarget === 'followup') {
+              setFollowUpQuery(displayText);
+            } else {
+              setSearchValue(displayText);
+            }
+          };
+          recognition.onerror = (_e: any) => {};
+          recognition.onend = () => {
+            // When recognition ends, show final transcript (no interim)
+            const displayText = startingTextRef.current + 
+              (startingTextRef.current && finalTranscriptRef.current ? ' ' : '') + 
+              finalTranscriptRef.current.trim();
+            if (localTarget === 'followup') {
+              setFollowUpQuery(displayText);
+            } else {
+              setSearchValue(displayText);
+            }
+          };
+          speechRecognitionRef.current = recognition;
+          recognition.start();
+        } catch (_) {
+          // If SpeechRecognition fails, just rely on server transcription
+        }
+      }
+    } catch (e) {
+      console.error('Mic error', e);
+      alert('Microphone permission denied or unavailable');
+    }
+  };
+
+  const stopRecording = () => {
+    try {
+      // Stop speech recognition first to get final transcript
+      if (speechRecognitionRef.current) {
+        try { 
+          speechRecognitionRef.current.stop(); 
+          speechRecognitionRef.current = null;
+        } catch {}
+      }
+      // Then stop media recorder
+      mediaRecorderRef.current?.stop();
+      // Reset for next recording
+      finalTranscriptRef.current = '';
+      startingTextRef.current = '';
+      lastInterimRef.current = '';
+    } catch {}
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -2036,6 +2184,23 @@ const SearchInterface = () => {
                             disabled={isFollowUpLoading}
                           />
                           <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => (isRecording ? stopRecording() : startRecording('followup'))}
+                            disabled={isTranscribing}
+                            className={`p-2 ${isRecording ? 'text-red-500 hover:text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
+                            title={isRecording ? 'Stop recording' : 'Click to record'}
+                          >
+                            {isRecording ? (
+                              <Square className="w-4 h-4 animate-pulse" />
+                            ) : isTranscribing ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Mic className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
                             type="submit"
                             size="lg"
                             variant="default"
@@ -2515,6 +2680,23 @@ const SearchInterface = () => {
                         className="flex-1 border-0 bg-transparent text-base placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-medium"
                         disabled={isFollowUpLoading}
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => (isRecording ? stopRecording() : startRecording('followup'))}
+                        disabled={isTranscribing}
+                        className={`p-2 ${isRecording ? 'text-red-500 hover:text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
+                        title={isRecording ? 'Stop recording' : 'Click to record'}
+                      >
+                        {isRecording ? (
+                          <Square className="w-4 h-4 animate-pulse" />
+                        ) : isTranscribing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </Button>
                       <Button 
                         type="submit" 
                         variant="default"
@@ -2618,6 +2800,23 @@ const SearchInterface = () => {
                   placeholder="Search across your workspace…"
                   className="flex-1 border-0 bg-transparent text-sm sm:text-base md:text-lg lg:text-xl placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0 font-light"
                 />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => (isRecording ? stopRecording() : startRecording('search'))}
+                  disabled={isTranscribing}
+                  className={`p-2 ${isRecording ? 'text-red-500 hover:text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
+                  title={isRecording ? 'Stop recording' : 'Click to record'}
+                >
+                  {isRecording ? (
+                    <Square className="w-4 h-4 lg:w-5 lg:h-5 animate-pulse" />
+                  ) : isTranscribing ? (
+                    <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
+                  ) : (
+                    <Mic className="w-4 h-4 lg:w-5 lg:h-5" />
+                  )}
+                </Button>
                 <Button 
                   type="submit" 
                   variant="search"
