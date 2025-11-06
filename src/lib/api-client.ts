@@ -78,8 +78,12 @@ export class ApiClient {
     return this.post('/api/prd/create', { title });
   }
 
-  static async savePRDSection(prdVersionId: string, sectionId: string, content: string, metadata?: Record<string, any>): Promise<{ section: any }> {
-    return this.post('/api/prd/sections', { prd_version_id: prdVersionId, section_id: sectionId, content, metadata });
+  static async savePRDSection(prdVersionId: string, sectionId: string, content: string, metadata?: Record<string, any>, citationChunkIds?: string[]): Promise<{ section: any }> {
+    return this.post('/api/prd/sections', { prd_version_id: prdVersionId, section_id: sectionId, content, metadata, citation_chunk_ids: citationChunkIds });
+  }
+
+  static async suggestPRDSection(prdVersionId: string, sectionId: string, userText: string, chunkIds?: string[]): Promise<{ draft: string; citations: string[] }> {
+    return this.post('/api/prd/sections/suggest', { prd_version_id: prdVersionId, section_id: sectionId, user_text: userText, chunk_ids: chunkIds || [] });
   }
 
   static async getPRD(prdId: string): Promise<{ prd: any }> {

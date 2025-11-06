@@ -1541,6 +1541,94 @@ app.post('/api/search', async (req, res) => {
   }
 });
 
+// PRD: Generate section draft from context (AI Draft Generation)
+app.post('/api/prd/sections/suggest', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { prd_version_id, section_id, user_text = '', chunk_ids = [] } = req.body || {};
+
+    if (!prd_version_id || !section_id) {
+      return res.status(400).json({ error: 'prd_version_id and section_id are required' });
+    }
+
+    // Verify PRD ownership
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', prd_version_id)
+      .eq('user_id', user.id)
+      .single();
+    
+    if (prdError || !prd) {
+      return res.status(403).json({ error: 'PRD not found or access denied' });
+    }
+
+    // Fetch chunks by IDs
+    let chunks = [];
+    if (chunk_ids.length > 0) {
+      const { data: chunkData, error: chunkError } = await supabaseAdmin
+        .from('document_chunks')
+        .select('id, content, document_id, metadata')
+        .in('id', chunk_ids)
+        .eq('user_id', user.id);
+      
+      if (chunkError) {
+        console.error('Error fetching chunks:', chunkError);
+        return res.status(500).json({ error: 'Failed to fetch chunks' });
+      }
+
+      // Fetch document metadata for chunks
+      if (chunkData && chunkData.length > 0) {
+        const documentIds = [...new Set(chunkData.map(c => c.document_id).filter(Boolean))];
+        const { data: documents } = await supabaseAdmin
+          .from('documents')
+          .select('id, title, source_type, synced_at')
+          .in('id', documentIds);
+
+        const docMap = new Map();
+        documents?.forEach(doc => docMap.set(doc.id, doc));
+
+        // Format chunks with metadata
+        chunks = chunkData.map(chunk => {
+          const doc = docMap.get(chunk.document_id);
+          return {
+            id: chunk.id,
+            chunk_id: chunk.id,
+            document_id: chunk.document_id,
+            content: chunk.content || '',
+            title: doc?.title || chunk.metadata?.title || 'Document',
+            source: doc?.source_type || chunk.metadata?.source_type || 'unknown',
+            timestamp: doc?.synced_at || chunk.metadata?.synced_at || new Date().toISOString(),
+            metadata: chunk.metadata || {}
+          };
+        });
+      }
+    }
+
+    if (chunks.length === 0) {
+      return res.status(400).json({ error: 'No chunks provided. Please search and select context first.' });
+    }
+
+    // Generate draft using GPT-4
+    const result = await searchService.generatePRDSectionDraft(user_text, chunks, section_id);
+
+    res.json({
+      draft: result.draft,
+      citations: result.citations
+    });
+
+  } catch (e) {
+    console.error('Suggest section error:', e);
+    res.status(500).json({ error: e.message || 'Failed to generate draft' });
+  }
+});
+
 // PRD: Create new PRD version
 app.post('/api/prd/create', async (req, res) => {
   try {
@@ -1591,7 +1679,7 @@ app.post('/api/prd/sections', async (req, res) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { prd_version_id, section_id, content, metadata } = req.body || {};
+    const { prd_version_id, section_id, content, metadata, citation_chunk_ids = [] } = req.body || {};
     if (!prd_version_id || !section_id || !content) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -1617,8 +1705,69 @@ app.post('/api/prd/sections', async (req, res) => {
       .single();
 
     if (error) return res.status(500).json({ error: error.message });
+
+    // Store citations if provided
+    if (citation_chunk_ids.length > 0) {
+      // Fetch chunks to get source_type and document_id
+      const { data: chunks, error: chunkError } = await supabaseAdmin
+        .from('document_chunks')
+        .select('id, document_id')
+        .in('id', citation_chunk_ids)
+        .eq('user_id', user.id);
+
+      if (!chunkError && chunks && chunks.length > 0) {
+        // Fetch documents to get source_type
+        const documentIds = [...new Set(chunks.map(c => c.document_id).filter(Boolean))];
+        const { data: documents } = await supabaseAdmin
+          .from('documents')
+          .select('id, source_type')
+          .in('id', documentIds);
+
+        const docMap = new Map();
+        documents?.forEach(doc => docMap.set(doc.id, doc));
+
+        // Insert citations into prd_source_refs (avoid duplicates)
+        const citationsToInsert = [];
+        for (const chunk of chunks) {
+          const doc = docMap.get(chunk.document_id);
+          if (doc && doc.source_type) {
+            // Check if citation already exists
+            const { data: existing, error: checkError } = await supabaseAdmin
+              .from('prd_source_refs')
+              .select('id')
+              .eq('prd_version_id', prd_version_id)
+              .eq('section_id', section_id)
+              .eq('source_type', doc.source_type)
+              .eq('source_id', chunk.document_id)
+              .maybeSingle();
+
+            if (!existing && !checkError) {
+              citationsToInsert.push({
+                prd_version_id,
+                section_id,
+                source_type: doc.source_type,
+                source_id: chunk.document_id
+              });
+            }
+          }
+        }
+
+        if (citationsToInsert.length > 0) {
+          const { error: citationError } = await supabaseAdmin
+            .from('prd_source_refs')
+            .insert(citationsToInsert);
+
+          if (citationError) {
+            console.error('Error storing citations:', citationError);
+            // Don't fail the request, just log the error
+          }
+        }
+      }
+    }
+
     res.json({ section });
   } catch (e) {
+    console.error('Save section error:', e);
     res.status(500).json({ error: 'Failed to save section' });
   }
 });

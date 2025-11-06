@@ -1972,4 +1972,187 @@ Answer using only these documents. Be specific and cite sources.`;
     if (lowerTitle.includes('slack') || lowerTitle.includes('message')) return 'message';
     return 'page';
   }
+
+  /**
+   * Calculate text similarity between two strings (simple word overlap)
+   * Returns similarity score between 0 and 1
+   */
+  calculateTextSimilarity(text1, text2) {
+    if (!text1 || !text2) return 0;
+    
+    const words1 = new Set(text1.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+    const words2 = new Set(text2.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+    
+    if (words1.size === 0 || words2.size === 0) return 0;
+    
+    const intersection = new Set([...words1].filter(w => words2.has(w)));
+    const union = new Set([...words1, ...words2]);
+    
+    return intersection.size / union.size; // Jaccard similarity
+  }
+
+  /**
+   * Preprocess chunks: deduplicate, trim, sort
+   */
+  preprocessChunksForDraft(chunks) {
+    if (!chunks || chunks.length === 0) return [];
+
+    // Step 1: Deduplicate chunks with >70% text overlap
+    const deduplicated = [];
+    
+    for (const chunk of chunks) {
+      let isDuplicate = false;
+      const chunkText = (chunk.content || '').toLowerCase();
+      
+      for (const existing of deduplicated) {
+        const existingText = (existing.content || '').toLowerCase();
+        const similarity = this.calculateTextSimilarity(chunkText, existingText);
+        
+        if (similarity > 0.7) {
+          isDuplicate = true;
+          break;
+        }
+      }
+      
+      if (!isDuplicate) {
+        deduplicated.push(chunk);
+      }
+    }
+
+    // Step 2: Trim to first 500 characters per chunk
+    const trimmed = deduplicated.map(chunk => ({
+      ...chunk,
+      content: (chunk.content || '').substring(0, 500)
+    }));
+
+    // Step 3: Sort by weighted score (recency * 0.3 + relevance * 0.7)
+    const now = Date.now();
+    const sorted = trimmed.map(chunk => {
+      const recencyScore = chunk.timestamp 
+        ? Math.max(0, 1 - (now - new Date(chunk.timestamp).getTime()) / (90 * 24 * 60 * 60 * 1000)) // 90 days decay
+        : 0.5;
+      const relevanceScore = chunk.relevance || chunk.normalizedRRFScore || chunk.rrfScore || chunk.similarity || chunk.score || 0.5;
+      const weightedScore = (recencyScore * 0.3) + (relevanceScore * 0.7);
+      
+      return { ...chunk, weightedScore };
+    }).sort((a, b) => b.weightedScore - a.weightedScore);
+
+    // Step 4: Limit to top 8 chunks
+    return sorted.slice(0, 8);
+  }
+
+  /**
+   * Generate PRD section draft using GPT-4 with deterministic style
+   */
+  async generatePRDSectionDraft(userText, chunks, sectionId) {
+    try {
+      // Preprocess chunks
+      const preprocessedChunks = this.preprocessChunksForDraft(chunks);
+      
+      if (preprocessedChunks.length === 0) {
+        return {
+          draft: userText || 'To be determined',
+          citations: []
+        };
+      }
+
+      // System prompt (deterministic style)
+      const SYSTEM_PROMPT = `You are a Senior Product Manager writing structured, concise PRD sections.
+
+Follow the company PRD style guide:
+- Use short paragraphs and bullet points.
+- Always start with a summary line.
+- If no data is available, write "To be determined".
+- Never fabricate metrics or dependencies.
+- Cite sources as [1], [2] matching provided context.
+
+Return only the section text, no headings or explanations.`;
+
+      // Section-specific user prompt
+      const sectionPrompts = {
+        objective: `Write a PRD Objective section that clearly states the problem being solved, user pain points, and goals. Focus on:
+- Problem statement (what issue are we solving?)
+- User pain points (why does this matter?)
+- Goals and success criteria
+
+User's current notes: ${userText || '(none)'}`,
+        
+        scope: `Write a PRD Scope section that defines clear boundaries. Focus on:
+- In scope: Features and functionality included in this PRD
+- Out of scope: What is explicitly excluded
+- MVP boundaries: Minimum viable feature set
+
+User's current notes: ${userText || '(none)'}`,
+        
+        metrics: `Write a PRD Metrics section with quantifiable success criteria. Focus on:
+- Key Performance Indicators (KPIs)
+- Success metrics with target values
+- Measurement methods
+- Baseline vs target comparisons
+
+User's current notes: ${userText || '(none)'}`,
+        
+        dependencies: `Write a PRD Dependencies section listing blockers and constraints. Focus on:
+- Technical dependencies (APIs, services, infrastructure)
+- Organizational dependencies (teams, approvals)
+- External constraints (timing, resources)
+- Risk factors and mitigation strategies
+
+User's current notes: ${userText || '(none)'}`,
+        
+        timeline: `Write a PRD Timeline section with key milestones. Focus on:
+- Major phases and milestones
+- Key dates and deadlines
+- Dependencies between phases
+- Launch targets
+
+User's current notes: ${userText || '(none)'}`
+      };
+
+      const sectionPrompt = sectionPrompts[sectionId] || sectionPrompts.objective;
+
+      // Format chunks with numbered citations
+      const contextChunks = preprocessedChunks.map((chunk, idx) => {
+        const title = chunk.title || chunk.metadata?.title || 'Document';
+        const source = chunk.source || chunk.metadata?.source_type || 'Unknown';
+        return `[${idx + 1}] ${title} - ${source}\n${chunk.content}`;
+      }).join('\n\n---\n\n');
+
+      const userPrompt = `${sectionPrompt}
+
+Context from documents:
+
+${contextChunks}
+
+Generate the PRD section based on the user's notes and the provided context. Cite sources using [1], [2], etc.`;
+
+      // Call GPT-4
+      const response = await this.openai.chat.completions.create({
+        model: this.llmModel,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 1000,
+        temperature: 0.7
+      });
+
+      const draft = response.choices[0].message.content.trim();
+      const citations = preprocessedChunks.map(chunk => chunk.chunk_id || chunk.id);
+
+      return {
+        draft,
+        citations: citations.filter(Boolean)
+      };
+
+    } catch (error) {
+      console.error('❌ PRD draft generation error:', error);
+      
+      if (error.code === 'insufficient_quota' || error.status === 429) {
+        throw new Error('OpenAI quota exceeded. Please try again later.');
+      }
+      
+      throw new Error('Failed to generate draft. Please try again.');
+    }
+  }
 }

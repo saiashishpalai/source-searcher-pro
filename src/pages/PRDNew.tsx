@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus } from 'lucide-react';
 import { ApiClient } from '@/lib/api-client';
 
 type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
@@ -27,6 +27,9 @@ export default function PRDNew() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentQueryHash, setCurrentQueryHash] = useState<string | null>(null);
+  const [draftMode, setDraftMode] = useState<'insert' | 'replace'>('insert');
+  const [sectionCitations, setSectionCitations] = useState<Record<SectionId, string[]>>({ objective: [], scope: [], metrics: [], dependencies: [], timeline: [] });
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hybridTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -174,11 +177,12 @@ export default function PRDNew() {
       if (isSaving) return;
       try {
         setIsSaving(true);
-        // save sections
+        // save sections with citations
         for (const [sid, content] of Object.entries(answers)) {
           const sectionId = sid as SectionId;
           if (content && content.trim()) {
-            await ApiClient.savePRDSection(prdId, sectionId, content);
+            const citations = sectionCitations[sectionId] || [];
+            await ApiClient.savePRDSection(prdId, sectionId, content, undefined, citations);
           }
         }
         // save title if edited
@@ -191,16 +195,79 @@ export default function PRDNew() {
       }
     }, 2000);
     return () => clearInterval(timer);
-  }, [prdId, answers, title, isSaving]);
+  }, [prdId, answers, title, isSaving, sectionCitations]);
 
   const insertContext = (chunk: any) => {
     const text = chunk.snippet || chunk.content || '';
     setAnswers(prev => ({ ...prev, [current.id]: ((prev[current.id] as string) || '') + (prev[current.id] ? '\n\n' : '') + text }));
     
-    // Store citation in prd_source_refs (optional, for tracking)
-    if (prdId && chunk.chunk_id) {
-      // This will be handled by the backend when saving the section
-      // For now, we just insert the text
+    // Track citation
+    if (chunk.chunk_id || chunk.id) {
+      const chunkId = chunk.chunk_id || chunk.id;
+      setSectionCitations(prev => ({
+        ...prev,
+        [current.id]: [...(prev[current.id] || []), chunkId].filter((id, idx, arr) => arr.indexOf(id) === idx) // deduplicate
+      }));
+    }
+  };
+
+  const handleGenerateDraft = async () => {
+    if (!prdId || isGeneratingDraft) return;
+
+    // Collect chunk IDs: pinned chunks + top 5-8 from contextSuggestions
+    const chunkIds = new Set<string>();
+    
+    // Add pinned chunks
+    pinnedChunks.forEach(id => chunkIds.add(id));
+    
+    // Add top chunks from suggestions (sorted by relevance)
+    const sortedSuggestions = [...contextSuggestions]
+      .sort((a, b) => (b.relevance || 0) - (a.relevance || 0))
+      .slice(0, 8);
+    
+    sortedSuggestions.forEach(s => {
+      const id = s.chunk_id || s.id;
+      if (id) chunkIds.add(id);
+    });
+
+    if (chunkIds.size === 0) {
+      alert('Please search and select context first, or pin some chunks.');
+      return;
+    }
+
+    setIsGeneratingDraft(true);
+    try {
+      const currentAnswer = answers[current.id] || '';
+      const result = await ApiClient.suggestPRDSection(
+        prdId,
+        current.id,
+        currentAnswer,
+        Array.from(chunkIds)
+      );
+
+      // Update answer based on mode
+      if (draftMode === 'replace') {
+        setAnswers(prev => ({ ...prev, [current.id]: result.draft }));
+      } else {
+        // Insert mode: append with separator
+        const existingText = answers[current.id] || '';
+        const separator = existingText ? '\n\n---\n\n' : '';
+        setAnswers(prev => ({ ...prev, [current.id]: existingText + separator + result.draft }));
+      }
+
+      // Track citations
+      setSectionCitations(prev => ({
+        ...prev,
+        [current.id]: [...(prev[current.id] || []), ...result.citations].filter((id, idx, arr) => arr.indexOf(id) === idx)
+      }));
+
+      // Show success feedback (you can replace with toast if you have one)
+      console.log(`✅ Draft generated • ${result.citations.length} citations added • ${draftMode} mode`);
+    } catch (error: any) {
+      console.error('Draft generation error:', error);
+      alert(error.message || 'Failed to generate draft. Please try again.');
+    } finally {
+      setIsGeneratingDraft(false);
     }
   };
 
@@ -322,7 +389,54 @@ export default function PRDNew() {
         )}
 
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-400 mb-2">Your answer:</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-400">Your answer:</label>
+            {(contextSuggestions.length > 0 || pinnedChunks.size > 0) && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-[#1f1f23] border border-gray-700 rounded-lg p-1">
+                  <Button
+                    size="sm"
+                    variant={draftMode === 'insert' ? 'default' : 'ghost'}
+                    onClick={() => setDraftMode('insert')}
+                    className={`h-7 px-2 text-xs ${draftMode === 'insert' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
+                    title="Insert mode: Append draft below existing text"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Insert
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={draftMode === 'replace' ? 'default' : 'ghost'}
+                    onClick={() => setDraftMode('replace')}
+                    className={`h-7 px-2 text-xs ${draftMode === 'replace' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
+                    title="Replace mode: Overwrite textarea content"
+                  >
+                    <RotateCcw className="w-3 h-3 mr-1" />
+                    Replace
+                  </Button>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleGenerateDraft}
+                  disabled={isGeneratingDraft}
+                  className="bg-purple-500 hover:bg-purple-600 text-white h-7 px-3 text-xs"
+                  title="Generate draft from context using AI"
+                >
+                  {isGeneratingDraft ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Draft from Context
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
           <textarea
             value={answers[current.id] || ''}
             onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
