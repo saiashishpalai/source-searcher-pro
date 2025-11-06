@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ApiClient } from '@/lib/api-client';
+import nlp from 'compromise';
 
 type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
 
@@ -27,6 +29,8 @@ export default function PRDNew() {
   const [pinnedChunksGlobal, setPinnedChunksGlobal] = useState<Set<string>>(new Set()); // Accumulated across all sections
   const [priorAnswerSummaries, setPriorAnswerSummaries] = useState<string[]>([]); // Prior answer snippets
   const [useAccumulatedContext, setUseAccumulatedContext] = useState(true); // Toggle for iterative grounding
+  const [useDependencyHints, setUseDependencyHints] = useState(true); // Toggle for cross-question hints
+  const [dependencyHints, setDependencyHints] = useState<{ terms: string[]; entities: string[]; dates: string[] }>({ terms: [], entities: [], dates: [] });
   const [consecutiveLowResults, setConsecutiveLowResults] = useState(0); // Track for auto-clear
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -73,6 +77,114 @@ export default function PRDNew() {
     }
     return summaries.slice(0, 4); // Cap at 4
   }, [currentStep, answers]);
+
+  // Helper: Extract dependency hints from prior answers
+  const extractDependencyHints = (): { terms: string[]; entities: string[]; dates: string[] } => {
+    const allPriorText = [];
+    for (let i = 0; i < currentStep; i++) {
+      const sectionId = PRD_QUESTIONS[i].id;
+      const answer = answers[sectionId]?.trim();
+      if (answer && answer.length > 0) {
+        allPriorText.push(answer);
+      }
+    }
+    
+    if (allPriorText.length === 0) {
+      return { terms: [], entities: [], dates: [] };
+    }
+
+    const combinedText = allPriorText.join(' ');
+    const terms: Set<string> = new Set();
+    const entities: Set<string> = new Set();
+    const dates: Set<string> = new Set();
+
+    try {
+      // Use compromise for entity extraction
+      const doc = nlp(combinedText);
+      
+      // Extract noun phrases (terms)
+      const nouns = doc.nouns().out('array');
+      nouns.forEach(noun => {
+        const cleaned = noun.toLowerCase().trim();
+        if (cleaned.length > 2 && cleaned.length < 30) {
+          terms.add(cleaned);
+        }
+      });
+
+      // Extract proper nouns (entities) - product/feature names
+      const properNouns = doc.match('#ProperNoun+').out('array');
+      properNouns.forEach(entity => {
+        const cleaned = entity.trim();
+        if (cleaned.length > 1 && cleaned.length < 40) {
+          entities.add(cleaned);
+        }
+      });
+
+      // Extract dates
+      const dateMatches = doc.match('#Date+').out('array');
+      dateMatches.forEach(dateStr => {
+        try {
+          // Try to normalize to ISO format
+          const date = new Date(dateStr);
+          if (!isNaN(date.getTime())) {
+            dates.add(date.toISOString().split('T')[0]); // YYYY-MM-DD
+          }
+        } catch {
+          // Fallback: keep original if parsing fails
+          dates.add(dateStr);
+        }
+      });
+
+      // Fallback heuristics for entities (capitalized words + 2-gram)
+      const words = combinedText.split(/\s+/);
+      for (let i = 0; i < words.length - 1; i++) {
+        const word = words[i];
+        const nextWord = words[i + 1];
+        if (word[0] && word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase() &&
+            nextWord[0] && nextWord[0] === nextWord[0].toUpperCase() && nextWord[0] !== nextWord[0].toLowerCase()) {
+          const entity = `${word} ${nextWord}`.trim();
+          if (entity.length > 2 && entity.length < 40) {
+            entities.add(entity);
+          }
+        }
+      }
+
+      // Extract common date patterns (Q1, Q2, next quarter, etc.)
+      const quarterPattern = /Q[1-4]\s*\d{4}|\d{4}\s*Q[1-4]|next quarter|this quarter|last quarter/gi;
+      const quarterMatches = combinedText.match(quarterPattern);
+      if (quarterMatches) {
+        quarterMatches.forEach(match => {
+          dates.add(match.toLowerCase());
+        });
+      }
+
+    } catch (error) {
+      console.warn('Hint extraction error (falling back to heuristics):', error);
+      // Fallback: simple word extraction
+      const words = combinedText.split(/\s+/);
+      words.forEach(word => {
+        const cleaned = word.toLowerCase().replace(/[^\w]/g, '');
+        if (cleaned.length > 3 && cleaned.length < 20) {
+          terms.add(cleaned);
+        }
+      });
+    }
+
+    // Apply caps and dedupe
+    return {
+      terms: Array.from(terms).slice(0, 10),
+      entities: Array.from(entities).slice(0, 6),
+      dates: Array.from(dates).slice(0, 6)
+    };
+  };
+
+  // Memoize dependency hints
+  const dependencyHintsMemo = useMemo(() => {
+    if (!useDependencyHints || currentStep === 0) {
+      return { terms: [], entities: [], dates: [] };
+    }
+    return extractDependencyHints();
+  }, [currentStep, answers, useDependencyHints]);
 
   // Create PRD draft on mount
   useEffect(() => {
@@ -132,9 +244,10 @@ export default function PRDNew() {
         // Build expanded context if enabled
         // Token guard: Skip prior snippets if query is very long (>200 chars)
         const shouldIncludePriorSnippets = currentAnswer.trim().length <= 200;
-        const expandedContext = useAccumulatedContext ? {
-          pinned_chunk_ids: Array.from(pinnedChunksGlobal).slice(0, 12), // Cap at 12
-          prior_answer_snippets: shouldIncludePriorSnippets ? priorAnswerSummariesMemo : []
+        const expandedContext = (useAccumulatedContext || useDependencyHints) ? {
+          pinned_chunk_ids: useAccumulatedContext ? Array.from(pinnedChunksGlobal).slice(0, 12) : [],
+          prior_answer_snippets: (useAccumulatedContext && shouldIncludePriorSnippets) ? priorAnswerSummariesMemo : [],
+          dependency_hints: useDependencyHints ? dependencyHintsMemo : undefined
         } : undefined;
 
         // Phase 1: Instant BM25 search
@@ -185,9 +298,10 @@ export default function PRDNew() {
             // Build expanded context if enabled
             // Token guard: Skip prior snippets if query is very long (>200 chars)
             const shouldIncludePriorSnippets = currentAnswer.trim().length <= 200;
-            const expandedContext = useAccumulatedContext ? {
-              pinned_chunk_ids: Array.from(pinnedChunksGlobal).slice(0, 12), // Cap at 12
-              prior_answer_snippets: shouldIncludePriorSnippets ? priorAnswerSummariesMemo : []
+            const expandedContext = (useAccumulatedContext || useDependencyHints) ? {
+              pinned_chunk_ids: useAccumulatedContext ? Array.from(pinnedChunksGlobal).slice(0, 12) : [],
+              prior_answer_snippets: (useAccumulatedContext && shouldIncludePriorSnippets) ? priorAnswerSummariesMemo : [],
+              dependency_hints: useDependencyHints ? dependencyHintsMemo : undefined
             } : undefined;
 
             const phase2Result = await ApiClient.searchSections(
@@ -239,7 +353,7 @@ export default function PRDNew() {
         abortControllerRef.current.abort();
       }
     };
-  }, [answers, current.id, prdId, pinnedChunks, pinnedChunksGlobal, priorAnswerSummariesMemo, useAccumulatedContext]);
+  }, [answers, current.id, prdId, pinnedChunks, pinnedChunksGlobal, priorAnswerSummariesMemo, useAccumulatedContext, dependencyHintsMemo, useDependencyHints]);
 
   // Auto-save
   useEffect(() => {
@@ -562,12 +676,47 @@ export default function PRDNew() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-2xl font-semibold">Question {currentStep + 1} of {PRD_QUESTIONS.length}: {current.question}</h2>
-            {(pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) && (
+            {((pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) || (dependencyHintsMemo.terms.length + dependencyHintsMemo.entities.length + dependencyHintsMemo.dates.length >= 2)) && (
               <div className="flex items-center gap-2">
-                <div className="px-3 py-1 bg-purple-900/30 border border-purple-500/30 rounded-md text-sm text-gray-300">
-                  Using {pinnedChunksGlobal.size} pinned {pinnedChunksGlobal.size === 1 ? 'item' : 'items'}
-                  {priorAnswerSummariesMemo.length > 0 && `, ${priorAnswerSummariesMemo.length} prior ${priorAnswerSummariesMemo.length === 1 ? 'answer' : 'answers'}`}
-                </div>
+                {(pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) && (
+                  <div className="px-3 py-1 bg-purple-900/30 border border-purple-500/30 rounded-md text-sm text-gray-300">
+                    Using {pinnedChunksGlobal.size} pinned {pinnedChunksGlobal.size === 1 ? 'item' : 'items'}
+                    {priorAnswerSummariesMemo.length > 0 && `, ${priorAnswerSummariesMemo.length} prior ${priorAnswerSummariesMemo.length === 1 ? 'answer' : 'answers'}`}
+                  </div>
+                )}
+                {dependencyHintsMemo.terms.length + dependencyHintsMemo.entities.length + dependencyHintsMemo.dates.length >= 2 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="px-3 py-1 bg-blue-900/30 border border-blue-500/30 rounded-md text-sm text-gray-300 cursor-help">
+                          Hints: {dependencyHintsMemo.terms.length} terms, {dependencyHintsMemo.entities.length} entities, {dependencyHintsMemo.dates.length} dates
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-md">
+                        <div className="text-xs space-y-1">
+                          {dependencyHintsMemo.terms.length > 0 && (
+                            <div>
+                              <strong>Terms:</strong> {dependencyHintsMemo.terms.slice(0, 5).join(', ')}
+                              {dependencyHintsMemo.terms.length > 5 && ` +${dependencyHintsMemo.terms.length - 5} more`}
+                            </div>
+                          )}
+                          {dependencyHintsMemo.entities.length > 0 && (
+                            <div>
+                              <strong>Entities:</strong> {dependencyHintsMemo.entities.slice(0, 5).join(', ')}
+                              {dependencyHintsMemo.entities.length > 5 && ` +${dependencyHintsMemo.entities.length - 5} more`}
+                            </div>
+                          )}
+                          {dependencyHintsMemo.dates.length > 0 && (
+                            <div>
+                              <strong>Dates:</strong> {dependencyHintsMemo.dates.slice(0, 5).join(', ')}
+                              {dependencyHintsMemo.dates.length > 5 && ` +${dependencyHintsMemo.dates.length - 5} more`}
+                            </div>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
                   <input
                     type="checkbox"
@@ -576,6 +725,15 @@ export default function PRDNew() {
                     className="w-4 h-4 rounded border-gray-600 bg-[#1f1f23] text-purple-500 focus:ring-purple-500"
                   />
                   Use context
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useDependencyHints}
+                    onChange={(e) => setUseDependencyHints(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-600 bg-[#1f1f23] text-blue-500 focus:ring-blue-500"
+                  />
+                  Use hints
                 </label>
                 <Button
                   variant="ghost"

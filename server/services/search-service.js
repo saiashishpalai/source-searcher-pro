@@ -747,6 +747,14 @@ Follow the format from the examples above. Write Answer sections as single unbro
               queryEmbedding,
               supabaseAdmin
             );
+            
+            // Apply dependency hint boosts if provided
+            if (expanded_context.dependency_hints) {
+              mergedResults = this.applyDependencyHintBoosts(
+                mergedResults,
+              expanded_context.dependency_hints
+              );
+            }
           }
 
           // Fetch embeddings for MMR
@@ -779,7 +787,14 @@ Follow the format from the examples above. Write Answer sections as single unbro
 
           // Log telemetry
           const avgBoostApplied = expanded_context ? this.calculateAvgBoost(mergedResults) : 0;
+          const hintMetrics = expanded_context?.dependency_hints 
+            ? this.calculateHintMetrics(mergedResults, expanded_context.dependency_hints)
+            : { hint_matches: 0, total_hints: 0, hit_rate: 0, avg_rank_shift: 0 };
+          
           console.log(`📊 Telemetry: expanded_context_count=${expandedContextCount}, avg_boost_applied=${avgBoostApplied.toFixed(2)}, query_latency_ms=${hybridTime}`);
+          if (expanded_context?.dependency_hints) {
+            console.log(`📊 Hint Telemetry: hint_terms_count=${(expanded_context.dependency_hints.terms?.length || 0)}, hint_matches=${hintMetrics.hint_matches}, hint_avg_boost=${avgBoostApplied.toFixed(2)}, dependency_hint_hit_rate=${hintMetrics.hit_rate.toFixed(2)}, avg_rank_shift=${hintMetrics.avg_rank_shift.toFixed(1)}`);
+          }
 
           return {
             phase: 'hybrid',
@@ -791,6 +806,10 @@ Follow the format from the examples above. Write Answer sections as single unbro
             merged_count: mergedResults.length,
             expanded_context_count: expandedContextCount,
             avg_boost_applied: avgBoostApplied,
+            hint_terms_count: expanded_context?.dependency_hints ? (expanded_context.dependency_hints.terms?.length || 0) : 0,
+            hint_matches: hintMetrics.hint_matches,
+            dependency_hint_hit_rate: hintMetrics.hit_rate,
+            avg_rank_shift: hintMetrics.avg_rank_shift,
             timestamp: new Date().toISOString()
           };
         } catch (error) {
@@ -972,13 +991,147 @@ Follow the format from the examples above. Write Answer sections as single unbro
   }
 
   /**
+   * Apply dependency hint boosts to search results
+   * - +0.4 for title/content match on hint term
+   * - +0.6 for entity exact match
+   * - +0.3 for date proximity match
+   * - -0.2 penalty for exclusion phrases (whitelist only)
+   * - Clamp total boost to max 1.0
+   */
+  applyDependencyHintBoosts(results, dependencyHints) {
+    if (!dependencyHints || results.length === 0) return results;
+
+    const terms = (dependencyHints.terms || []).map(t => t.toLowerCase());
+    const entities = (dependencyHints.entities || []).map(e => e.toLowerCase());
+    const dates = dependencyHints.dates || [];
+    const TERM_BOOST = 0.4;
+    const ENTITY_BOOST = 0.6;
+    const DATE_BOOST = 0.3;
+    const PENALTY = -0.2;
+    const MAX_TOTAL_BOOST = 1.0;
+    
+    // Whitelist of exclusion phrases (only apply penalty if these appear in body content)
+    const EXCLUSION_PHRASES = ['not planned', 'later phase', 'excluded', 'out of scope', 'not in scope'];
+
+    // Helper: Check if text contains any exclusion phrase
+    const hasExclusionPhrase = (text) => {
+      const lowerText = text.toLowerCase();
+      return EXCLUSION_PHRASES.some(phrase => lowerText.includes(phrase));
+    };
+
+    // Helper: Check date proximity (simple string matching for now)
+    const matchesDate = (text, dateHints) => {
+      const lowerText = text.toLowerCase();
+      return dateHints.some(date => {
+        // Check for ISO date format (YYYY-MM-DD)
+        if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return lowerText.includes(date) || lowerText.includes(date.replace(/-/g, '/'));
+        }
+        // Check for quarter patterns
+        return lowerText.includes(date);
+      });
+    };
+
+    // Store original ranks for telemetry
+    const originalRanks = new Map();
+    results.forEach((r, idx) => {
+      originalRanks.set(r.id, idx + 1);
+    });
+
+    // Apply boosts
+    const boostedResults = results.map(result => {
+      let hintBoost = 0;
+      const content = (result.content || '').toLowerCase();
+      const title = (result.title || result.metadata?.title || '').toLowerCase();
+      const combinedText = `${title} ${content}`;
+
+      // Term match (title or content)
+      terms.forEach(term => {
+        if (combinedText.includes(term)) {
+          hintBoost += TERM_BOOST;
+        }
+      });
+
+      // Entity exact match (case-insensitive)
+      entities.forEach(entity => {
+        const entityLower = entity.toLowerCase();
+        // Check for exact match in title (higher weight) or content
+        if (title.includes(entityLower)) {
+          hintBoost += ENTITY_BOOST;
+        } else if (content.includes(entityLower)) {
+          hintBoost += ENTITY_BOOST * 0.8; // Slightly less for content-only matches
+        }
+      });
+
+      // Date proximity match
+      if (dates.length > 0 && matchesDate(combinedText, dates)) {
+        hintBoost += DATE_BOOST;
+      }
+
+      // Penalty for exclusion phrases (only in body content, not title/metadata)
+      if (hasExclusionPhrase(content) && !hasExclusionPhrase(title)) {
+        hintBoost += PENALTY;
+      }
+
+      // Clamp total boost
+      hintBoost = Math.min(MAX_TOTAL_BOOST, hintBoost);
+
+      return {
+        ...result,
+        rrfScore: (result.rrfScore || 0) + hintBoost,
+        hintBoost: hintBoost,
+        originalRank: originalRanks.get(result.id) || 0
+      };
+    }).sort((a, b) => (b.rrfScore || 0) - (a.rrfScore || 0)); // Re-sort by boosted score
+
+    return boostedResults;
+  }
+
+  /**
    * Calculate average boost applied to results (for telemetry)
    */
   calculateAvgBoost(results) {
     if (!results || results.length === 0) return 0;
-    const boosts = results.map(r => r.groundingBoost || 0).filter(b => b > 0);
+    const boosts = results.map(r => (r.groundingBoost || 0) + (r.hintBoost || 0)).filter(b => b > 0);
     if (boosts.length === 0) return 0;
     return boosts.reduce((sum, b) => sum + b, 0) / boosts.length;
+  }
+
+  /**
+   * Calculate hint hit rate and average rank shift (for telemetry)
+   */
+  calculateHintMetrics(results, dependencyHints) {
+    if (!dependencyHints || results.length === 0) {
+      return { hint_matches: 0, total_hints: 0, hit_rate: 0, avg_rank_shift: 0 };
+    }
+
+    const totalHints = (dependencyHints.terms?.length || 0) + 
+                      (dependencyHints.entities?.length || 0) + 
+                      (dependencyHints.dates?.length || 0);
+    
+    if (totalHints === 0) {
+      return { hint_matches: 0, total_hints: 0, hit_rate: 0, avg_rank_shift: 0 };
+    }
+
+    // Count matches (results with hintBoost > 0)
+    const hintMatches = results.filter(r => (r.hintBoost || 0) > 0).length;
+    const hitRate = totalHints > 0 ? hintMatches / totalHints : 0;
+
+    // Calculate average rank shift
+    const rankShifts = results
+      .filter(r => r.originalRank && r.originalRank > 0)
+      .map(r => r.originalRank - (results.indexOf(r) + 1));
+    
+    const avgRankShift = rankShifts.length > 0 
+      ? rankShifts.reduce((sum, shift) => sum + shift, 0) / rankShifts.length 
+      : 0;
+
+    return {
+      hint_matches: hintMatches,
+      total_hints: totalHints,
+      hit_rate: hitRate,
+      avg_rank_shift: avgRankShift
+    };
   }
 
   /**
