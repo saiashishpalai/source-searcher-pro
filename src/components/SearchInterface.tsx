@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users, HelpCircle, Lightbulb, ChevronUp, Mic, Square, Loader2 } from 'lucide-react';
@@ -309,7 +307,6 @@ const SearchInterface = () => {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
   const [isCheckingConnections, setIsCheckingConnections] = useState(true);
-  const [recentPRDs, setRecentPRDs] = useState<any[]>([]);
 
   // Fetch profile data for avatar
   useEffect(() => {
@@ -394,18 +391,6 @@ const SearchInterface = () => {
   // Load recent searches on mount
   useEffect(() => {
     fetchRecentSearches();
-  }, [user]);
-
-  // Fetch recent PRDs
-  useEffect(() => {
-    (async () => {
-      try {
-        const { prds } = await ApiClient.getRecentPRDs();
-        setRecentPRDs(prds || []);
-      } catch {
-        setRecentPRDs([]);
-      }
-    })();
   }, [user]);
 
   // Check if user has connected sources
@@ -1593,19 +1578,6 @@ const SearchInterface = () => {
                   <div className="w-1 h-1 bg-primary/60 rounded-full animate-ping" />
                 </div>
               </Button>
-              {/* New PRD quick action */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-accent/5 hover:border-purple-400/40 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500 py-3 rounded-xl border-border/50 group relative overflow-hidden"
-                onClick={() => navigate('/prd/new')}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-                <FileText className="w-4 h-4 text-foreground group-hover:text-purple-200 transition-all duration-500 relative z-10" />
-                <span className="relative z-10 transition-all duration-500 text-foreground group-hover:text-primary-foreground dark:group-hover:text-white">
-                  New PRD
-                </span>
-              </Button>
             </div>
           )}
         </div>
@@ -1706,50 +1678,6 @@ const SearchInterface = () => {
           </div>
         )}
 
-        {/* Recent PRDs */}
-        {!sidebarCollapsed && (
-          <div className="p-4 space-y-3 border-t border-border/30">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground/80 font-medium">Recent PRDs</p>
-              {recentPRDs.length > 0 && (
-                <button
-                  onClick={() => navigate('/prds')}
-                  className="text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  View All →
-                </button>
-              )}
-            </div>
-            {recentPRDs.length > 0 ? (
-              <div className="space-y-2">
-                {recentPRDs.map((prd, index) => (
-                  <div
-                    key={prd.id}
-                    className="group relative p-3 rounded-lg cursor-pointer transition-all duration-300 hover:scale-[1.02] animate-slide-in-from-left bg-secondary/40 hover:bg-secondary/60 border border-border/20 hover:border-border/40"
-                    style={{ animationDelay: `${(conversations.length + index) * 0.1}s` }}
-                    onClick={() => navigate(`/prd/${prd.id}`)}
-                  >
-                    <div className="flex items-start gap-2">
-                      <FileText className="w-4 h-4 text-purple-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-purple-300 transition-colors duration-200">
-                          {prd.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          v{prd.version} • {new Date(prd.updated_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground/60 italic">No recent PRDs</p>
-            )}
-          </div>
-        )}
-
       </div>
 
       {/* Main Content Area */}
@@ -1778,8 +1706,14 @@ const SearchInterface = () => {
             </span>
           </div>
           
-          {/* Right section: Profile */}
+          {/* Right section: Theme toggle, PRD Studio, Profile */}
           <div className="flex items-center gap-4 pr-6">
+            <button
+              onClick={() => navigate('/prd/new')}
+              className="rounded-full border border-border/50 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:bg-accent/10 hover:text-foreground"
+            >
+              PRD Studio
+            </button>
             <ThemeToggle />
             {/* User avatar with dropdown */}
             <DropdownMenu>
@@ -1803,7 +1737,7 @@ const SearchInterface = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent 
                 align="end" 
-                className="w-56 bg-card/95 backdrop-blur-sm border-border/50 z-[9999] shadow-lg"
+                className="w-56 bg-card/95 backdrop-blur-sm border border-border/50 z-[9999] shadow-lg"
                 sideOffset={8}
                 alignOffset={-8}
               >
@@ -1833,15 +1767,6 @@ const SearchInterface = () => {
                 >
                   <Link className="w-4 h-4 mr-2" />
                   Connected Sources
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="hover:bg-accent/50 cursor-pointer"
-                  onClick={() => {
-                    navigate('/prds');
-                  }}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  My PRDs
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
