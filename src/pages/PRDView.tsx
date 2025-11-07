@@ -1,9 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check } from 'lucide-react';
+import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, Menu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApiClient } from '@/lib/api-client';
+
+const SECTION_DEFINITIONS = [
+  { id: 'objective', title: 'Objective' },
+  { id: 'background', title: 'Background' },
+  { id: 'scope', title: 'Scope' },
+  { id: 'requirements', title: 'Requirements' },
+  { id: 'metrics', title: 'Success Metrics' },
+  { id: 'access_permissions', title: 'Access Permissions' },
+  { id: 'notifications', title: 'Notifications' },
+  { id: 'reporting', title: 'Reporting' },
+  { id: 'analytics_events', title: 'Analytics Events' },
+  { id: 'filters', title: 'Filters' },
+  { id: 'dependencies', title: 'Dependencies' },
+  { id: 'backward_compatibility', title: 'Backward Compatibility' },
+  { id: 'release_plan', title: 'Release Plan' },
+  { id: 'timeline', title: 'Timeline' }
+];
 
 type SectionId = 'objective' | 'background' | 'scope' | 'requirements' | 'metrics' | 'access_permissions' | 'notifications' | 'reporting' | 'analytics_events' | 'filters' | 'dependencies' | 'backward_compatibility' | 'release_plan' | 'timeline';
 
@@ -19,6 +36,8 @@ export default function PRDView() {
   const [versions, setVersions] = useState<any[]>([]);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -274,277 +293,253 @@ export default function PRDView() {
     return titles[sectionId] || sectionId;
   };
 
-  if (!prd) return <div className="min-h-screen bg-background text-foreground p-8 transition-colors">Loading...</div>;
+  if (!prd) return <div className="min-h-screen bg-[#050509] text-white p-8 transition-colors">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors">
-      <div className="border-b border-border/60 bg-card/80 dark:bg-card/60 sticky top-0 z-10 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#050509] text-white flex flex-col lg:flex-row">
+      {showMobileSidebar && (
+        <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setShowMobileSidebar(false)} />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-[#06040d]/95 text-white backdrop-blur-2xl border-r border-white/10 transition-all duration-500 ease-in-out ${sidebarCollapsed ? 'w-16' : 'w-80'} ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} lg:relative lg:h-auto lg:flex-shrink-0`}
+      >
+        <div className={`border-b border-white/10 ${sidebarCollapsed ? 'p-4' : 'px-6 py-5'}`}>
+          {sidebarCollapsed ? (
+            <div className="flex flex-col items-center gap-4">
             <Button
               variant="ghost"
-              onClick={() => navigate('/prds')}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              All PRDs
-            </Button>
-            <h1 className="text-xl font-semibold">{prd.title}</h1>
-          </div>
-          {isEditing ? (
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={handleCancel} className="text-muted-foreground hover:text-foreground">
-                <X className="w-4 h-4 mr-2" /> Cancel
+                size="icon"
+                onClick={() => setSidebarCollapsed(false)}
+                className="h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white/70 hover:text-white"
+              >
+                <ArrowLeft className="h-4 w-4 rotate-180" />
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : `Save as v${prd.version + 1}`}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/prds')}
+                className="h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white/70 hover:text-white"
+                title="All PRDs"
+              >
+                <ArrowLeft className="h-4 w-4" />
               </Button>
             </div>
           ) : (
-            <Button onClick={handleEdit} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Edit className="w-4 h-4 mr-2" /> Edit
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <div className="inline-flex flex-col gap-1">
+                  <span className="text-[11px] uppercase tracking-[0.55em] text-white/40">Haven7</span>
+                  <span className="text-2xl font-semibold tracking-tight text-white">PRD Document</span>
+        </div>
+                <p className="text-sm leading-relaxed text-white/55 max-w-xs">
+                  Review details, iterate, and align on every decision inside your product requirements document.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-2">
+            <Button
+              variant="ghost"
+                    onClick={() => { navigate('/prds'); setShowMobileSidebar(false); }}
+                    className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/20 hover:text-white"
+            >
+                    <ArrowLeft className="mr-2 h-4 w-4" /> All PRDs
             </Button>
+                  {!isEditing ? (
+                    <Button
+                      onClick={handleEdit}
+                      className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:bg-white/15 hover:text-white"
+                    >
+                      <Edit className="mr-2 h-4 w-4" /> Edit
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        onClick={handleCancel}
+                        className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
+                      >
+                        <X className="mr-2 h-4 w-4" /> Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="rounded-full border border-white/20 bg-white/90 px-4 py-2 text-sm text-gray-900 transition-colors hover:bg-white"
+                      >
+                        <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Saving…' : `Save v${prd.version + 1}`}
+                      </Button>
+                    </div>
+                  )}
+                  </div>
+                </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarCollapsed(true)}
+                className="mt-1 h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white/70 hover:text-white"
+                aria-label="Collapse sidebar"
+              >
+                <ArrowLeft className="h-4 w-4" />
+            </Button>
+            </div>
           )}
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto px-8 py-8">
-        <div className="flex items-center justify-between mb-8 p-6 bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl hover:bg-card/80 transition-all duration-300">
-          <div className="flex items-center gap-3">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">{isEditing ? `Editing v${prd.version}...` : `v${prd.version} • Updated ${new Date(prd.updated_at).toLocaleDateString()}`}</span>
-            {prd.change_summary && !isEditing && (<span className="text-sm text-muted-foreground/80">• {prd.change_summary}</span>)}
+        {!sidebarCollapsed && (
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="text-xs uppercase tracking-[0.4em] text-white/35 mb-3">Summary</div>
+              <div className="flex flex-col gap-2 text-sm text-white/60">
+                <span>Version {prd.version}</span>
+                <span>Updated {new Date(prd.updated_at).toLocaleString()}</span>
+                {prd.change_summary && <span>Change • {prd.change_summary}</span>}
+              </div>
+            </section>
+
+            {!isEditing && (
+              <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+                <div className="text-xs uppercase tracking-[0.4em] text-white/35">Utilities</div>
+                <Button variant="ghost" className="justify-start rounded-xl border border-white/10 bg-white/5 text-white/70 hover:bg-white/15 hover:text-white" onClick={copyMarkdown}>
+                  <Copy className="mr-2 h-4 w-4" /> {copiedMarkdown ? 'Copied Markdown' : 'Copy Markdown'}
+                </Button>
+                <Button variant="ghost" className="justify-start rounded-xl border border-white/10 bg-white/5 text-white/70 hover:bg-white/15 hover:text-white" onClick={downloadMarkdown}>
+                  <Download className="mr-2 h-4 w-4" /> Download Markdown
+                </Button>
+                <Button variant="ghost" className="justify-start rounded-xl border border-white/10 bg-white/5 text-white/70 hover:bg-white/15 hover:text-white" onClick={async () => {
+                  await navigator.clipboard.writeText(window.location.href);
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 1500);
+                }}>
+                  <Share className="mr-2 h-4 w-4" /> {copiedLink ? 'Link Copied' : 'Copy Link'}
+                </Button>
+              </section>
+            )}
           </div>
+        )}
+      </aside>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="lg:hidden flex justify-end p-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowMobileSidebar(prev => !prev)}
+            className="h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white/70 backdrop-blur"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <main className="relative flex-1 overflow-y-auto px-6 pb-16 pt-4 sm:px-8 lg:px-10">
+          <div className="mb-6 flex flex-col gap-2">
+            <h1 className="text-3xl font-semibold text-white">{prd.title || 'Untitled PRD'}</h1>
+            <p className="text-sm text-white/60">v{prd.version} • Updated {new Date(prd.updated_at).toLocaleString()}</p>
+          </div>
+
+          {showVersionHistory && !isEditing && (
+            <section className="mb-8 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+              <h3 className="mb-4 text-lg font-semibold text-white">Version History</h3>
+              <div className="space-y-3">
+                {versions.map((v, idx) => (
+                  <div
+                    key={v.id}
+                    className={`cursor-pointer rounded-xl border p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg ${
+                      v.id === prd.id
+                        ? 'border-white/20 bg-white/12 text-white'
+                        : 'border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:bg-white/12 hover:text-white'
+                    }`}
+                    onClick={() => v.id !== prd.id && navigate(`/prd/${v.id}`)}
+                    style={{ animationDelay: `${idx * 50}ms`, animationFillMode: 'both' }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">
+                          v{v.version}{' '}
+                          {v.id === prd.id && (
+                            <span className="ml-2 rounded-full border border-white/15 px-2 py-0.5 text-xs font-semibold">Current</span>
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs text-white/60">{new Date(v.created_at).toLocaleDateString()}</p>
+                        {v.change_summary && <p className="mt-1 text-xs text-white/50">{v.change_summary}</p>}
+                      </div>
+                      {v.id !== prd.id && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/prd/compare/${prd.id}/${v.id}`);
+                          }}
+                          className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/60 transition-colors hover:border-white/20 hover:bg-white/15 hover:text-white"
+                        >
+                          Compare
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isEditing && (
+            <section className="mb-8 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+              <label className="mb-2 block text-sm font-medium text-white">💬 What changed? (optional but recommended)</label>
+              <input
+                type="text"
+                value={changeSummary}
+                onChange={(e) => setChangeSummary(e.target.value)}
+                placeholder="e.g., Clarified success metrics, added Q2 timeline"
+                className="w-full rounded-xl border border-white/15 bg-white/5 p-3 text-white placeholder:text-white/30 focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+            </section>
+          )}
+ 
+          <div className="space-y-6">
+            {SECTION_DEFINITIONS.map((section, index) => {
+              const content = editedSections[section.id] ?? '';
+              return (
+                <section
+                  key={section.id}
+                  id={`section-${section.id}`}
+                  className="rounded-2xl border border-white/10 bg-white/[0.05] p-6 transition hover:border-white/20 hover:bg-white/[0.08]"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.45em] text-white/40">Section {index + 1}</div>
+                      <h2 className="mt-2 text-2xl font-semibold text-white">{section.title}</h2>
+                      </div>
           {!isEditing && (
             <Button
               variant="ghost"
-              onClick={() => setShowVersionHistory(!showVersionHistory)}
-              className="text-primary hover:text-primary/80"
-            >
-              Version History {showVersionHistory ? '▲' : '▼'}
+                        size="icon"
+                        className="rounded-full border border-white/10 bg-white/5 text-white/60 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <Edit className="h-4 w-4" />
             </Button>
           )}
-        </div>
-
-        {showVersionHistory && !isEditing && (
-          <div className="mb-8 p-6 bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-            <h3 className="font-semibold mb-4 text-foreground">Version History</h3>
-            <div className="space-y-3">
-              {versions.map((v, idx) => (
-                <div
-                  key={v.id}
-                  className={`p-4 rounded-lg border transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg ${
-                    v.id === prd.id
-                      ? 'bg-primary/10 border-primary/30 shadow-primary/5'
-                      : 'bg-background/50 border-border/50 hover:border-primary/30 hover:bg-background/70'
-                  }`}
-                  onClick={() => v.id !== prd.id && navigate(`/prd/${v.id}`)}
-                  style={{
-                    animationDelay: `${idx * 50}ms`,
-                    animationFillMode: 'both'
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm text-foreground">
-                        v{v.version} {v.id === prd.id && (<span className="ml-2 text-xs text-primary font-semibold">Current</span>)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">{new Date(v.created_at).toLocaleDateString()}</p>
-                      {v.change_summary && (<p className="text-xs text-muted-foreground/80 mt-1">{v.change_summary}</p>)}
-                    </div>
-                    {v.id !== prd.id && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/prd/compare/${prd.id}/${v.id}`);
-                        }}
-                        className="text-primary hover:text-primary/80 hover:bg-primary/10"
-                      >
-                        Compare
-                      </Button>
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {isEditing && (
-          <div className="mb-8 p-6 bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-            <label className="block text-sm font-medium text-foreground mb-2">💬 What changed? (optional but recommended)</label>
-            <input
-              type="text"
-              value={changeSummary}
-              onChange={(e) => setChangeSummary(e.target.value)}
-              placeholder="e.g., Clarified success metrics, added Q2 timeline"
-              className="w-full bg-background/50 border border-border/50 rounded-lg p-3 text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50"
-            />
-          </div>
-        )}
-
-
-        {/* Always use the same rendering structure - parse assembled_text if available, otherwise use individual sections */}
-        <div className="space-y-6">
-          {(() => {
-            // Define all 14 sections in order (same as edit mode)
-            const allSections = [
-              { id: 'objective', title: 'Objective' },
-              { id: 'background', title: 'Background' },
-              { id: 'scope', title: 'Scope' },
-              { id: 'requirements', title: 'Requirements' },
-              { id: 'metrics', title: 'Success Metrics' },
-              { id: 'access_permissions', title: 'Access Permissions' },
-              { id: 'notifications', title: 'Notifications' },
-              { id: 'reporting', title: 'Reporting' },
-              { id: 'analytics_events', title: 'Analytics Events' },
-              { id: 'filters', title: 'Filters' },
-              { id: 'dependencies', title: 'Dependencies' },
-              { id: 'backward_compatibility', title: 'Backward Compatibility' },
-              { id: 'release_plan', title: 'Release Plan' },
-              { id: 'timeline', title: 'Timeline' }
-            ];
-
-            // Create a map of existing sections from prd_sections
-            const existingSectionsMap = new Map();
-            (prd.prd_sections || []).forEach((section: any) => {
-              existingSectionsMap.set(section.section_id, section.content);
-            });
-
-            // If assembled_text exists, parse it to extract all sections
-            let parsedSections: Record<string, string> = {};
-            if (prd.assembled_text && !isEditing) {
-              parsedSections = parseAssembledText(prd.assembled_text);
-            }
-
-            // Merge: use parsed sections if available, otherwise use existing sections
-            const allSectionsContent: Record<string, string> = {};
-            allSections.forEach(section => {
-              allSectionsContent[section.id] = parsedSections[section.id] || existingSectionsMap.get(section.id) || '';
-            });
-
-            // Get content for each section (use editedSections if editing)
-            return allSections.map((section, index) => {
-              const content = isEditing 
-                ? (editedSections[section.id] !== undefined ? editedSections[section.id] : allSectionsContent[section.id])
-                : allSectionsContent[section.id];
-
-              // EXACT same rendering as edit mode
-              return (
-                <div
-                  key={section.id}
-                  className="group relative bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl p-6 hover:bg-card/80 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 ease-in-out hover:scale-[1.01] hover:-translate-y-0.5 animate-in fade-in-0 slide-in-from-bottom-2 duration-500"
-                  style={{ 
-                    animationDelay: `${index * 50}ms`,
-                    animationFillMode: 'both'
-                  }}
-                >
-                  {/* Hover glow effect */}
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/0 via-primary/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                  
-                  {/* Section Header - EXACT same as edit mode */}
-                  <div className="relative z-10 mb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/20 text-primary font-bold text-sm">
-                        {index + 1}
-                      </div>
-                      <h2 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-200">
-                        {section.title}
-                      </h2>
-                    </div>
-                    <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent ml-11" />
-                  </div>
-                  
-                  {/* Section Content - EXACT same as edit mode */}
-                  <div className="relative z-10">
                     {isEditing ? (
                       <textarea 
                         value={content} 
                         onChange={(e) => setEditedSections({ ...editedSections, [section.id]: e.target.value })} 
-                        className="w-full min-h-[200px] bg-background/50 border border-border/50 rounded-lg p-4 text-foreground resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50" 
-                        placeholder={`Enter ${section.title.toLowerCase()}...`}
+                      className="w-full min-h-[220px] rounded-xl border border-white/15 bg-white/5 p-4 text-white focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+                      placeholder={`Document the ${section.title.toLowerCase()}…`}
                       />
                     ) : (
-                      <div className="prose prose-invert max-w-none text-foreground/90">
+                    <div className="prose prose-invert max-w-none text-white/85">
                         {content ? (
-                          <ReactMarkdown
-                            components={{
-                              p: ({ children }) => <p className="mb-4 leading-7">{children}</p>,
-                              ul: ({ children }) => <ul className="mb-4 ml-6 space-y-2 list-disc">{children}</ul>,
-                              ol: ({ children }) => <ol className="mb-4 ml-6 space-y-2 list-decimal">{children}</ol>,
-                              li: ({ children }) => <li className="leading-7">{children}</li>,
-                              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-                              em: ({ children }) => <em className="italic text-foreground/80">{children}</em>,
-                              code: ({ children }) => (
-                                <code className="px-2 py-1 bg-muted/50 rounded text-sm font-mono text-primary">
-                                  {children}
-                                </code>
-                              ),
-                              h3: ({ children }) => <h3 className="text-lg font-semibold mt-6 mb-3 text-foreground">{children}</h3>,
-                              h4: ({ children }) => <h4 className="text-base font-semibold mt-4 mb-2 text-foreground">{children}</h4>,
-                            }}
-                          >
-                            {content}
-                          </ReactMarkdown>
-                        ) : (
-                          <p className="text-muted-foreground italic py-4">No content for this section yet.</p>
+                        <ReactMarkdown>{content}</ReactMarkdown>
+                      ) : (
+                        <p className="italic text-white/40">No content yet.</p>
                         )}
                       </div>
                     )}
-                  </div>
-                </div>
+                </section>
               );
-            });
-          })()}
-        </div>
-
-        {!isEditing && (
-          <div className="mt-8 flex gap-4">
-            <Button
-              onClick={copyMarkdown}
-              variant="outline"
-              className="border-border/60 text-muted-foreground hover:bg-muted/60 transition-colors"
-            >
-              {copiedMarkdown ? (
-                <>
-                  <Check className="w-4 h-4 mr-2 text-emerald-500" />Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4 mr-2" />Copy Markdown
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={downloadMarkdown}
-              variant="outline"
-              className="border-border/60 text-muted-foreground hover:bg-muted/60"
-            >
-              <Download className="w-4 h-4 mr-2" />Download
-            </Button>
-            <Button
-              onClick={async () => {
-                await navigator.clipboard.writeText(window.location.href);
-                setCopiedLink(true);
-                setTimeout(() => setCopiedLink(false), 1500);
-              }}
-              variant="outline"
-              className="border-border/60 text-muted-foreground hover:bg-muted/60 transition-colors"
-            >
-              {copiedLink ? (
-                <>
-                  <Check className="w-4 h-4 mr-2 text-emerald-500" />Link Copied
-                </>
-              ) : (
-                <>
-                  <Share className="w-4 h-4 mr-2" />Share Link
-                </>
-              )}
-            </Button>
+            })}
           </div>
-        )}
+        </main>
       </div>
     </div>
   );

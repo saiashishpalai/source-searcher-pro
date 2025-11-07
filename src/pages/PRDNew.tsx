@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings, Clock, Folder, ChevronRight, ChevronLeft, Menu } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -46,6 +46,25 @@ const PRD_QUESTIONS: Array<{ id: SectionId; question: string; placeholder: strin
 
 const HERO_PROMPT = 'Objective: Clarify the opportunity, the why, and the conviction behind it.';
 
+type PRDStatus = 'draft' | 'published' | 'archived';
+
+interface PRDSidebarItem {
+  id: string;
+  title: string;
+  version: number;
+  status: PRDStatus;
+  updated_at: string;
+  version_group_id?: string;
+}
+
+interface PRDGroupSummary {
+  groupId: string;
+  title: string;
+  latestVersion: PRDSidebarItem | null;
+  totalVersions: number;
+  updatedAt: string | null;
+}
+
 export default function PRDNew() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('Untitled PRD');
@@ -79,6 +98,70 @@ export default function PRDNew() {
   const [assemblyError, setAssemblyError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [typedHeroLine, setTypedHeroLine] = useState('');
+  const [recentPRDs, setRecentPRDs] = useState<PRDSidebarItem[]>([]);
+  const [prdGroups, setPrdGroups] = useState<PRDGroupSummary[]>([]);
+  const [isSidebarLoading, setIsSidebarLoading] = useState(true);
+  const [sidebarError, setSidebarError] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
+  const loadSidebarData = useCallback(async () => {
+    setIsSidebarLoading(true);
+    setSidebarError(null);
+    try {
+      const [recentResponse, listResponse] = await Promise.all([
+        ApiClient.getRecentPRDs().catch(() => ({ prds: [] })),
+        ApiClient.listPRDs().catch(() => ({ prds: [] })),
+      ]);
+
+      const recent = (recentResponse?.prds || []) as PRDSidebarItem[];
+      setRecentPRDs(recent.slice(0, 6));
+
+      const all = (listResponse?.prds || []) as PRDSidebarItem[];
+      const groupedMap = new Map<string, PRDSidebarItem[]>();
+      all.forEach(prd => {
+        const groupId = prd.version_group_id || prd.id;
+        const current = groupedMap.get(groupId) || [];
+        current.push(prd);
+        groupedMap.set(groupId, current);
+      });
+
+      const groups: PRDGroupSummary[] = Array.from(groupedMap.entries()).map(([groupId, versions]) => {
+        const sorted = [...versions].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        const latest = sorted[0] || null;
+        return {
+          groupId,
+          title: latest?.title || 'Untitled PRD',
+          latestVersion: latest,
+          totalVersions: sorted.length,
+          updatedAt: latest?.updated_at || null,
+        };
+      }).sort((a, b) => {
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+      setPrdGroups(groups);
+    } catch (error: any) {
+      setSidebarError(error?.message || 'Failed to load PRDs');
+    } finally {
+      setIsSidebarLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSidebarData();
+  }, [loadSidebarData]);
+
+  const formatGroupTimestamp = (date?: string | null) => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<any>(null);
@@ -283,11 +366,12 @@ export default function PRDNew() {
       try {
         const { prd } = await ApiClient.createPRD(title);
         setPrdId(prd.id);
+        await loadSidebarData();
       } catch (e) {
         // no-op: surface via UI if needed
       }
     })();
-  }, [hasStarted, title]);
+  }, [hasStarted, title, loadSidebarData]);
 
   // Debounced dual-phase search based on user input
   useEffect(() => {
@@ -810,92 +894,89 @@ export default function PRDNew() {
   const handleBack = () => {
     if (currentStep > 0) setCurrentStep(s => s - 1);
   };
-
-  if (!hasStarted) {
-    return (
-      <div className="relative min-h-screen overflow-hidden bg-[#050509] text-white">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-b from-[#181124] via-[#050509] to-[#050509]" />
-          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#7c5cff] via-[#2f1d66] to-transparent opacity-60 blur-[160px]" />
-          <div className="absolute bottom-[-160px] right-[-120px] h-[380px] w-[380px] rounded-full bg-gradient-to-br from-[#0d1726] via-[#2d3a5f] to-transparent opacity-60 blur-[180px]" />
-        </div>
-
-        <div className="relative flex min-h-screen flex-col">
-          <header className="flex items-center justify-start px-8 py-10">
-            <span className="text-xs uppercase tracking-[0.45em] text-white/40">PRD Studio</span>
-          </header>
-          <main className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-10">
-            <div className="w-full max-w-3xl text-center">
-              <h1 className="mt-6 text-4xl font-light tracking-tight text-white sm:text-5xl md:text-6xl">
-                Create your PRD with conviction.
-              </h1>
-              <p className="mx-auto mt-6 max-w-xl text-base text-white/60 md:text-lg">
-                Your PRD, powered by intelligence, designed for intent.
-              </p>
-              <div className="mx-auto mt-10 flex w-full max-w-xl items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-left shadow-[0_40px_120px_rgba(50,30,120,0.35)] backdrop-blur-md">
-                <Sparkles className="mr-3 h-4 w-4 text-white/50" />
-                <div className="relative w-full font-mono text-sm tracking-wide text-white/60 md:text-base">
-                  {typedHeroLine}
-                  <span className="ml-1 inline-block h-4 w-[2px] animate-pulse bg-white/60 align-middle md:h-5" />
-                </div>
-              </div>
-              <div className="mt-12 flex justify-center">
-                <Button
-                  onClick={() => setHasStarted(true)}
-                  className="group relative h-14 rounded-full border border-white/15 bg-white/10 px-10 text-base font-medium tracking-tight text-white/80 shadow-[0_0_0_rgba(0,0,0,0)] backdrop-blur-xl transition-all duration-300 hover:text-white"
-                >
-                  <span className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 blur-[20px] transition-opacity duration-500 group-hover:opacity-100" />
-                  <span className="absolute inset-0 rounded-full border border-white/0 transition-colors duration-300 group-hover:border-white/20" />
-                  <span className="relative flex items-center gap-3">
-                    Begin with Clarity
-                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                  </span>
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-24 w-full max-w-5xl">
-              <div className="grid grid-cols-1 gap-8 text-left md:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                  <p className="text-sm uppercase tracking-[0.35em] text-white/40">Structured Flow</p>
-                  <h3 className="mt-4 text-lg font-medium text-white">Guided 5-step input</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-white/60">
-                    Move through essential prompts that frame intent, context, and conviction—without noise.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                  <p className="text-sm uppercase tracking-[0.35em] text-white/40">Intelligent Drafting</p>
-                  <h3 className="mt-4 text-lg font-medium text-white">AI-powered clarity</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-white/60">
-                    Surface the right references, assemble refined prose, and keep every decision anchored in data.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                  <p className="text-sm uppercase tracking-[0.35em] text-white/40">Refinement Loop</p>
-                  <h3 className="mt-4 text-lg font-medium text-white">Collaborate, critique, improve</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-white/60">
-                    Iterate with your team, capture citations, and evolve drafts into crisp, shareable conviction.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </main>
-          <footer className="relative flex justify-center px-8 pb-10">
-            <span className="text-xs text-white/45">Crafted by product thinkers, for product thinkers.</span>
-          </footer>
-        </div>
+  const heroContent = (
+    <div className="relative min-h-screen overflow-hidden bg-[#050509] text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#181124] via-[#050509] to-[#050509]" />
+        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#7c5cff] via-[#2f1d66] to-transparent opacity-60 blur-[160px]" />
+        <div className="absolute bottom-[-160px] right-[-120px] h-[380px] w-[380px] rounded-full bg-gradient-to-br from-[#0d1726] via-[#2d3a5f] to-transparent opacity-60 blur-[180px]" />
       </div>
-    );
-  }
 
-  return (
-    <div id="prd-builder-root" className="min-h-screen bg-background text-foreground transition-colors">
-      <div className="border-b border-border/60 bg-card/80 dark:bg-card/60 sticky top-0 z-10 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-8 py-4 flex items-center gap-4">
+      <div className="relative flex min-h-screen flex-col">
+        <main className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-28">
+          <div className="w-full max-w-3xl text-center">
+            <h1 className="mt-6 text-4xl font-light tracking-tight text-white sm:text-5xl md:text-6xl">
+              Create your PRD with conviction.
+            </h1>
+            <p className="mx-auto mt-6 max-w-xl text-base text-white/60 md:text-lg">
+              Your PRD, powered by intelligence, designed for intent.
+            </p>
+            <div className="mx-auto mt-10 flex w-full max-w-xl items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-left shadow-[0_40px_120px_rgba(50,30,120,0.35)] backdrop-blur-md">
+              <Sparkles className="mr-3 h-4 w-4 text-white/50" />
+              <div className="relative w-full font-mono text-sm tracking-wide text-white/60 md:text-base">
+                {typedHeroLine}
+                <span className="ml-1 inline-block h-4 w-[2px] animate-pulse bg-white/60 align-middle md:h-5" />
+              </div>
+            </div>
+            <div className="mt-12 flex justify-center">
+              <Button
+                onClick={() => {
+                  setHasStarted(true);
+                  setShowMobileSidebar(false);
+                }}
+                className="group relative h-14 rounded-full border border-white/10 bg-white/10 px-10 text-base font-medium tracking-tight text-white/75 shadow-none backdrop-blur-xl transition-colors duration-300 hover:border-white/20 hover:bg-white/15 hover:text-white"
+              >
+                <span className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 blur-[20px] transition-opacity duration-500 group-hover:opacity-100" />
+                <span className="absolute inset-0 rounded-full border border-white/0 transition-colors duration-300 group-hover:border-white/20" />
+                <span className="relative flex items-center gap-3">
+                  Begin with Clarity
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                </span>
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-24 w-full max-w-5xl">
+            <div className="grid grid-cols-1 gap-8 text-left md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                <p className="text-sm uppercase tracking-[0.35em] text-white/40">Structured Flow</p>
+                <h3 className="mt-4 text-lg font-medium text-white">Guided 5-step input</h3>
+                <p className="mt-3 text-sm leading-relaxed text-white/60">
+                  Move through essential prompts that frame intent, context, and conviction—without noise.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                <p className="text-sm uppercase tracking-[0.35em] text-white/40">Intelligent Drafting</p>
+                <h3 className="mt-4 text-lg font-medium text-white">AI-powered clarity</h3>
+                <p className="mt-3 text-sm leading-relaxed text-white/60">
+                  Surface the right references, assemble refined prose, and keep every decision anchored in data.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                <p className="text-sm uppercase tracking-[0.35em] text-white/40">Refinement Loop</p>
+                <h3 className="mt-4 text-lg font-medium text-white">Collaborate, critique, improve</h3>
+                <p className="mt-3 text-sm leading-relaxed text-white/60">
+                  Iterate with your team, capture citations, and evolve drafts into crisp, shareable conviction.
+                </p>
+              </div>
+            </div>
+          </div>
+        </main>
+        <footer className="relative flex justify-center px-8 pb-10">
+          <span className="text-xs text-white/45">Crafted by product thinkers, for product thinkers.</span>
+        </footer>
+      </div>
+    </div>
+  );
+
+  const builderContent = (
+    <div id="prd-builder-root" className="min-h-screen bg-[#050509] text-white transition-colors">
+      <div className="sticky top-0 z-20 border-b border-white/10 bg-[#06040d]/95 backdrop-blur-xl">
+        <div className="max-w-5xl mx-auto px-10 py-5 flex items-center gap-4 text-white">
           <Button
             variant="ghost"
             onClick={() => { setExitError(''); setTempTitle(''); setShowExitDialog(true); }}
-            className="text-muted-foreground hover:text-foreground"
+            className="rounded-full border border-white/10 bg-white/5 text-white/60 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
             aria-label="Back to Dashboard"
             title="Back to Dashboard"
           >
@@ -906,33 +987,33 @@ export default function PRDNew() {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="flex-1 bg-transparent text-xl font-semibold outline-none"
+            className="flex-1 bg-transparent text-xl font-semibold outline-none text-white placeholder:text-white/40"
             placeholder="Untitled PRD"
           />
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-8 py-12">
-        <div className="mb-8 p-6 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/5 border border-primary/20 dark:from-purple-900/20 dark:via-blue-900/20 dark:to-blue-950/40 rounded-lg transition-colors">
-          <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-purple-400 mt-1" />
-            <p className="text-muted-foreground">Let's create your PRD. I'll ask you 5 questions and suggest relevant context from your documents.</p>
+      <div className="max-w-5xl mx-auto px-10 py-12">
+        <div className="mb-10 rounded-2xl border border-white/10 bg-white/[0.06] px-8 py-6 backdrop-blur">
+          <div className="flex items-start gap-3 text-white/80">
+            <Sparkles className="w-5 h-5 text-white/70 mt-1" />
+            <p className="leading-relaxed">Let's create your PRD. I'll guide you through five deliberate prompts and surface supporting context from your sources.</p>
           </div>
         </div>
 
-        <div className="flex gap-2 mb-8">
+        <div className="flex gap-2 mb-10">
           {PRD_QUESTIONS.map((_, idx) => (
-            <div key={idx} className={`h-1 flex-1 rounded ${idx <= currentStep ? 'bg-primary' : 'bg-border/60'}`} />
+            <div key={idx} className={`h-1 flex-1 rounded-full transition-colors ${idx <= currentStep ? 'bg-white' : 'bg-white/15'}`} />
           ))}
         </div>
 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-2xl font-semibold">Question {currentStep + 1} of {PRD_QUESTIONS.length}: {current.question}</h2>
+            <h2 className="text-2xl font-semibold text-white">Question {currentStep + 1} of {PRD_QUESTIONS.length}: {current.question}</h2>
             {((pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) || (dependencyHintsMemo.terms.length + dependencyHintsMemo.entities.length + dependencyHintsMemo.dates.length >= 2)) && (
               <div className="flex items-center gap-2">
                 {(pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) && (
-                  <div className="px-3 py-1 bg-primary/10 dark:bg-purple-900/30 border border-primary/30 rounded-md text-sm text-muted-foreground">
+                  <div className="px-3 py-1 rounded-md border border-white/15 bg-white/[0.08] text-xs text-white/70">
                     Using {pinnedChunksGlobal.size} pinned {pinnedChunksGlobal.size === 1 ? 'item' : 'items'}
                     {priorAnswerSummariesMemo.length > 0 && `, ${priorAnswerSummariesMemo.length} prior ${priorAnswerSummariesMemo.length === 1 ? 'answer' : 'answers'}`}
                   </div>
@@ -942,19 +1023,19 @@ export default function PRDNew() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
+                      className="h-7 px-2 text-xs text-white/60 hover:text-white"
                     >
                       <Settings className="w-3 h-3 mr-1" />
                       Settings
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 bg-card border border-border/60">
-                    <DropdownMenuLabel className="text-muted-foreground">Search Settings</DropdownMenuLabel>
-                    <DropdownMenuSeparator className="bg-border/60" />
-                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-muted/60">
+                  <DropdownMenuContent align="end" className="w-56 border border-white/15 bg-[#0a0814] text-white/80">
+                    <DropdownMenuLabel className="text-xs uppercase tracking-[0.2em] text-white/40">Search Settings</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-white/10">
                       <div className="flex flex-col">
-                        <span className="text-sm text-foreground">Use context</span>
-                        <span className="text-xs text-muted-foreground">Accumulate pinned items across sections</span>
+                        <span className="text-sm text-white">Use context</span>
+                        <span className="text-xs text-white/50">Accumulate pinned items across sections</span>
                       </div>
                       <Switch
                         checked={useAccumulatedContext}
@@ -962,13 +1043,13 @@ export default function PRDNew() {
                         className="ml-2"
                       />
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-muted/60">
+                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-white/10">
                       <div className="flex flex-col">
-                        <span className="text-sm text-foreground">Use hints</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-sm text-white">Use hints</span>
+                        <span className="text-xs text-white/50">
                           Cross-question dependency hints
                           {dependencyHintSummary && (
-                            <span className="block text-[11px] text-muted-foreground/80 mt-1">{dependencyHintSummary}</span>
+                            <span className="block text-[11px] text-white/40 mt-1">{dependencyHintSummary}</span>
                           )}
                         </span>
                       </div>
@@ -978,10 +1059,10 @@ export default function PRDNew() {
                         className="ml-2"
                       />
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-border/60" />
+                    <DropdownMenuSeparator className="bg-white/10" />
                     <DropdownMenuItem
                       onClick={clearAccumulatedContext}
-                      className="text-red-500 focus:text-red-400 focus:bg-muted/60 cursor-pointer"
+                      className="text-red-400 focus:text-red-300 focus:bg-white/10 cursor-pointer"
                     >
                       <RotateCcw className="w-3 h-3 mr-2" />
                       Clear accumulated context
@@ -994,37 +1075,37 @@ export default function PRDNew() {
         </div>
 
         {(isLoadingContext || contextSuggestions.length > 0 || isRefining) && (
-          <div className="mb-6 p-6 bg-card/80 dark:bg-card/40 border border-border/60 rounded-lg transition-colors">
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition-colors">
             <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-4 h-4 text-purple-400" />
-              <p className="text-sm font-medium text-muted-foreground">
+              <Sparkles className="w-4 h-4 text-white/70" />
+              <p className="text-sm font-medium text-white/80">
                 {isLoadingContext ? 'Searching...' : isRefining ? 'Refining results with AI...' : 'I found relevant context from your documents:'}
               </p>
-              {isRefining && <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />}
+              {isRefining && <Loader2 className="w-4 h-4 text-white/70 animate-spin" />}
             </div>
             {isLoadingContext && contextSuggestions.length === 0 ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
-                <span className="ml-2 text-sm text-muted-foreground">Finding relevant context...</span>
+                <Loader2 className="w-6 h-6 text-white/70 animate-spin" />
+                <span className="ml-2 text-sm text-white/60">Finding relevant context...</span>
               </div>
             ) : (
               <div className="space-y-4">
                 {contextSuggestions.map((s, i) => (
                   <div
                     key={s.chunk_id || s.id || i}
-                    className="p-4 bg-muted/40 dark:bg-muted/20 border border-border/60 rounded-lg hover:border-primary/50 transition-colors"
+                    className="p-4 rounded-xl border border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.07] transition-colors"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-foreground">{s.title || 'Document'}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{s.source} • {new Date(s.timestamp).toLocaleDateString()}</p>
+                        <p className="font-medium text-sm text-white">{s.title || 'Document'}</p>
+                        <p className="text-xs text-white/50 mt-1">{s.source} • {new Date(s.timestamp).toLocaleDateString()}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button 
                           size="sm" 
                           variant="ghost" 
                           onClick={() => togglePin(s.chunk_id || s.id)}
-                          className={`p-2 ${pinnedChunks.has(s.chunk_id || s.id) ? 'text-yellow-500 hover:text-yellow-400' : 'text-muted-foreground hover:text-foreground'}`}
+                          className={`p-2 ${pinnedChunks.has(s.chunk_id || s.id) ? 'text-yellow-300 hover:text-yellow-200' : 'text-white/60 hover:text-white'}`}
                           title={pinnedChunks.has(s.chunk_id || s.id) ? 'Unpin' : 'Pin'}
                         >
                           <Pin className={`w-4 h-4 ${pinnedChunks.has(s.chunk_id || s.id) ? 'fill-current' : ''}`} />
@@ -1033,15 +1114,15 @@ export default function PRDNew() {
                           size="sm" 
                           variant="ghost" 
                           onClick={() => insertContext(s)} 
-                          className="text-primary hover:text-primary/80"
+                          className="text-white/80 hover:text-white"
                         >
                           Insert →
                         </Button>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground line-clamp-3">{s.snippet || s.content}</p>
+                    <p className="text-sm text-white/60 line-clamp-3">{s.snippet || s.content}</p>
                     {pinnedChunks.has(s.chunk_id || s.id) && (
-                      <div className="mt-2 flex items-center gap-1 text-xs text-yellow-500">
+                      <div className="mt-2 flex items-center gap-1 text-xs text-yellow-300">
                         <Pin className="w-3 h-3 fill-current" />
                         <span>Pinned</span>
                       </div>
@@ -1055,10 +1136,10 @@ export default function PRDNew() {
 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-muted-foreground">Your answer:</label>
+            <label className="block text-sm font-medium text-white/70">Your answer:</label>
             {(contextSuggestions.length > 0 || pinnedChunks.size > 0) && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-card/80 dark:bg-card/40 border border-border/60 rounded-lg p-1">
+                <div className="flex items-center gap-1 rounded-lg border border-white/15 bg-white/[0.05] p-1">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1066,7 +1147,7 @@ export default function PRDNew() {
                           size="sm"
                           variant={draftMode === 'insert' ? 'default' : 'ghost'}
                           onClick={() => setDraftMode('insert')}
-                          className={`h-7 px-2 text-xs ${draftMode === 'insert' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                          className={`h-7 px-2 text-xs ${draftMode === 'insert' ? 'rounded-md border border-white/15 bg-white/90 text-gray-900 hover:bg-white' : 'rounded-md border border-white/10 text-white/60 hover:border-white/20 hover:text-white'}`}
                         >
                           <Plus className="w-3 h-3 mr-0.5" />
                           Insert
@@ -1084,7 +1165,7 @@ export default function PRDNew() {
                           size="sm"
                           variant={draftMode === 'replace' ? 'default' : 'ghost'}
                           onClick={() => setDraftMode('replace')}
-                          className={`h-7 px-2 text-xs ${draftMode === 'replace' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                          className={`h-7 px-2 text-xs ${draftMode === 'replace' ? 'rounded-md border border-white/15 bg-white/90 text-gray-900 hover:bg-white' : 'rounded-md border border-white/10 text-white/60 hover:border-white/20 hover:text-white'}`}
                         >
                           <RotateCcw className="w-3 h-3 mr-0.5" />
                           Replace
@@ -1100,7 +1181,7 @@ export default function PRDNew() {
                   size="sm"
                   onClick={handleGenerateDraft}
                   disabled={isGeneratingDraft}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-7 px-3 text-xs"
+                  className="h-7 rounded-md border border-white/10 px-3 text-xs text-white/70 transition-colors hover:border-white/20 hover:bg-white/15 hover:text-white"
                   title="Use AI to improve and enhance your answer based on context"
                 >
                   {isGeneratingDraft ? (
@@ -1123,14 +1204,14 @@ export default function PRDNew() {
               value={answers[current.id] || ''}
               onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
               placeholder={current.placeholder}
-              className="w-full h-64 bg-card/80 dark:bg-card/40 border border-border/60 rounded-lg p-4 pr-12 text-foreground resize-none focus:outline-none focus:border-primary"
+              className="w-full h-64 rounded-xl border border-white/15 bg-white/[0.03] p-4 pr-12 text-white resize-none focus:outline-none focus:border-white/40 placeholder:text-white/30"
             />
             <Button
               size="sm"
               variant="ghost"
               onClick={() => (isRecording ? stopRecording() : startRecording())}
               disabled={isTranscribing}
-              className={`absolute bottom-3 right-3 p-2 z-10 bg-card/80 dark:bg-card/60 backdrop-blur-sm rounded-lg ${isRecording ? 'text-red-500 hover:text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`absolute bottom-3 right-3 z-10 rounded-lg bg-white/[0.08] p-2 backdrop-blur ${isRecording ? 'text-red-300 hover:text-red-200' : 'text-white/60 hover:text-white'}`}
               title={isRecording ? 'Stop recording' : 'Click to record'}
             >
               {isRecording ? (
@@ -1149,7 +1230,7 @@ export default function PRDNew() {
             <Button
               variant="ghost"
               onClick={handleBack}
-              className="text-muted-foreground hover:text-foreground"
+              className="rounded-full border border-white/10 bg-white/5 text-white/65 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
               aria-label="Previous question"
               title="Previous question"
             >
@@ -1160,7 +1241,7 @@ export default function PRDNew() {
             <Button 
               onClick={handleAssemblePRD} 
               disabled={!allSectionsFilled || isAssembling || !prdId}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed" 
+              className="rounded-full border border-white/15 bg-white/90 px-6 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Generate PRD Document"
             >
               {isAssembling ? (
@@ -1176,7 +1257,11 @@ export default function PRDNew() {
               )}
             </Button>
           ) : (
-            <Button onClick={handleNext} className="bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Next question">
+            <Button
+              onClick={handleNext}
+              className="rounded-full border border-white/15 bg-white/90 px-6 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
+              aria-label="Next question"
+            >
               Next Question
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -1185,19 +1270,19 @@ export default function PRDNew() {
 
         {lastSaved && (
           <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">💾 Draft auto-saved {formatTimeAgo(lastSaved)}</p>
+            <p className="text-sm text-white/60">💾 Draft auto-saved {formatTimeAgo(lastSaved)}</p>
           </div>
         )}
 
         {assemblyError && (
-          <div className="mt-4 p-3 rounded-lg border border-red-200 bg-red-100 text-red-700 dark:border-red-600/50 dark:bg-red-500/10 dark:text-red-200">
+          <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-red-200">
             <p className="text-sm">{assemblyError}</p>
           </div>
         )}
 
         {currentStep === PRD_QUESTIONS.length - 1 && !allSectionsFilled && (
-          <div className="mt-4 p-3 rounded-lg border border-yellow-200 bg-yellow-100 text-yellow-700 dark:border-yellow-500/40 dark:bg-yellow-500/10 dark:text-yellow-200">
-            <p className="text-sm">Please fill all 5 sections before generating the PRD document.</p>
+          <div className="mt-4 rounded-lg border border-yellow-400/40 bg-yellow-400/10 p-3 text-yellow-100">
+            <p className="text-sm">Please fill all five sections before generating the PRD document.</p>
           </div>
         )}
       </div>
@@ -1326,6 +1411,236 @@ export default function PRDNew() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+
+  const sidebarContent = (
+    <aside
+      className={`
+        fixed inset-y-0 left-0 z-40 flex flex-col bg-[#06040d]/95 text-white backdrop-blur-2xl border-r border-white/10 transition-all duration-500 ease-in-out
+        ${sidebarCollapsed ? 'w-16' : 'w-80'}
+        ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        lg:relative lg:h-auto lg:translate-x-0
+      `}
+    >
+      <div className={`border-b border-white/10 ${sidebarCollapsed ? 'p-4' : 'px-6 py-5'}`}>
+        {sidebarCollapsed ? (
+          <div className="flex flex-col items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(false)}
+              className="h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white/70 hover:text-white"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setHasStarted(true);
+                setShowMobileSidebar(false);
+              }}
+              className="h-10 w-10 rounded-xl border border-white/10 bg-white/10 text-white/70 hover:text-white"
+              title="New PRD"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <div className="inline-flex flex-col gap-1">
+                <span className="text-[11px] uppercase tracking-[0.55em] text-white/40">Haven7</span>
+                <span className="text-2xl font-semibold tracking-tight text-white">PRD Studio</span>
+              </div>
+              <p className="text-sm leading-relaxed text-white/55 max-w-xs">
+                A calm workspace where product ideas gain structure, evidence, and conviction.
+              </p>
+              <Button
+                onClick={() => {
+                  setHasStarted(true);
+                  setShowMobileSidebar(false);
+                }}
+                className="group w-full justify-center rounded-xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-medium tracking-tight text-white/75 transition-colors duration-300 hover:border-white/20 hover:bg-white/15 hover:text-white"
+              >
+                <span className="relative flex items-center gap-2">
+                  <Plus className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  New PRD
+                </span>
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(true)}
+              className="mt-1 h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white/70 hover:text-white"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {!sidebarCollapsed && (
+        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8">
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-[0.45em] text-white/40">Recent PRDs</p>
+              <button
+                onClick={() => {
+                  navigate('/prds');
+                  setShowMobileSidebar(false);
+                }}
+                className="text-[11px] text-white/60 hover:text-white transition-colors"
+              >
+                View all
+              </button>
+            </div>
+            {isSidebarLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="h-12 rounded-xl bg-white/5 animate-pulse" />
+                ))}
+              </div>
+            ) : sidebarError ? (
+              <p className="text-xs text-red-300/80">{sidebarError}</p>
+            ) : recentPRDs.length > 0 ? (
+              <div className="space-y-2">
+                {recentPRDs.map(prd => {
+                  const updatedAt = new Date(prd.updated_at);
+                  return (
+                    <div
+                      key={prd.id}
+                      onClick={() => {
+                        navigate(`/prd/${prd.id}`);
+                        setShowMobileSidebar(false);
+                      }}
+                      className="group cursor-pointer rounded-xl border border-white/5 bg-white/[0.04] px-4 py-3 transition-all duration-200 hover:border-white/15 hover:bg-white/[0.08]"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-lg bg-white/[0.06] p-2">
+                          <FileText className="h-4 w-4 text-white/70" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{prd.title || 'Untitled PRD'}</p>
+                          <p className="mt-1 flex items-center gap-2 text-xs text-white/55">
+                            <span>v{prd.version}</span>
+                            <span className="text-white/25">•</span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatTimeAgo(updatedAt)}
+                            </span>
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-white/25 opacity-0 transition-all duration-200 group-hover:opacity-100" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-white/45">No recent PRDs yet. Your next draft will appear here.</p>
+            )}
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-[0.45em] text-white/40">My Library</p>
+              <button
+                onClick={() => {
+                  navigate('/prds');
+                  setShowMobileSidebar(false);
+                }}
+                className="text-[11px] text-white/60 hover:text-white transition-colors"
+              >
+                Manage
+              </button>
+            </div>
+            {isSidebarLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="h-14 rounded-xl bg-white/5 animate-pulse" />
+                ))}
+              </div>
+            ) : sidebarError ? (
+              <p className="text-xs text-red-300/80">{sidebarError}</p>
+            ) : prdGroups.length > 0 ? (
+              <div className="space-y-2">
+                {prdGroups.slice(0, 5).map(group => {
+                  const metaParts: string[] = [];
+                  if (group.latestVersion?.version) {
+                    metaParts.push(`v${group.latestVersion.version}`);
+                  }
+                  if (group.updatedAt) {
+                    metaParts.push(formatGroupTimestamp(group.updatedAt));
+                  }
+                  metaParts.push(`${group.totalVersions} version${group.totalVersions !== 1 ? 's' : ''}`);
+
+                  return (
+                    <div
+                      key={group.groupId}
+                      onClick={() => {
+                        if (group.latestVersion) {
+                          navigate(`/prd/${group.latestVersion.id}`);
+                          setShowMobileSidebar(false);
+                        }
+                      }}
+                      className="group cursor-pointer rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 transition-all duration-200 hover:border-white/15 hover:bg-white/[0.08]"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-lg bg-white/[0.06] p-2">
+                          <Folder className="h-4 w-4 text-white/70" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{group.title}</p>
+                          <p className="mt-1 text-xs text-white/55 truncate">{metaParts.join(' • ')}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-white/25 opacity-0 transition-all duration-200 group-hover:opacity-100" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-white/45">No PRDs yet. Begin with clarity to populate your library.</p>
+            )}
+          </section>
+        </div>
+      )}
+
+    </aside>
+  );
+
+  return (
+    <div className="min-h-screen flex bg-[#050509]">
+      {/* Mobile overlay */}
+      {showMobileSidebar && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 lg:hidden"
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+
+      {sidebarContent}
+
+      <div className="flex-1 flex flex-col">
+        <div className="lg:hidden flex justify-end p-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowMobileSidebar(prev => !prev)}
+            className="h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white/70 backdrop-blur"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="relative flex-1">
+          {hasStarted ? builderContent : heroContent}
+        </div>
+      </div>
     </div>
   );
 }
