@@ -1710,9 +1710,13 @@ const SearchInterface = () => {
           <div className="flex items-center gap-4 pr-6">
             <button
               onClick={() => navigate('/prd/new')}
-              className="rounded-full border border-border/50 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:bg-accent/10 hover:text-foreground"
+              className="group relative overflow-hidden rounded-xl border border-white/20 bg-white/[0.08] px-5 py-2 text-sm font-semibold text-white/80 shadow-[0_12px_30px_rgba(144,96,255,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/[0.12] hover:text-white"
             >
-              PRD Studio
+              <span className="relative z-10 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-white/70" />
+                PRD Studio
+              </span>
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             </button>
             <ThemeToggle />
             {/* User avatar with dropdown */}

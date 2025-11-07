@@ -904,21 +904,21 @@ export default function PRDNew() {
 
       <div className="relative flex min-h-screen flex-col">
         <main className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-28">
-          <div className="w-full max-w-3xl text-center">
+          <div className="animate-[fadeInUp_700ms_ease_700ms] w-full max-w-3xl text-center">
             <h1 className="mt-6 text-4xl font-light tracking-tight text-white sm:text-5xl md:text-6xl">
               Create your PRD with conviction.
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-base text-white/60 md:text-lg">
               Your PRD, powered by intelligence, designed for intent.
             </p>
-            <div className="mx-auto mt-10 flex w-full max-w-xl items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-left shadow-[0_40px_120px_rgba(50,30,120,0.35)] backdrop-blur-md">
+            <div className="animate-[fadeInUp_700ms_ease_300ms] mx-auto mt-10 flex w-full max-w-xl items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-left shadow-[0_40px_120px_rgba(50,30,120,0.35)] backdrop-blur-md">
               <Sparkles className="mr-3 h-4 w-4 text-white/50" />
               <div className="relative w-full font-mono text-sm tracking-wide text-white/60 md:text-base">
                 {typedHeroLine}
                 <span className="ml-1 inline-block h-4 w-[2px] animate-pulse bg-white/60 align-middle md:h-5" />
               </div>
             </div>
-            <div className="mt-12 flex justify-center">
+            <div className="animate-[fadeInUp_700ms_ease_500ms] mt-12 flex justify-center">
               <Button
                 onClick={() => {
                   setHasStarted(true);
@@ -936,7 +936,7 @@ export default function PRDNew() {
             </div>
           </div>
 
-          <div className="mt-24 w-full max-w-5xl">
+          <div className="animate-[fadeInUp_700ms_ease_700ms] mt-24 w-full max-w-5xl">
             <div className="grid grid-cols-1 gap-8 text-left md:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
                 <p className="text-sm uppercase tracking-[0.35em] text-white/40">Structured Flow</p>
