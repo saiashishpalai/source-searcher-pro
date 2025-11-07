@@ -44,6 +44,8 @@ const PRD_QUESTIONS: Array<{ id: SectionId; question: string; placeholder: strin
   { id: 'timeline', question: 'What is the timeline?', placeholder: 'Key milestones:\n- Week 1: X\n- Week 4: Y\n- Week 8: Launch', contextQuery: 'milestone release timeline deadline launch' }
 ];
 
+const HERO_PROMPT = 'Objective: Clarify the opportunity, the why, and the conviction behind it.';
+
 export default function PRDNew() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('Untitled PRD');
@@ -75,6 +77,8 @@ export default function PRDNew() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isAssembling, setIsAssembling] = useState(false);
   const [assemblyError, setAssemblyError] = useState<string | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [typedHeroLine, setTypedHeroLine] = useState('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<any>(null);
@@ -239,8 +243,42 @@ export default function PRDNew() {
     return `Currently tracking ${parts.join(', ')}`;
   }, [dependencyHintsMemo]);
 
-  // Create PRD draft on mount
   useEffect(() => {
+    if (hasStarted) {
+      setTypedHeroLine('');
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    setTypedHeroLine('');
+    let index = 0;
+    const interval = window.setInterval(() => {
+      index += 1;
+      setTypedHeroLine(HERO_PROMPT.slice(0, index));
+      if (index >= HERO_PROMPT.length) {
+        window.clearInterval(interval);
+      }
+    }, 55);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [hasStarted]);
+
+  useEffect(() => {
+    if (!hasStarted || typeof window === 'undefined') return;
+    const timeout = window.setTimeout(() => {
+      document.getElementById('prd-builder-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+    return () => window.clearTimeout(timeout);
+  }, [hasStarted]);
+
+  // Create PRD draft once the flow begins
+  useEffect(() => {
+    if (!hasStarted) return;
     (async () => {
       try {
         const { prd } = await ApiClient.createPRD(title);
@@ -249,10 +287,13 @@ export default function PRDNew() {
         // no-op: surface via UI if needed
       }
     })();
-  }, []);
+  }, [hasStarted, title]);
 
   // Debounced dual-phase search based on user input
   useEffect(() => {
+    if (!hasStarted) {
+      return;
+    }
     const currentAnswer = answers[current.id] || '';
     
     // Clear previous timeout
@@ -406,12 +447,14 @@ export default function PRDNew() {
         abortControllerRef.current.abort();
       }
     };
-  }, [answers, current.id, prdId, pinnedChunks, pinnedChunksGlobal, priorAnswerSummariesMemo, useAccumulatedContext, dependencyHintsMemo, useDependencyHints]);
+  }, [answers, current.id, prdId, pinnedChunks, pinnedChunksGlobal, priorAnswerSummariesMemo, useAccumulatedContext, dependencyHintsMemo, useDependencyHints, hasStarted]);
 
   // Auto-save
   useEffect(() => {
+    if (!hasStarted || !prdId) {
+      return;
+    }
     const timer = setInterval(async () => {
-      if (!prdId) return;
       if (isSaving) return;
       try {
         setIsSaving(true);
@@ -433,7 +476,7 @@ export default function PRDNew() {
       }
     }, 2000);
     return () => clearInterval(timer);
-  }, [prdId, answers, title, isSaving, sectionCitations]);
+  }, [prdId, answers, title, isSaving, sectionCitations, hasStarted]);
 
   const insertContext = (chunk: any) => {
     const text = chunk.snippet || chunk.content || '';
@@ -768,8 +811,85 @@ export default function PRDNew() {
     if (currentStep > 0) setCurrentStep(s => s - 1);
   };
 
+  if (!hasStarted) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-[#050509] text-white">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-b from-[#181124] via-[#050509] to-[#050509]" />
+          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#7c5cff] via-[#2f1d66] to-transparent opacity-60 blur-[160px]" />
+          <div className="absolute bottom-[-160px] right-[-120px] h-[380px] w-[380px] rounded-full bg-gradient-to-br from-[#0d1726] via-[#2d3a5f] to-transparent opacity-60 blur-[180px]" />
+        </div>
+
+        <div className="relative flex min-h-screen flex-col">
+          <header className="flex items-center justify-start px-8 py-10">
+            <span className="text-xs uppercase tracking-[0.45em] text-white/40">PRD Studio</span>
+          </header>
+          <main className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-10">
+            <div className="w-full max-w-3xl text-center">
+              <h1 className="mt-6 text-4xl font-light tracking-tight text-white sm:text-5xl md:text-6xl">
+                Create your PRD with conviction.
+              </h1>
+              <p className="mx-auto mt-6 max-w-xl text-base text-white/60 md:text-lg">
+                Your PRD, powered by intelligence, designed for intent.
+              </p>
+              <div className="mx-auto mt-10 flex w-full max-w-xl items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-left shadow-[0_40px_120px_rgba(50,30,120,0.35)] backdrop-blur-md">
+                <Sparkles className="mr-3 h-4 w-4 text-white/50" />
+                <div className="relative w-full font-mono text-sm tracking-wide text-white/60 md:text-base">
+                  {typedHeroLine}
+                  <span className="ml-1 inline-block h-4 w-[2px] animate-pulse bg-white/60 align-middle md:h-5" />
+                </div>
+              </div>
+              <div className="mt-12 flex justify-center">
+                <Button
+                  onClick={() => setHasStarted(true)}
+                  className="group relative h-14 rounded-full border border-white/15 bg-white/10 px-10 text-base font-medium tracking-tight text-white/80 shadow-[0_0_0_rgba(0,0,0,0)] backdrop-blur-xl transition-all duration-300 hover:text-white"
+                >
+                  <span className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 blur-[20px] transition-opacity duration-500 group-hover:opacity-100" />
+                  <span className="absolute inset-0 rounded-full border border-white/0 transition-colors duration-300 group-hover:border-white/20" />
+                  <span className="relative flex items-center gap-3">
+                    Begin with Clarity
+                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  </span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-24 w-full max-w-5xl">
+              <div className="grid grid-cols-1 gap-8 text-left md:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                  <p className="text-sm uppercase tracking-[0.35em] text-white/40">Structured Flow</p>
+                  <h3 className="mt-4 text-lg font-medium text-white">Guided 5-step input</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/60">
+                    Move through essential prompts that frame intent, context, and conviction—without noise.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                  <p className="text-sm uppercase tracking-[0.35em] text-white/40">Intelligent Drafting</p>
+                  <h3 className="mt-4 text-lg font-medium text-white">AI-powered clarity</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/60">
+                    Surface the right references, assemble refined prose, and keep every decision anchored in data.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                  <p className="text-sm uppercase tracking-[0.35em] text-white/40">Refinement Loop</p>
+                  <h3 className="mt-4 text-lg font-medium text-white">Collaborate, critique, improve</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/60">
+                    Iterate with your team, capture citations, and evolve drafts into crisp, shareable conviction.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </main>
+          <footer className="relative flex justify-center px-8 pb-10">
+            <span className="text-xs text-white/45">Crafted by product thinkers, for product thinkers.</span>
+          </footer>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors">
+    <div id="prd-builder-root" className="min-h-screen bg-background text-foreground transition-colors">
       <div className="border-b border-border/60 bg-card/80 dark:bg-card/60 sticky top-0 z-10 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-8 py-4 flex items-center gap-4">
           <Button
