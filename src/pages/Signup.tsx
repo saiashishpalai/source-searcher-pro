@@ -5,11 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Loader2, ArrowLeft, Sparkles, CheckCircle } from 'lucide-react';
 import { debugRedirectUrl } from '@/utils/debug-redirect';
 import authBg6 from '@/assets/auth-bg-6.png';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -75,22 +74,25 @@ const Signup = () => {
   };
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="relative flex h-screen bg-background text-foreground dark:bg-black dark:text-white transition-colors">
+      <div className="absolute top-6 right-6 z-30">
+        <ThemeToggle />
+      </div>
       {/* Left side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
         {/* Radial gradient overlay from center */}
-        <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-radial from-primary/10 via-transparent to-transparent dark:from-[#1a0a2e]/40 dark:via-black dark:to-black pointer-events-none transition-colors" />
         
         {/* Soft purple glow accents */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
-          <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-fuchsia-600/15 rounded-full blur-[128px]" />
+          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary/20 dark:bg-purple-600/20 rounded-full blur-[128px] transition-colors" />
+          <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-accent/25 dark:bg-fuchsia-600/15 rounded-full blur-[128px] transition-colors" />
         </div>
 
         <div className="w-full max-w-md relative z-20">
           {/* Logo */}
           <div className="mb-8 animate-fade-in">
-            <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
+            <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white transition">
               <ArrowLeft className="w-4 h-4" />
               Back to Haven7
             </Link>
@@ -98,10 +100,10 @@ const Signup = () => {
 
           {/* Heading */}
           <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+            <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-3 bg-gradient-to-r from-primary to-accent/80 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
               Create your account
             </h1>
-            <p className="text-gray-400 text-base">
+            <p className="text-muted-foreground text-base">
               Welcome! Please fill in the details to get started.
             </p>
           </div>
@@ -136,9 +138,9 @@ const Signup = () => {
           {/* Form fields */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
-              <Label className="block text-sm text-gray-300 mb-2" htmlFor="email">Email address</Label>
+              <Label className="block text-sm text-muted-foreground dark:text-gray-300 mb-2" htmlFor="email">Email address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground/80 dark:text-gray-500" />
                 <Input
                   id="email"
                   name="email"
@@ -146,16 +148,16 @@ const Signup = () => {
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="Enter your email address"
-                  className="pl-10 pr-4 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  className="pl-10 pr-4 bg-card/80 dark:bg-white/5 border border-border/60 dark:border-gray-800/50 rounded-xl py-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-accent/10 dark:focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
                   required
                 />
               </div>
             </div>
 
             <div className="animate-fade-in-up" style={{ animationDelay: '1.0s' }}>
-              <Label className="block text-sm text-gray-300 mb-2" htmlFor="password">Password</Label>
+              <Label className="block text-sm text-muted-foreground dark:text-gray-300 mb-2" htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground/80 dark:text-gray-500" />
                 <Input
                   id="password"
                   name="password"
@@ -163,27 +165,27 @@ const Signup = () => {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Enter your password"
-                  className="pl-10 pr-12 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  className="pl-10 pr-12 bg-card/80 dark:bg-white/5 border border-border/60 dark:border-gray-800/50 rounded-xl py-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-accent/10 dark:focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
                   required
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                  className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label="Toggle password visibility"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters long</p>
+              <p className="text-xs text-muted-foreground mt-1">Must be at least 8 characters long</p>
             </div>
 
             <div className="animate-fade-in-up" style={{ animationDelay: '1.2s' }}>
-              <Label className="block text-sm text-gray-300 mb-2" htmlFor="confirmPassword">Confirm Password</Label>
+              <Label className="block text-sm text-muted-foreground dark:text-gray-300 mb-2" htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground/80 dark:text-gray-500" />
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -191,14 +193,14 @@ const Signup = () => {
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
                   placeholder="Confirm your password"
-                  className="pl-10 pr-12 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  className="pl-10 pr-12 bg-card/80 dark:bg-white/5 border border-border/60 dark:border-gray-800/50 rounded-xl py-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-accent/10 dark:focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
                   required
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                  className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   aria-label="Toggle confirm password visibility"
                 >
@@ -209,11 +211,14 @@ const Signup = () => {
 
             {/* Message Display */}
             {message && (
-              <div className={`p-4 rounded-lg border animate-fade-in-up ${
-                message.type === 'error' 
-                  ? 'bg-red-50/5 border-red-200/20 text-red-300' 
-                  : 'bg-green-50/5 border-green-200/20 text-green-300'
-              }`} style={{ animationDelay: '1.2s' }}>
+              <div
+                className={`p-4 rounded-lg border animate-fade-in-up ${
+                  message.type === 'error'
+                    ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-200 dark:border-red-500/30'
+                    : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-green-500/10 dark:text-green-200 dark:border-green-500/30'
+                }`}
+                style={{ animationDelay: '1.2s' }}
+              >
                 {message.isExistingUser ? (
                   <div className="space-y-3">
                     {/* Clean minimal header */}
@@ -224,10 +229,10 @@ const Signup = () => {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-red-200">
+                        <p className="text-sm font-medium text-red-700 dark:text-red-200">
                           Account already exists
                         </p>
-                        <p className="text-xs text-red-300/70 mt-1">
+                        <p className="text-xs text-red-600/80 dark:text-red-300/70 mt-1">
                           Please sign in to continue
                         </p>
                       </div>
@@ -237,7 +242,7 @@ const Signup = () => {
                     <div className="flex justify-end">
                       <Link 
                         to="/login" 
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#A855F7] hover:text-purple-400 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
@@ -247,7 +252,7 @@ const Signup = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3">
                     <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
                       message.type === 'error' ? 'bg-red-500/10' : 'bg-green-500/10'
                     }`}>
@@ -259,7 +264,7 @@ const Signup = () => {
                         <CheckCircle className="w-3 h-3 text-green-400" />
                       )}
                     </div>
-                    <span className="text-sm text-gray-300">{message.text}</span>
+                    <span className="text-sm text-muted-foreground dark:text-gray-300">{message.text}</span>
                   </div>
                 )}
               </div>
@@ -270,7 +275,7 @@ const Signup = () => {
                 type="submit"
                 className={`w-full rounded-xl py-3.5 font-semibold transition-all duration-200 ${
                   message?.isExistingUser 
-                    ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed border border-gray-700/50' 
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed border border-border/60 dark:bg-gray-600/50 dark:text-gray-400 dark:border-gray-700/50' 
                     : 'bg-gradient-to-r from-[#A855F7] via-purple-600 to-fuchsia-600 text-white hover:from-purple-600 hover:via-purple-700 hover:to-fuchsia-700 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50'
                 }`}
                 disabled={isLoading || message?.isExistingUser}
@@ -299,16 +304,16 @@ const Signup = () => {
 
           {/* Sign in link - only show when no account exists error */}
           {!message?.isExistingUser && (
-            <p className="text-center text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '1.6s' }}>
+            <p className="text-center text-muted-foreground mt-6 animate-fade-in" style={{ animationDelay: '1.6s' }}>
               Already have an account?{' '}
-              <Link to="/login" className="text-[#A855F7] hover:text-purple-400">
+              <Link to="/login" className="text-primary hover:text-primary/80">
                 Sign in
               </Link>
             </p>
           )}
 
           {/* Terms footer */}
-          <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.8s' }}>
+          <p className="text-xs text-muted-foreground mt-8 text-center animate-fade-in" style={{ animationDelay: '1.8s' }}>
             By signing up, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>
@@ -325,7 +330,7 @@ const Signup = () => {
         />
         
         {/* Overlay for better text contrast */}
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-white/60 dark:bg-black/20 transition-colors" />
       </div>
     </div>
   );

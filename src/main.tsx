@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import App from './App'
 import './index.css'
@@ -21,9 +22,11 @@ createRoot(document.getElementById('root')!).render(
           <TooltipProvider>
             <BrowserRouter>
               <AuthProvider>
-                <App />
-                <Toaster />
-                <Sonner />
+                <ThemeProvider>
+                  <App />
+                  <Toaster />
+                  <Sonner />
+                </ThemeProvider>
               </AuthProvider>
             </BrowserRouter>
           </TooltipProvider>

@@ -116,7 +116,7 @@ export default function PRDList() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading PRDs...</div>
+        <div className="text-muted-foreground">Loading PRDs...</div>
       </div>
     );
   }
@@ -124,7 +124,7 @@ export default function PRDList() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="text-red-400 mb-4">{error}</div>
+        <div className="text-destructive mb-4">{error}</div>
         <Button onClick={loadPRDs} variant="outline">Retry</Button>
       </div>
     );
@@ -133,9 +133,9 @@ export default function PRDList() {
   if (prds.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
-        <FileText className="w-16 h-16 text-gray-500 mb-4" />
-        <h3 className="text-lg font-semibold text-white mb-2">No PRDs yet</h3>
-        <p className="text-gray-400 mb-4">Create your first PRD by typing "/prd" in the search bar</p>
+        <FileText className="w-16 h-16 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">No PRDs yet</h3>
+        <p className="text-muted-foreground mb-4">Create your first PRD by typing "/prd" in the search bar</p>
         <Button onClick={() => navigate('/dashboard')} variant="outline">
           Go to Dashboard
         </Button>
@@ -145,101 +145,100 @@ export default function PRDList() {
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-white">My PRDs</h1>
-      </div>
+      <div className="p-6 space-y-6 bg-card/40 dark:bg-card/20 rounded-2xl border border-border/60 transition-colors">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-foreground">My PRDs</h1>
+        </div>
 
-      <div className="space-y-6">
-        {Object.entries(groupedPRDs).map(([groupId, versions]) => {
-          // Get title from first version (all versions in a group have same title)
-          const title = versions[0]?.title || 'Untitled';
-          return (
-          <div key={groupId} className="border border-gray-700 rounded-lg p-4 bg-[#1f1f23]">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">{title}</h2>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
-                {versions.length > 0 && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleCreateVersion(versions[0].id)}
-                        disabled={creatingVersion === versions[0].id}
-                        className="p-2 rounded-md border border-gray-700 hover:border-purple-500/60 text-gray-300 hover:text-white disabled:opacity-50"
-                      >
-                        <GitBranch className="w-4 h-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{creatingVersion === versions[0].id ? 'Creating…' : 'New Version'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => handleDeleteGroup(groupId, title)}
-                      className="p-2 rounded-md border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-500/60"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Delete PRD (all versions)</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {versions.map((prd) => (
-                <div
-                  key={prd.id}
-                  onClick={() => handleViewPRD(prd.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleViewPRD(prd.id); }}
-                  role="button"
-                  tabIndex={0}
-                  className="group flex items-center justify-between p-3 rounded-lg bg-[#0f0f11] border border-gray-800 hover:border-purple-500/50 transition-colors cursor-pointer"
-                >
+        <div className="space-y-6">
+          {Object.entries(groupedPRDs).map(([groupId, versions]) => {
+            const title = versions[0]?.title || 'Untitled';
+            return (
+              <div key={groupId} className="border border-border/60 rounded-xl p-4 bg-card/80 dark:bg-card/40 transition-colors">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-foreground">{title}</h2>
                   <div className="flex items-center gap-3">
-                    {getStatusIcon(prd.status)}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-medium">v{prd.version}</span>
-                        <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 capitalize">
-                          {prd.status}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {formatDate(prd.updated_at)}
-                        </span>
-                      </div>
-                    </div>
+                    <span className="text-xs text-muted-foreground">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
+                    {versions.length > 0 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => handleCreateVersion(versions[0].id)}
+                            disabled={creatingVersion === versions[0].id}
+                            className="p-2 rounded-md border border-border/60 hover:border-primary/60 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                          >
+                            <GitBranch className="w-4 h-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{creatingVersion === versions[0].id ? 'Creating…' : 'New Version'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => handleDeleteGroup(groupId, title)}
+                          className="p-2 rounded-md border border-red-500/30 text-red-500 hover:text-red-400 hover:border-red-500/60"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Delete PRD (all versions)</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteVersion(prd.id); }}
-                        className="opacity-0 group-hover:opacity-100 p-2 rounded-md text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Delete version</p>
-                    </TooltipContent>
-                  </Tooltip>
                 </div>
-              ))}
-            </div>
-          </div>
-          );
-        })}
+
+                <div className="space-y-2">
+                  {versions.map((prd) => (
+                    <div
+                      key={prd.id}
+                      onClick={() => handleViewPRD(prd.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleViewPRD(prd.id); }}
+                      role="button"
+                      tabIndex={0}
+                      className="group flex items-center justify-between p-3 rounded-lg bg-muted/40 dark:bg-muted/20 border border-border/60 hover:border-primary/50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(prd.status)}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-foreground font-medium">v{prd.version}</span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground capitalize">
+                              {prd.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {formatDate(prd.updated_at)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteVersion(prd.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-2 rounded-md text-red-500 hover:text-red-400 transition-opacity"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete version</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
     </TooltipProvider>
   );
 }

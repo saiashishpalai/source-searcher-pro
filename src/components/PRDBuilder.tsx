@@ -147,18 +147,18 @@ export default function PRDBuilder({ initialTitle, onClose }: PRDBuilderProps) {
   if (isComplete) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="w-full max-w-4xl rounded-lg bg-[#1f1f23] p-6 max-h-[90vh] overflow-y-auto">
+        <div className="w-full max-w-4xl rounded-lg bg-card border border-border/60 p-6 max-h-[90vh] overflow-y-auto transition-colors">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20">
                 <Check className="h-6 w-6 text-green-500" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-white">PRD Created Successfully!</h2>
-                <p className="text-sm text-gray-400">{initialTitle}</p>
+                <h2 className="text-xl font-semibold text-foreground">PRD Created Successfully!</h2>
+                <p className="text-sm text-muted-foreground">{initialTitle}</p>
               </div>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-200">Close</button>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">Close</button>
           </div>
 
           <div className="mb-4 flex gap-3">
@@ -189,9 +189,9 @@ export default function PRDBuilder({ initialTitle, onClose }: PRDBuilderProps) {
             </Button>
           </div>
 
-          <div className="rounded-lg border border-gray-700 bg-[#0f0f11] p-4">
-            <div className="mb-2 text-sm font-medium text-gray-400">Preview:</div>
-            <pre className="whitespace-pre-wrap text-sm text-gray-300 font-mono overflow-x-auto">
+          <div className="rounded-lg border border-border/60 bg-muted/30 dark:bg-muted/20 p-4">
+            <div className="mb-2 text-sm font-medium text-muted-foreground">Preview:</div>
+            <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-mono overflow-x-auto">
               {prdMarkdown}
             </pre>
           </div>
@@ -208,32 +208,32 @@ export default function PRDBuilder({ initialTitle, onClose }: PRDBuilderProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-3xl rounded-lg bg-[#1f1f23] p-6">
+      <div className="w-full max-w-3xl rounded-lg bg-card border border-border/60 p-6 transition-colors">
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Create PRD: {initialTitle}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">Close</button>
+          <h2 className="text-xl font-semibold text-foreground">Create PRD: {initialTitle}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">Close</button>
         </div>
 
         <div className="mb-6 flex gap-2">
           {PRD_QUESTIONS.map((_, idx) => (
-            <div key={idx} className={`h-1 flex-1 rounded ${idx <= currentStep ? 'bg-purple-500' : 'bg-gray-700'}`} />
+            <div key={idx} className={`h-1 flex-1 rounded ${idx <= currentStep ? 'bg-primary' : 'bg-border/60'}`} />
           ))}
         </div>
 
-        <div className="mb-2 text-lg font-medium text-white">{current.question}</div>
-        <div className="mb-4 text-sm text-gray-400">{current.hint}</div>
+        <div className="mb-2 text-lg font-medium text-foreground">{current.question}</div>
+        <div className="mb-4 text-sm text-muted-foreground">{current.hint}</div>
 
         <textarea
           value={answers[current.id]}
           onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
           placeholder={current.placeholder}
-          className="h-48 w-full resize-none rounded-lg border border-gray-700 bg-[#0f0f11] p-4 text-white"
+          className="h-48 w-full resize-none rounded-lg border border-border/60 bg-card/80 dark:bg-card/40 p-4 text-foreground"
         />
 
         {error && <div className="mt-2 text-sm text-red-400">{error}</div>}
 
         <div className="mt-6 flex items-center justify-between">
-          <button onClick={handleBack} disabled={currentStep === 0} className="px-4 py-2 text-gray-300 disabled:opacity-50">Back</button>
+          <button onClick={handleBack} disabled={currentStep === 0} className="px-4 py-2 text-muted-foreground disabled:opacity-50">Back</button>
           <Button onClick={handleNext} disabled={!answers[current.id]?.trim() || isSaving}>
             {currentStep === PRD_QUESTIONS.length - 1 ? 'Finish' : 'Next'}
           </Button>

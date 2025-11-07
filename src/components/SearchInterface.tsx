@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import ThemeToggle from '@/components/ThemeToggle';
 import { supabase } from '@/integrations/supabase/client';
 import { ApiClient } from '@/lib/api-client';
 import aiIllustration from '@/assets/ai-search-illustration.jpg';
@@ -1532,7 +1533,7 @@ const SearchInterface = () => {
                     {/* Animated shimmer effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
                     
-                    <span className="text-white font-bold text-lg relative z-10 group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-foreground dark:text-white font-bold text-lg relative z-10 group-hover:scale-110 transition-transform duration-300">
                       H7
                     </span>
                     
@@ -1583,7 +1584,7 @@ const SearchInterface = () => {
                 <Plus className="w-4 h-4 group-hover:text-primary group-hover:rotate-90 transition-all duration-500 relative z-10" />
                 
                 {/* Text with flowing color */}
-                <span className="relative z-10 transition-all duration-500 text-foreground group-hover:text-white">
+                <span className="relative z-10 transition-all duration-500 text-foreground group-hover:text-primary-foreground dark:group-hover:text-white">
                   New Conversation
                 </span>
                 
@@ -1601,7 +1602,7 @@ const SearchInterface = () => {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
                 <FileText className="w-4 h-4 text-foreground group-hover:text-purple-200 transition-all duration-500 relative z-10" />
-                <span className="relative z-10 transition-all duration-500 text-foreground group-hover:text-white">
+                <span className="relative z-10 transition-all duration-500 text-foreground group-hover:text-primary-foreground dark:group-hover:text-white">
                   New PRD
                 </span>
               </Button>
@@ -1766,7 +1767,7 @@ const SearchInterface = () => {
             </button>
             
             {/* Haven7 logo */}
-            <span className="text-xl font-semibold text-white leading-none group hover:cursor-pointer relative animate-subtle-glow">
+            <span className="text-xl font-semibold text-foreground leading-none group hover:cursor-pointer relative animate-subtle-glow">
               <span className="relative z-10 hover:bg-gradient-to-r hover:from-primary hover:via-accent hover:to-primary hover:bg-clip-text hover:text-transparent transition-all duration-700">
                 Haven7
               </span>
@@ -1779,6 +1780,7 @@ const SearchInterface = () => {
           
           {/* Right section: Profile */}
           <div className="flex items-center gap-4 pr-6">
+            <ThemeToggle />
             {/* User avatar with dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

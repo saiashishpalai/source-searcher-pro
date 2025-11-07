@@ -221,6 +221,24 @@ export default function PRDNew() {
     return extractDependencyHints();
   }, [currentStep, answers, useDependencyHints]);
 
+  const dependencyHintSummary = useMemo(() => {
+    const termCount = dependencyHintsMemo.terms.length;
+    const entityCount = dependencyHintsMemo.entities.length;
+    const dateCount = dependencyHintsMemo.dates.length;
+    const total = termCount + entityCount + dateCount;
+
+    if (total === 0) {
+      return '';
+    }
+
+    const parts: string[] = [];
+    if (termCount) parts.push(`${termCount} ${termCount === 1 ? 'term' : 'terms'}`);
+    if (entityCount) parts.push(`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}`);
+    if (dateCount) parts.push(`${dateCount} ${dateCount === 1 ? 'date' : 'dates'}`);
+
+    return `Currently tracking ${parts.join(', ')}`;
+  }, [dependencyHintsMemo]);
+
   // Create PRD draft on mount
   useEffect(() => {
     (async () => {
@@ -751,10 +769,16 @@ export default function PRDNew() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f11] text-white">
-      <div className="border-b border-gray-800 bg-[#1f1f23] sticky top-0 z-10">
+    <div className="min-h-screen bg-background text-foreground transition-colors">
+      <div className="border-b border-border/60 bg-card/80 dark:bg-card/60 sticky top-0 z-10 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-8 py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => { setExitError(''); setTempTitle(''); setShowExitDialog(true); }} className="text-gray-400 hover:text-white" aria-label="Back to Dashboard" title="Back to Dashboard">
+          <Button
+            variant="ghost"
+            onClick={() => { setExitError(''); setTempTitle(''); setShowExitDialog(true); }}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Back to Dashboard"
+            title="Back to Dashboard"
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </Button>
@@ -769,16 +793,16 @@ export default function PRDNew() {
       </div>
 
       <div className="max-w-4xl mx-auto px-8 py-12">
-        <div className="mb-8 p-6 bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/20 rounded-lg">
+        <div className="mb-8 p-6 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/5 border border-primary/20 dark:from-purple-900/20 dark:via-blue-900/20 dark:to-blue-950/40 rounded-lg transition-colors">
           <div className="flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-purple-400 mt-1" />
-            <p className="text-gray-300">Let's create your PRD. I'll ask you 5 questions and suggest relevant context from your documents.</p>
+            <p className="text-muted-foreground">Let's create your PRD. I'll ask you 5 questions and suggest relevant context from your documents.</p>
           </div>
         </div>
 
         <div className="flex gap-2 mb-8">
           {PRD_QUESTIONS.map((_, idx) => (
-            <div key={idx} className={`h-1 flex-1 rounded ${idx <= currentStep ? 'bg-purple-500' : 'bg-gray-700'}`} />
+            <div key={idx} className={`h-1 flex-1 rounded ${idx <= currentStep ? 'bg-primary' : 'bg-border/60'}`} />
           ))}
         </div>
 
@@ -788,62 +812,29 @@ export default function PRDNew() {
             {((pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) || (dependencyHintsMemo.terms.length + dependencyHintsMemo.entities.length + dependencyHintsMemo.dates.length >= 2)) && (
               <div className="flex items-center gap-2">
                 {(pinnedChunksGlobal.size > 0 || priorAnswerSummariesMemo.length > 0) && (
-                  <div className="px-3 py-1 bg-purple-900/30 border border-purple-500/30 rounded-md text-sm text-gray-300">
+                  <div className="px-3 py-1 bg-primary/10 dark:bg-purple-900/30 border border-primary/30 rounded-md text-sm text-muted-foreground">
                     Using {pinnedChunksGlobal.size} pinned {pinnedChunksGlobal.size === 1 ? 'item' : 'items'}
                     {priorAnswerSummariesMemo.length > 0 && `, ${priorAnswerSummariesMemo.length} prior ${priorAnswerSummariesMemo.length === 1 ? 'answer' : 'answers'}`}
                   </div>
-                )}
-                {dependencyHintsMemo.terms.length + dependencyHintsMemo.entities.length + dependencyHintsMemo.dates.length >= 2 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="px-3 py-1 bg-blue-900/30 border border-blue-500/30 rounded-md text-sm text-gray-300 cursor-help">
-                          Hints: {dependencyHintsMemo.terms.length} terms, {dependencyHintsMemo.entities.length} entities, {dependencyHintsMemo.dates.length} dates
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-md">
-                        <div className="text-xs space-y-1">
-                          {dependencyHintsMemo.terms.length > 0 && (
-                            <div>
-                              <strong>Terms:</strong> {dependencyHintsMemo.terms.slice(0, 5).join(', ')}
-                              {dependencyHintsMemo.terms.length > 5 && ` +${dependencyHintsMemo.terms.length - 5} more`}
-                            </div>
-                          )}
-                          {dependencyHintsMemo.entities.length > 0 && (
-                            <div>
-                              <strong>Entities:</strong> {dependencyHintsMemo.entities.slice(0, 5).join(', ')}
-                              {dependencyHintsMemo.entities.length > 5 && ` +${dependencyHintsMemo.entities.length - 5} more`}
-                            </div>
-                          )}
-                          {dependencyHintsMemo.dates.length > 0 && (
-                            <div>
-                              <strong>Dates:</strong> {dependencyHintsMemo.dates.slice(0, 5).join(', ')}
-                              {dependencyHintsMemo.dates.length > 5 && ` +${dependencyHintsMemo.dates.length - 5} more`}
-                            </div>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs text-gray-400 hover:text-white h-7 px-2"
+                      className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
                     >
                       <Settings className="w-3 h-3 mr-1" />
                       Settings
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 bg-[#1f1f23] border-gray-700">
-                    <DropdownMenuLabel className="text-gray-300">Search Settings</DropdownMenuLabel>
-                    <DropdownMenuSeparator className="bg-gray-700" />
-                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-[#0f0f11]">
+                  <DropdownMenuContent align="end" className="w-56 bg-card border border-border/60">
+                    <DropdownMenuLabel className="text-muted-foreground">Search Settings</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-border/60" />
+                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-muted/60">
                       <div className="flex flex-col">
-                        <span className="text-sm text-gray-300">Use context</span>
-                        <span className="text-xs text-gray-500">Accumulate pinned items across sections</span>
+                        <span className="text-sm text-foreground">Use context</span>
+                        <span className="text-xs text-muted-foreground">Accumulate pinned items across sections</span>
                       </div>
                       <Switch
                         checked={useAccumulatedContext}
@@ -851,10 +842,15 @@ export default function PRDNew() {
                         className="ml-2"
                       />
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-[#0f0f11]">
+                    <DropdownMenuItem className="flex items-center justify-between cursor-default focus:bg-muted/60">
                       <div className="flex flex-col">
-                        <span className="text-sm text-gray-300">Use hints</span>
-                        <span className="text-xs text-gray-500">Cross-question dependency hints</span>
+                        <span className="text-sm text-foreground">Use hints</span>
+                        <span className="text-xs text-muted-foreground">
+                          Cross-question dependency hints
+                          {dependencyHintSummary && (
+                            <span className="block text-[11px] text-muted-foreground/80 mt-1">{dependencyHintSummary}</span>
+                          )}
+                        </span>
                       </div>
                       <Switch
                         checked={useDependencyHints}
@@ -862,10 +858,10 @@ export default function PRDNew() {
                         className="ml-2"
                       />
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-gray-700" />
+                    <DropdownMenuSeparator className="bg-border/60" />
                     <DropdownMenuItem
                       onClick={clearAccumulatedContext}
-                      className="text-red-400 focus:text-red-300 focus:bg-[#0f0f11] cursor-pointer"
+                      className="text-red-500 focus:text-red-400 focus:bg-muted/60 cursor-pointer"
                     >
                       <RotateCcw className="w-3 h-3 mr-2" />
                       Clear accumulated context
@@ -878,10 +874,10 @@ export default function PRDNew() {
         </div>
 
         {(isLoadingContext || contextSuggestions.length > 0 || isRefining) && (
-          <div className="mb-6 p-6 bg-[#1f1f23] border border-gray-700 rounded-lg">
+          <div className="mb-6 p-6 bg-card/80 dark:bg-card/40 border border-border/60 rounded-lg transition-colors">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <p className="text-sm font-medium text-gray-300">
+              <p className="text-sm font-medium text-muted-foreground">
                 {isLoadingContext ? 'Searching...' : isRefining ? 'Refining results with AI...' : 'I found relevant context from your documents:'}
               </p>
               {isRefining && <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />}
@@ -889,23 +885,26 @@ export default function PRDNew() {
             {isLoadingContext && contextSuggestions.length === 0 ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
-                <span className="ml-2 text-sm text-gray-400">Finding relevant context...</span>
+                <span className="ml-2 text-sm text-muted-foreground">Finding relevant context...</span>
               </div>
             ) : (
               <div className="space-y-4">
                 {contextSuggestions.map((s, i) => (
-                  <div key={s.chunk_id || s.id || i} className="p-4 bg-[#0f0f11] border border-gray-700 rounded-lg hover:border-purple-500/50 transition-colors">
+                  <div
+                    key={s.chunk_id || s.id || i}
+                    className="p-4 bg-muted/40 dark:bg-muted/20 border border-border/60 rounded-lg hover:border-primary/50 transition-colors"
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-white">{s.title || 'Document'}</p>
-                        <p className="text-xs text-gray-400 mt-1">{s.source} • {new Date(s.timestamp).toLocaleDateString()}</p>
+                        <p className="font-medium text-sm text-foreground">{s.title || 'Document'}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{s.source} • {new Date(s.timestamp).toLocaleDateString()}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button 
                           size="sm" 
                           variant="ghost" 
                           onClick={() => togglePin(s.chunk_id || s.id)}
-                          className={`p-2 ${pinnedChunks.has(s.chunk_id || s.id) ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'}`}
+                          className={`p-2 ${pinnedChunks.has(s.chunk_id || s.id) ? 'text-yellow-500 hover:text-yellow-400' : 'text-muted-foreground hover:text-foreground'}`}
                           title={pinnedChunks.has(s.chunk_id || s.id) ? 'Unpin' : 'Pin'}
                         >
                           <Pin className={`w-4 h-4 ${pinnedChunks.has(s.chunk_id || s.id) ? 'fill-current' : ''}`} />
@@ -914,15 +913,15 @@ export default function PRDNew() {
                           size="sm" 
                           variant="ghost" 
                           onClick={() => insertContext(s)} 
-                          className="text-purple-400 hover:text-purple-300"
+                          className="text-primary hover:text-primary/80"
                         >
                           Insert →
                         </Button>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-300 line-clamp-3">{s.snippet || s.content}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{s.snippet || s.content}</p>
                     {pinnedChunks.has(s.chunk_id || s.id) && (
-                      <div className="mt-2 flex items-center gap-1 text-xs text-yellow-400">
+                      <div className="mt-2 flex items-center gap-1 text-xs text-yellow-500">
                         <Pin className="w-3 h-3 fill-current" />
                         <span>Pinned</span>
                       </div>
@@ -936,10 +935,10 @@ export default function PRDNew() {
 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-400">Your answer:</label>
+            <label className="block text-sm font-medium text-muted-foreground">Your answer:</label>
             {(contextSuggestions.length > 0 || pinnedChunks.size > 0) && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-[#1f1f23] border border-gray-700 rounded-lg p-1">
+                <div className="flex items-center gap-1 bg-card/80 dark:bg-card/40 border border-border/60 rounded-lg p-1">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -947,7 +946,7 @@ export default function PRDNew() {
                           size="sm"
                           variant={draftMode === 'insert' ? 'default' : 'ghost'}
                           onClick={() => setDraftMode('insert')}
-                          className={`h-7 px-2 text-xs ${draftMode === 'insert' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
+                          className={`h-7 px-2 text-xs ${draftMode === 'insert' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                           <Plus className="w-3 h-3 mr-0.5" />
                           Insert
@@ -965,7 +964,7 @@ export default function PRDNew() {
                           size="sm"
                           variant={draftMode === 'replace' ? 'default' : 'ghost'}
                           onClick={() => setDraftMode('replace')}
-                          className={`h-7 px-2 text-xs ${draftMode === 'replace' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-gray-300'}`}
+                          className={`h-7 px-2 text-xs ${draftMode === 'replace' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                           <RotateCcw className="w-3 h-3 mr-0.5" />
                           Replace
@@ -981,7 +980,7 @@ export default function PRDNew() {
                   size="sm"
                   onClick={handleGenerateDraft}
                   disabled={isGeneratingDraft}
-                  className="bg-purple-500 hover:bg-purple-600 text-white h-7 px-3 text-xs"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-7 px-3 text-xs"
                   title="Use AI to improve and enhance your answer based on context"
                 >
                   {isGeneratingDraft ? (
@@ -1004,14 +1003,14 @@ export default function PRDNew() {
               value={answers[current.id] || ''}
               onChange={(e) => setAnswers({ ...answers, [current.id]: e.target.value })}
               placeholder={current.placeholder}
-              className="w-full h-64 bg-[#1f1f23] border border-gray-700 rounded-lg p-4 pr-12 text-white resize-none focus:outline-none focus:border-purple-500"
+              className="w-full h-64 bg-card/80 dark:bg-card/40 border border-border/60 rounded-lg p-4 pr-12 text-foreground resize-none focus:outline-none focus:border-primary"
             />
             <Button
               size="sm"
               variant="ghost"
               onClick={() => (isRecording ? stopRecording() : startRecording())}
               disabled={isTranscribing}
-              className={`absolute bottom-3 right-3 p-2 z-10 bg-[#1f1f23]/80 backdrop-blur-sm rounded-lg ${isRecording ? 'text-red-500 hover:text-red-400' : 'text-gray-400 hover:text-gray-300'}`}
+              className={`absolute bottom-3 right-3 p-2 z-10 bg-card/80 dark:bg-card/60 backdrop-blur-sm rounded-lg ${isRecording ? 'text-red-500 hover:text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
               title={isRecording ? 'Stop recording' : 'Click to record'}
             >
               {isRecording ? (
@@ -1027,7 +1026,13 @@ export default function PRDNew() {
 
         <div className={`flex items-center ${currentStep === 0 ? 'justify-end' : 'justify-between'}`}>
           {currentStep > 0 && (
-            <Button variant="ghost" onClick={handleBack} className="text-gray-400 hover:text-white" aria-label="Previous question" title="Previous question">
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Previous question"
+              title="Previous question"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" /> Previous Question
             </Button>
           )}
@@ -1035,7 +1040,7 @@ export default function PRDNew() {
             <Button 
               onClick={handleAssemblePRD} 
               disabled={!allSectionsFilled || isAssembling || !prdId}
-              className="bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed" 
+              className="bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed" 
               aria-label="Generate PRD Document"
             >
               {isAssembling ? (
@@ -1051,7 +1056,7 @@ export default function PRDNew() {
               )}
             </Button>
           ) : (
-            <Button onClick={handleNext} className="bg-purple-500 hover:bg-purple-600 text-white" aria-label="Next question">
+            <Button onClick={handleNext} className="bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Next question">
               Next Question
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -1060,39 +1065,39 @@ export default function PRDNew() {
 
         {lastSaved && (
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">💾 Draft auto-saved {formatTimeAgo(lastSaved)}</p>
+            <p className="text-sm text-muted-foreground">💾 Draft auto-saved {formatTimeAgo(lastSaved)}</p>
           </div>
         )}
 
         {assemblyError && (
-          <div className="mt-4 p-3 bg-red-900/20 border border-red-700 rounded-lg">
-            <p className="text-sm text-red-400">{assemblyError}</p>
+          <div className="mt-4 p-3 rounded-lg border border-red-200 bg-red-100 text-red-700 dark:border-red-600/50 dark:bg-red-500/10 dark:text-red-200">
+            <p className="text-sm">{assemblyError}</p>
           </div>
         )}
 
         {currentStep === PRD_QUESTIONS.length - 1 && !allSectionsFilled && (
-          <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-700 rounded-lg">
-            <p className="text-sm text-yellow-400">Please fill all 5 sections before generating the PRD document.</p>
+          <div className="mt-4 p-3 rounded-lg border border-yellow-200 bg-yellow-100 text-yellow-700 dark:border-yellow-500/40 dark:bg-yellow-500/10 dark:text-yellow-200">
+            <p className="text-sm">Please fill all 5 sections before generating the PRD document.</p>
           </div>
         )}
       </div>
 
       {/* PRD Preview Modal */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#1a1a1e] border-gray-700">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border border-border/60">
           <DialogHeader>
-            <DialogTitle className="text-white">PRD Document Preview</DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogTitle className="text-foreground">PRD Document Preview</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Review the generated PRD document. You can save it, edit manually, or regenerate.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 p-4 bg-[#1f1f23] rounded-lg border border-gray-700">
+          <div className="mt-4 p-4 bg-card/80 dark:bg-card/40 rounded-lg border border-border/60">
             {assembledPRD ? (
-              <div className="prose prose-invert max-w-none text-gray-300">
+              <div className="prose max-w-none text-foreground dark:prose-invert">
                 <ReactMarkdown>{assembledPRD}</ReactMarkdown>
               </div>
             ) : (
-              <p className="text-gray-500">No PRD content available.</p>
+              <p className="text-muted-foreground">No PRD content available.</p>
             )}
           </div>
           <DialogFooter className="flex gap-2">
@@ -1100,7 +1105,7 @@ export default function PRDNew() {
               variant="outline"
               onClick={handleRegenerate}
               disabled={isAssembling}
-              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+              className="border-border/60 text-muted-foreground hover:bg-muted/60"
             >
               <RotateCcw className="w-4 h-4 mr-2" />
               Regenerate
@@ -1108,14 +1113,14 @@ export default function PRDNew() {
             <Button
               variant="outline"
               onClick={handleEditManually}
-              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+              className="border-border/60 text-muted-foreground hover:bg-muted/60"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Manually
             </Button>
             <Button
               onClick={handleSaveAssembledPRD}
-              className="bg-purple-500 hover:bg-purple-600 text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Save className="w-4 h-4 mr-2" />
               Save as Version
@@ -1125,7 +1130,7 @@ export default function PRDNew() {
       </Dialog>
       {/* Exit confirmation dialog */}
       <AlertDialog open={showExitDialog} onOpenChange={(open) => setShowExitDialog(open)}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="max-w-md bg-card border border-border/60">
           <AlertDialogHeader>
             <AlertDialogTitle>Leave PRD builder?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -1134,13 +1139,13 @@ export default function PRDNew() {
           </AlertDialogHeader>
           {(!title || title === 'Untitled PRD') && (
             <div className="mt-3">
-              <label className="block text-sm text-gray-400 mb-1">PRD Title</label>
+              <label className="block text-sm text-muted-foreground mb-1">PRD Title</label>
               <input
                 type="text"
                 value={tempTitle}
                 onChange={(e) => setTempTitle(e.target.value)}
                 placeholder="Enter a title"
-                className="w-full bg-[#1f1f23] border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-purple-500"
+                className="w-full bg-card/80 dark:bg-card/40 border border-border/60 rounded px-3 py-2 text-sm outline-none focus:border-primary"
               />
               {exitError && <p className="text-xs text-red-400 mt-1">{exitError}</p>}
             </div>
@@ -1148,7 +1153,7 @@ export default function PRDNew() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setShowExitDialog(false)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-gray-800 hover:bg-gray-700"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
               onClick={async () => {
                 try {
                   if (prdId) {

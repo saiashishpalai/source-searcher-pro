@@ -140,7 +140,7 @@ export default function PRDViewer() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-400">Loading PRD...</div>
+        <div className="text-muted-foreground">Loading PRD...</div>
       </div>
     );
   }
@@ -148,7 +148,7 @@ export default function PRDViewer() {
   if (error || !prd) {
     return (
       <div className="p-6">
-        <div className="text-red-400 mb-4">{error || 'PRD not found'}</div>
+        <div className="text-destructive mb-4">{error || 'PRD not found'}</div>
         <Button onClick={() => navigate('/prds')} variant="outline">Back to PRDs</Button>
       </div>
     );
@@ -161,18 +161,23 @@ export default function PRDViewer() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0f0f11] text-white p-6">
+    <div className="min-h-screen bg-background text-foreground p-6 transition-colors">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button onClick={() => navigate('/prds')} variant="ghost" size="sm">
+            <Button
+              onClick={() => navigate('/prds')}
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-semibold text-white">{prd.title}</h1>
-              <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
+              <h1 className="text-2xl font-semibold text-foreground">{prd.title}</h1>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
                 <span>Version {prd.version}</span>
                 <span>•</span>
                 <span className="capitalize">{prd.status}</span>
@@ -186,24 +191,29 @@ export default function PRDViewer() {
               onClick={handleCopy}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-border/60 text-muted-foreground hover:bg-muted/60"
             >
-              {copied ? 'Copied!' : <><Copy className="w-4 h-4" /> Copy</>}
+              {copied ? (
+                'Copied!'
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" /> Copy
+                </>
+              )}
             </Button>
             <Button
               onClick={handleDownload}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-border/60 text-muted-foreground hover:bg-muted/60"
             >
               <Download className="w-4 h-4" /> Download
             </Button>
             <Button
               onClick={handleCreateVersion}
               disabled={creatingVersion}
-              variant="default"
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <GitBranch className="w-4 h-4" />
               {creatingVersion ? 'Creating...' : 'New Version'}
@@ -213,24 +223,25 @@ export default function PRDViewer() {
 
         {/* Versions List */}
         {versions.length > 1 && (
-          <div className="mb-6 p-4 bg-[#1f1f23] rounded-lg border border-gray-700">
+          <div className="mb-6 p-4 bg-card border border-border/60 rounded-lg">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-300">Versions</h3>
+              <h3 className="text-sm font-medium text-foreground">Versions</h3>
               <Button
                 onClick={() => setCompareMode(!compareMode)}
                 variant="ghost"
                 size="sm"
+                className="text-primary hover:text-primary/80"
               >
                 {compareMode ? 'Cancel' : 'Compare Versions'}
               </Button>
             </div>
             {compareMode ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <select
                     value={selectedVersions.v1 || ''}
                     onChange={(e) => setSelectedVersions({ ...selectedVersions, v1: e.target.value })}
-                    className="bg-[#0f0f11] border border-gray-700 rounded px-3 py-2 text-white"
+                    className="bg-card/80 dark:bg-card/40 border border-border/60 rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
                   >
                     <option value="">Select version 1</option>
                     {versions.map(v => (
@@ -240,7 +251,7 @@ export default function PRDViewer() {
                   <select
                     value={selectedVersions.v2 || ''}
                     onChange={(e) => setSelectedVersions({ ...selectedVersions, v2: e.target.value })}
-                    className="bg-[#0f0f11] border border-gray-700 rounded px-3 py-2 text-white"
+                    className="bg-card/80 dark:bg-card/40 border border-border/60 rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
                   >
                     <option value="">Select version 2</option>
                     {versions.map(v => (
@@ -252,6 +263,7 @@ export default function PRDViewer() {
                   onClick={handleCompare}
                   disabled={!selectedVersions.v1 || !selectedVersions.v2}
                   size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50"
                 >
                   Compare
                 </Button>
@@ -264,6 +276,7 @@ export default function PRDViewer() {
                     onClick={() => navigate(`/prd/${v.id}`)}
                     variant={v.id === id ? 'default' : 'outline'}
                     size="sm"
+                    className={v.id === id ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'border-border/60 text-muted-foreground hover:bg-muted/60'}
                   >
                     v{v.version}
                   </Button>
@@ -275,21 +288,21 @@ export default function PRDViewer() {
 
         {/* PRD Content */}
         <div className="space-y-6">
-          {Object.entries(sectionLabels).map(([id, label]) => {
-            const section = sectionMap[id];
+          {Object.entries(sectionLabels).map(([sectionId, label]) => {
+            const section = sectionMap[sectionId];
             if (!section) return null;
 
             return (
-              <div key={id} className="bg-[#1f1f23] rounded-lg p-6 border border-gray-700">
-                <h2 className="text-xl font-semibold text-white mb-4">{label}</h2>
-                <div className="prose prose-invert max-w-none">
+              <div key={sectionId} className="bg-card border border-border/60 rounded-lg p-6">
+                <h2 className="text-xl font-semibold text-foreground mb-4">{label}</h2>
+                <div className="prose max-w-none text-foreground dark:prose-invert">
                   <ReactMarkdown
                     components={{
-                      p: ({ node, ...props }) => <p className="text-gray-300 leading-relaxed mb-4" {...props} />,
-                      strong: ({ node, ...props }) => <strong className="text-white font-semibold" {...props} />,
-                      ul: ({ node, ...props }) => <ul className="list-disc ml-6 space-y-2 text-gray-300" {...props} />,
-                      ol: ({ node, ...props }) => <ol className="list-decimal ml-6 space-y-2 text-gray-300" {...props} />,
-                      li: ({ node, ...props }) => <li className="text-gray-300" {...props} />,
+                      p: ({ node, ...props }) => <p className="leading-relaxed mb-4 text-muted-foreground" {...props} />,
+                      strong: ({ node, ...props }) => <strong className="font-semibold text-foreground" {...props} />, 
+                      ul: ({ node, ...props }) => <ul className="list-disc ml-6 space-y-2 text-muted-foreground" {...props} />, 
+                      ol: ({ node, ...props }) => <ol className="list-decimal ml-6 space-y-2 text-muted-foreground" {...props} />, 
+                      li: ({ node, ...props }) => <li className="text-muted-foreground" {...props} />, 
                     }}
                   >
                     {section.content}

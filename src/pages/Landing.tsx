@@ -4,6 +4,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 import SEO from "@/components/SEO";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Landing = () => {
   const { user, loading } = useAuth();
@@ -19,8 +20,8 @@ const Landing = () => {
   // Show loading while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen bg-background text-foreground dark:bg-black dark:text-white flex items-center justify-center transition-colors">
+        <div className="text-foreground dark:text-white">Loading...</div>
       </div>
     );
   }
@@ -37,20 +38,23 @@ const Landing = () => {
         url="https://source-searcher-pro.vercel.app/"
         image="https://source-searcher-pro.vercel.app/main_preview.jpg"
       />
-      <div className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden">
+      <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-hidden transition-colors">
       {/* Radial gradient overlay from center */}
-      <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-radial from-primary/10 via-transparent to-transparent dark:from-[#1a0a2e]/40 dark:via-black dark:to-black pointer-events-none transition-colors" />
       
       {/* Soft purple glow accents */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-fuchsia-600/15 rounded-full blur-[128px]" />
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary/20 dark:bg-purple-600/20 rounded-full blur-[128px] transition-colors" />
+        <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-accent/25 dark:bg-fuchsia-600/15 rounded-full blur-[128px] transition-colors" />
       </div>
 
       {/* Header with Logo */}
       <header className="p-6 relative z-10">
-        <div className="text-2xl font-bold text-white animate-fade-in">
-          Haven7
+        <div className="flex items-center justify-between">
+          <div className="text-2xl font-bold text-foreground animate-fade-in">
+            Haven7
+          </div>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -63,7 +67,7 @@ const Landing = () => {
           </h1>
           
           {/* Subheadline */}
-          <p className="text-xl md:text-2xl text-gray-300 mb-12 leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <p className="text-xl md:text-2xl text-muted-foreground mb-12 leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             AI-powered search across Slack, Notion, and Google Drive. Find what you need without switching apps.
           </p>
           
@@ -78,7 +82,7 @@ const Landing = () => {
               
               {/* Button content */}
               <span className="relative flex items-center gap-3">
-                <Sparkles className="w-5 h-5 animate-pulse" />
+            <Sparkles className="w-5 h-5 animate-pulse" />
                 Get Early Access
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
               </span>
@@ -89,7 +93,7 @@ const Landing = () => {
           </div>
           
           {/* Additional CTA hint */}
-          <p className="text-sm text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+          <p className="text-sm text-muted-foreground mt-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
             Join 500+ product managers already using Haven7
           </p>
         </div>
@@ -97,7 +101,7 @@ const Landing = () => {
 
       {/* Footer */}
       <footer className="p-6 relative z-10">
-        <div className="text-center text-gray-400 animate-fade-in" style={{ animationDelay: '0.8s' }}>
+        <div className="text-center text-muted-foreground animate-fade-in" style={{ animationDelay: '0.8s' }}>
           Built for Product Managers
         </div>
       </footer>

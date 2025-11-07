@@ -274,14 +274,18 @@ export default function PRDView() {
     return titles[sectionId] || sectionId;
   };
 
-  if (!prd) return <div className="min-h-screen bg-[#0f0f11] text-white p-8">Loading...</div>;
+  if (!prd) return <div className="min-h-screen bg-background text-foreground p-8 transition-colors">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-[#0f0f11] text-white">
-      <div className="border-b border-gray-800 bg-[#1f1f23] sticky top-0 z-10">
+    <div className="min-h-screen bg-background text-foreground transition-colors">
+      <div className="border-b border-border/60 bg-card/80 dark:bg-card/60 sticky top-0 z-10 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/prds')} className="text-gray-400 hover:text-white">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/prds')}
+              className="text-muted-foreground hover:text-foreground"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               All PRDs
             </Button>
@@ -289,15 +293,15 @@ export default function PRDView() {
           </div>
           {isEditing ? (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={handleCancel} className="text-gray-400 hover:text-white">
+              <Button variant="ghost" onClick={handleCancel} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4 mr-2" /> Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="bg-purple-500 hover:bg-purple-600 text-white">
+              <Button onClick={handleSave} disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : `Save as v${prd.version + 1}`}
               </Button>
             </div>
           ) : (
-            <Button onClick={handleEdit} className="bg-purple-500 hover:bg-purple-600 text-white">
+            <Button onClick={handleEdit} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Edit className="w-4 h-4 mr-2" /> Edit
             </Button>
           )}
@@ -307,12 +311,16 @@ export default function PRDView() {
       <div className="max-w-5xl mx-auto px-8 py-8">
         <div className="flex items-center justify-between mb-8 p-6 bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl hover:bg-card/80 transition-all duration-300">
           <div className="flex items-center gap-3">
-            <Clock className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-400">{isEditing ? `Editing v${prd.version}...` : `v${prd.version} • Updated ${new Date(prd.updated_at).toLocaleDateString()}`}</span>
-            {prd.change_summary && !isEditing && (<span className="text-sm text-gray-500">• {prd.change_summary}</span>)}
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">{isEditing ? `Editing v${prd.version}...` : `v${prd.version} • Updated ${new Date(prd.updated_at).toLocaleDateString()}`}</span>
+            {prd.change_summary && !isEditing && (<span className="text-sm text-muted-foreground/80">• {prd.change_summary}</span>)}
           </div>
           {!isEditing && (
-            <Button variant="ghost" onClick={() => setShowVersionHistory(!showVersionHistory)} className="text-purple-400 hover:text-purple-300">
+            <Button
+              variant="ghost"
+              onClick={() => setShowVersionHistory(!showVersionHistory)}
+              className="text-primary hover:text-primary/80"
+            >
               Version History {showVersionHistory ? '▲' : '▼'}
             </Button>
           )}
@@ -494,12 +502,46 @@ export default function PRDView() {
 
         {!isEditing && (
           <div className="mt-8 flex gap-4">
-            <Button onClick={copyMarkdown} variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1f1f23] transition-colors">
-              {copiedMarkdown ? (<><Check className="w-4 h-4 mr-2 text-green-500" />Copied</>) : (<><Copy className="w-4 h-4 mr-2" />Copy Markdown</>)}
+            <Button
+              onClick={copyMarkdown}
+              variant="outline"
+              className="border-border/60 text-muted-foreground hover:bg-muted/60 transition-colors"
+            >
+              {copiedMarkdown ? (
+                <>
+                  <Check className="w-4 h-4 mr-2 text-emerald-500" />Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 mr-2" />Copy Markdown
+                </>
+              )}
             </Button>
-            <Button onClick={downloadMarkdown} variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1f1f23]"><Download className="w-4 h-4 mr-2" />Download</Button>
-            <Button onClick={async () => { await navigator.clipboard.writeText(window.location.href); setCopiedLink(true); setTimeout(() => setCopiedLink(false), 1500); }} variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1f1f23] transition-colors">
-              {copiedLink ? (<><Check className="w-4 h-4 mr-2 text-green-500" />Link Copied</>) : (<><Share className="w-4 h-4 mr-2" />Share Link</>)}
+            <Button
+              onClick={downloadMarkdown}
+              variant="outline"
+              className="border-border/60 text-muted-foreground hover:bg-muted/60"
+            >
+              <Download className="w-4 h-4 mr-2" />Download
+            </Button>
+            <Button
+              onClick={async () => {
+                await navigator.clipboard.writeText(window.location.href);
+                setCopiedLink(true);
+                setTimeout(() => setCopiedLink(false), 1500);
+              }}
+              variant="outline"
+              className="border-border/60 text-muted-foreground hover:bg-muted/60 transition-colors"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-4 h-4 mr-2 text-emerald-500" />Link Copied
+                </>
+              ) : (
+                <>
+                  <Share className="w-4 h-4 mr-2" />Share Link
+                </>
+              )}
             </Button>
           </div>
         )}

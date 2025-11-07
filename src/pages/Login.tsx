@@ -5,11 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Mail, Lock, CheckCircle, Loader2, ArrowLeft, LogIn } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Loader2, ArrowLeft, LogIn } from 'lucide-react';
 import { ApiClient } from '@/lib/api-client';
 import authBg7 from '@/assets/auth-bg-7.png';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -74,11 +73,14 @@ const Login = () => {
   };
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="relative flex h-screen bg-background text-foreground dark:bg-black dark:text-white transition-colors">
+      <div className="absolute top-6 right-6 z-30">
+        <ThemeToggle />
+      </div>
       {/* Left side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
         {/* Radial gradient overlay from center */}
-        <div className="absolute inset-0 bg-gradient-radial from-[#1a0a2e]/40 via-black to-black pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-radial from-primary/10 via-transparent to-transparent dark:from-[#1a0a2e]/40 dark:via-black dark:to-black pointer-events-none transition-colors" />
         
         {/* Soft purple glow accents */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -89,7 +91,7 @@ const Login = () => {
         <div className="w-full max-w-md relative z-20">
           {/* Back to Haven7 */}
           <div className="mb-8 animate-fade-in">
-            <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition">
+            <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white transition">
               <ArrowLeft className="w-4 h-4" />
               Back to Haven7
             </Link>
@@ -97,10 +99,10 @@ const Login = () => {
 
           {/* Heading */}
           <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+            <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-3 bg-gradient-to-r from-primary to-accent/80 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
               Sign In
             </h1>
-            <p className="text-gray-400 text-base">
+            <p className="text-muted-foreground text-base">
               Welcome back! Sign in to continue
             </p>
           </div>
@@ -108,9 +110,9 @@ const Login = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-              <Label className="block text-sm text-gray-300 mb-2" htmlFor="email">Email Address</Label>
+              <Label className="block text-sm text-muted-foreground dark:text-gray-300 mb-2" htmlFor="email">Email Address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground/80 dark:text-gray-500" />
                 <Input
                   id="email"
                   name="email"
@@ -118,16 +120,16 @@ const Login = () => {
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="Enter your email"
-                  className="pl-10 pr-4 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  className="pl-10 pr-4 bg-card/80 dark:bg-white/5 border border-border/60 dark:border-gray-800/50 rounded-xl py-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-accent/10 dark:focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
                   required
                 />
               </div>
             </div>
 
             <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-              <Label className="block text-sm text-gray-300 mb-2" htmlFor="password">Password</Label>
+              <Label className="block text-sm text-muted-foreground dark:text-gray-300 mb-2" htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground/80 dark:text-gray-500" />
                 <Input
                   id="password"
                   name="password"
@@ -135,14 +137,14 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Enter your password"
-                  className="pl-10 pr-12 bg-white/5 border border-gray-800/50 rounded-xl py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
+                  className="pl-10 pr-12 bg-card/80 dark:bg-white/5 border border-border/60 dark:border-gray-800/50 rounded-xl py-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-500 focus:outline-none focus:border-[#A855F7] focus:bg-accent/10 dark:focus:bg-white/10 transition-all duration-200 placeholder:pl-0"
                   required
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                  className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label="Toggle password visibility"
                 >
@@ -153,11 +155,11 @@ const Login = () => {
 
             {/* Remember me + Forgot password */}
             <div className="flex items-center justify-between animate-fade-in" style={{ animationDelay: '0.8s' }}>
-              <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                <input type="checkbox" className="rounded border-gray-700" />
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <input type="checkbox" className="rounded border-border dark:border-gray-700" />
                 Remember me
               </label>
-              <Link to="/forgot-password" className="text-sm text-[#A855F7] hover:text-purple-400">
+              <Link to="/forgot-password" className="text-sm text-primary hover:text-primary/80">
                 Forgot password?
               </Link>
             </div>
@@ -184,15 +186,15 @@ const Login = () => {
           </form>
 
           {/* Sign up link */}
-          <p className="text-center text-gray-400 mt-6 animate-fade-in" style={{ animationDelay: '1.2s' }}>
+          <p className="text-center text-muted-foreground mt-6 animate-fade-in" style={{ animationDelay: '1.2s' }}>
             Don't have an account?{' '}
-            <Link to="/signup" className="text-[#A855F7] hover:text-purple-400">
+            <Link to="/signup" className="text-primary hover:text-primary/80">
               Create one
             </Link>
           </p>
 
           {/* Footer text */}
-          <p className="text-xs text-gray-600 mt-8 text-center animate-fade-in" style={{ animationDelay: '1.4s' }}>
+          <p className="text-xs text-muted-foreground mt-8 text-center animate-fade-in" style={{ animationDelay: '1.4s' }}>
             Secure authentication powered by Haven7
           </p>
         </div>
@@ -209,7 +211,7 @@ const Login = () => {
         />
         
         {/* Overlay for better text contrast */}
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-white/60 dark:bg-black/20 transition-colors" />
       </div>
     </div>
   );

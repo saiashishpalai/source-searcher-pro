@@ -6,6 +6,72 @@
 
 @layer base {
   :root {
+    /* Light theme base colors */
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+
+    /* Card and surface colors */
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+
+    /* Primary - elegant violet */
+    --primary: 262 83% 60%;
+    --primary-foreground: 210 20% 98%;
+
+    /* Secondary - elevated surface */
+    --secondary: 264 100% 96%;
+    --secondary-foreground: 249 43% 32%;
+
+    /* Muted surfaces */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent - soft purple/lavender */
+    --accent: 270 85% 92%;
+    --accent-foreground: 249 43% 32%;
+
+    /* Destructive colors */
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 210 20% 98%;
+
+    /* Borders and inputs */
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 262 83% 60%;
+
+    /* Brand colors for integrations */
+    --slack-purple: 261 64% 58%;
+    --google-blue: 217 91% 60%;
+    --notion-gray: 0 0% 45%;
+
+    /* Gradients and effects */
+    --gradient-dark: linear-gradient(135deg, hsl(0 0% 100%), hsl(220 13% 92%));
+    --gradient-elegant: linear-gradient(135deg, hsl(262 83% 60% / 0.08), hsl(270 85% 72% / 0.04));
+    --gradient-search: linear-gradient(135deg, hsl(262 83% 60% / 0.12), hsl(270 85% 75% / 0.05));
+    --glow-primary: 0 0 30px hsl(262 83% 60% / 0.25);
+    --glow-accent: 0 0 20px hsl(270 85% 72% / 0.2);
+    --shadow-elegant: 0 12px 32px hsl(220 13% 50% / 0.12);
+
+    /* Animations */
+    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-search: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
     /* Dark theme base colors */
     --background: 220 13% 8%;
     --foreground: 210 20% 98%;
@@ -61,20 +127,13 @@
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
+    --sidebar-background: 223 13% 10%;
+    --sidebar-foreground: 210 20% 96%;
+    --sidebar-primary: 262 83% 70%;
+    --sidebar-primary-foreground: 220 13% 8%;
+    --sidebar-accent: 262 83% 16%;
+    --sidebar-accent-foreground: 210 20% 96%;
+    --sidebar-border: 220 13% 24%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }

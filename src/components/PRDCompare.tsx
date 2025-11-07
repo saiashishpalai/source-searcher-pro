@@ -54,7 +54,7 @@ export default function PRDCompare() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-400">Loading PRDs...</div>
+        <div className="text-muted-foreground">Loading PRDs...</div>
       </div>
     );
   }
@@ -62,25 +62,29 @@ export default function PRDCompare() {
   if (error || !prd1 || !prd2) {
     return (
       <div className="p-6">
-        <div className="text-red-400 mb-4">{error || 'Failed to load PRDs'}</div>
+        <div className="text-destructive mb-4">{error || 'Failed to load PRDs'}</div>
         <Button onClick={() => navigate('/prds')} variant="outline">Back to PRDs</Button>
       </div>
     );
   }
-
   return (
-    <div className="min-h-screen bg-[#0f0f11] text-white p-6">
+    <div className="min-h-screen bg-background text-foreground p-6 transition-colors">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button onClick={() => navigate(`/prd/${id1}`)} variant="ghost" size="sm">
+            <Button
+              onClick={() => navigate(`/prd/${id1}`)}
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-semibold text-white">Compare Versions</h1>
-              <div className="text-sm text-gray-400 mt-1">
+              <h1 className="text-2xl font-semibold text-foreground">Compare Versions</h1>
+              <div className="text-sm text-muted-foreground mt-1">
                 {prd1.title} - v{prd1.version} vs v{prd2.version}
               </div>
             </div>
@@ -88,12 +92,12 @@ export default function PRDCompare() {
         </div>
 
         {/* Comparison Table */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Version 1 */}
-          <div className="bg-[#1f1f23] rounded-lg p-4 border border-gray-700">
-            <div className="mb-4 pb-3 border-b border-gray-700">
-              <h2 className="text-lg font-semibold text-white">Version {prd1.version}</h2>
-              <div className="text-sm text-gray-400">
+          <div className="bg-card border border-border/60 rounded-lg p-4">
+            <div className="mb-4 pb-3 border-b border-border/60">
+              <h2 className="text-lg font-semibold text-foreground">Version {prd1.version}</h2>
+              <div className="text-sm text-muted-foreground">
                 {new Date(prd1.updated_at).toLocaleDateString()} • {prd1.status}
               </div>
             </div>
@@ -101,10 +105,10 @@ export default function PRDCompare() {
               {Object.entries(sectionLabels).map(([id, label]) => {
                 const content = getSectionContent(prd1, id);
                 return (
-                  <div key={id} className="border-b border-gray-800 pb-3 last:border-0">
-                    <h3 className="text-sm font-medium text-gray-300 mb-2">{label}</h3>
-                    <div className="text-sm text-gray-400 whitespace-pre-wrap">
-                      {content || <span className="text-gray-600">No content</span>}
+                  <div key={id} className="border-b border-border/40 pb-3 last:border-0">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">{label}</h3>
+                    <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {content || <span className="text-muted-foreground/60">No content</span>}
                     </div>
                   </div>
                 );
@@ -113,32 +117,31 @@ export default function PRDCompare() {
           </div>
 
           {/* Version 2 */}
-          <div className="bg-[#1f1f23] rounded-lg p-4 border border-gray-700">
-            <div className="mb-4 pb-3 border-b border-gray-700">
-              <h2 className="text-lg font-semibold text-white">Version {prd2.version}</h2>
-              <div className="text-sm text-gray-400">
+          <div className="bg-card border border-border/60 rounded-lg p-4">
+            <div className="mb-4 pb-3 border-b border-border/60">
+              <h2 className="text-lg font-semibold text-foreground">Version {prd2.version}</h2>
+              <div className="text-sm text-muted-foreground">
                 {new Date(prd2.updated_at).toLocaleDateString()} • {prd2.status}
               </div>
             </div>
             <div className="space-y-4">
               {Object.entries(sectionLabels).map(([id, label]) => {
                 const content = getSectionContent(prd2, id);
-                const content1 = getSectionContent(prd1, id);
                 const sectionDiff = diff?.[id];
                 const isDifferent = sectionDiff && sectionDiff.type !== 'unchanged';
-                
+
                 return (
-                  <div key={id} className="border-b border-gray-800 pb-3 last:border-0">
-                    <h3 className="text-sm font-medium text-gray-300 mb-2">
+                  <div key={id} className="border-b border-border/40 pb-3 last:border-0">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">
                       {label}
                       {isDifferent && (
-                        <span className="ml-2 text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-500">
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-600 dark:text-yellow-400">
                           {sectionDiff.type === 'added' ? 'Added' : sectionDiff.type === 'removed' ? 'Removed' : 'Modified'}
                         </span>
                       )}
                     </h3>
-                    <div className={`text-sm whitespace-pre-wrap ${isDifferent ? 'bg-yellow-500/10 p-2 rounded border border-yellow-500/30' : 'text-gray-400'}`}>
-                      {content || <span className="text-gray-600">No content</span>}
+                    <div className={`text-sm whitespace-pre-wrap ${isDifferent ? 'bg-yellow-500/10 p-2 rounded border border-yellow-500/30' : 'text-muted-foreground'}`}>
+                      {content || <span className="text-muted-foreground/60">No content</span>}
                     </div>
                   </div>
                 );
