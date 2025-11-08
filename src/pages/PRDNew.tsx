@@ -895,9 +895,12 @@ export default function PRDNew() {
     if (currentStep > 0) setCurrentStep(s => s - 1);
   };
   const heroContent = (
-    <div className="relative min-h-screen overflow-hidden bg-[#050509] text-white">
+    <div
+      className="relative min-h-screen overflow-hidden bg-[#050509] text-white bg-cover bg-center"
+      style={{ backgroundImage: "url('/prd_bg.png')" }}
+    >
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#181124] via-[#050509] to-[#050509]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#181124] via-[#050509]/85 to-[#050509]" />
         <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#7c5cff] via-[#2f1d66] to-transparent opacity-60 blur-[160px]" />
         <div className="absolute bottom-[-160px] right-[-120px] h-[380px] w-[380px] rounded-full bg-gradient-to-br from-[#0d1726] via-[#2d3a5f] to-transparent opacity-60 blur-[180px]" />
       </div>
