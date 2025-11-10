@@ -1203,7 +1203,7 @@ export default function PRDNew() {
             <div className="grid grid-cols-1 gap-8 text-left md:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
                 <p className="text-sm uppercase tracking-[0.35em] text-white/40">Structured Flow</p>
-                <h3 className="mt-4 text-lg font-medium text-white">Guided 5-step input</h3>
+                <h3 className="mt-4 text-lg font-medium text-white">Guided 7-step input</h3>
                 <p className="mt-3 text-sm leading-relaxed text-white/60">
                   Move through essential prompts that frame intent, context, and conviction—without noise.
                 </p>
@@ -1216,10 +1216,10 @@ export default function PRDNew() {
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                <p className="text-sm uppercase tracking-[0.35em] text-white/40">Refinement Loop</p>
-                <h3 className="mt-4 text-lg font-medium text-white">Collaborate, critique, improve</h3>
+                <p className="text-sm uppercase tracking-[0.35em] text-white/40">Integrated Context</p>
+                <h3 className="mt-4 text-lg font-medium text-white">Grounded in your workspace</h3>
                 <p className="mt-3 text-sm leading-relaxed text-white/60">
-                  Iterate with your team, capture citations, and evolve drafts into crisp, shareable conviction.
+                  Pull source material from Google Drive, Notion, and Slack so every draft stays tied to the docs your team already trusts.
                 </p>
               </div>
             </div>
