@@ -1762,10 +1762,12 @@ app.post('/api/prd/assemble', async (req, res) => {
     const result = await prdAssemblyService.generateFinalPRD({
       sections: {
         objective: sections.objective || '',
+        background: sections.background || '',
         scope: sections.scope || '',
+        requirements: sections.requirements || '',
         metrics: sections.metrics || '',
-        dependencies: sections.dependencies || '',
-        timeline: sections.timeline || ''
+        timeline: sections.timeline || '',
+        dependencies: sections.dependencies || ''
       },
       citations: citationContents,
       supabaseAdmin,
@@ -1783,6 +1785,8 @@ app.post('/api/prd/assemble', async (req, res) => {
 
     res.json({
       prd_text: result.prd_text,
+      structured_sections: result.structured_sections,
+      summary: result.summary,
       citations_used: result.citations_used
     });
 

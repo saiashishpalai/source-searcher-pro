@@ -86,7 +86,24 @@ export class ApiClient {
     return this.post('/api/prd/sections/suggest', { prd_version_id: prdVersionId, section_id: sectionId, user_text: userText, chunk_ids: chunkIds || [] });
   }
 
-  static async assemblePRD(prdVersionId: string, sections: { objective?: string; scope?: string; metrics?: string; dependencies?: string; timeline?: string }, citations?: string[]): Promise<{ prd_text: string; citations_used: string[] }> {
+  static async assemblePRD(
+    prdVersionId: string,
+    sections: {
+      objective?: string;
+      background?: string;
+      scope?: string;
+      requirements?: string;
+      metrics?: string;
+      dependencies?: string;
+      timeline?: string;
+    },
+    citations?: string[]
+  ): Promise<{
+    prd_text: string;
+    structured_sections?: any[];
+    summary?: any;
+    citations_used: string[];
+  }> {
     return this.post('/api/prd/assemble', { 
       prd_version_id: prdVersionId, 
       sections, 
