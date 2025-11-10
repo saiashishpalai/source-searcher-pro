@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings, Clock, Folder, ChevronRight, ChevronLeft, Menu } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings, Clock, Folder, ChevronRight, ChevronLeft, Menu, ShieldCheck, AlertTriangle, HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -33,16 +33,197 @@ import {
 } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import nlp from 'compromise';
+import { cn } from '@/lib/utils';
 
-type SectionId = 'objective' | 'scope' | 'metrics' | 'dependencies' | 'timeline';
+type SectionId =
+  | 'objective'
+  | 'background'
+  | 'scope'
+  | 'requirements'
+  | 'metrics'
+  | 'dependencies'
+  | 'timeline';
 
 const PRD_QUESTIONS: Array<{ id: SectionId; question: string; placeholder: string; contextQuery: string }> = [
-  { id: 'objective', question: 'What problem are you solving?', placeholder: 'Describe the user pain point and why it matters...', contextQuery: 'problem goal objective issue pain point' },
-  { id: 'scope', question: 'What is in scope vs. out of scope?', placeholder: 'Define clear boundaries:\n\nIn scope:\n- Feature A\n- Feature B\n\nOut of scope:\n- Feature C', contextQuery: 'scope MVP requirements features excluded' },
-  { id: 'metrics', question: 'How will you measure success?', placeholder: 'List quantifiable KPIs:\n- Metric 1: Target value\n- Metric 2: Target value', contextQuery: 'KPI metric goal target success measurement' },
-  { id: 'dependencies', question: 'What dependencies or constraints exist?', placeholder: 'Technical or organizational blockers:\n- Depends on X\n- Blocked by Y\n- Constraint Z', contextQuery: 'integration depends on compatibility blocked constraint' },
-  { id: 'timeline', question: 'What is the timeline?', placeholder: 'Key milestones:\n- Week 1: X\n- Week 4: Y\n- Week 8: Launch', contextQuery: 'milestone release timeline deadline launch' }
+  {
+    id: 'objective',
+    question: 'What problem are you solving?',
+    placeholder: 'Describe the user pain point and why it matters...',
+    contextQuery: 'problem goal objective issue pain point',
+  },
+  {
+    id: 'background',
+    question: 'What context or history is important?',
+    placeholder: 'Share relevant context:\n- Origin story or trigger\n- Prior attempts\n- Customer feedback or data points',
+    contextQuery: 'background history rationale context narrative',
+  },
+  {
+    id: 'scope',
+    question: 'What is in scope vs. out of scope?',
+    placeholder:
+      'Define clear boundaries:\n\nIn scope:\n- Feature A\n- Feature B\n\nOut of scope:\n- Feature C',
+    contextQuery: 'scope MVP requirements features excluded',
+  },
+  {
+    id: 'requirements',
+    question: 'What must this solution deliver?',
+    placeholder:
+      'Outline functional or experience needs:\n- Must do X\n- Should handle Y\n- Consider Z',
+    contextQuery: 'requirement capability user story acceptance criteria',
+  },
+  {
+    id: 'metrics',
+    question: 'How will you measure success?',
+    placeholder: 'List quantifiable KPIs:\n- Metric 1: Target value\n- Metric 2: Target value',
+    contextQuery: 'KPI metric goal target success measurement',
+  },
+  {
+    id: 'dependencies',
+    question: 'What dependencies or constraints exist?',
+    placeholder:
+      'Technical or organizational blockers:\n- Depends on X\n- Blocked by Y\n- Constraint Z',
+    contextQuery: 'integration depends on compatibility blocked constraint',
+  },
+  {
+    id: 'timeline',
+    question: 'What is the timeline?',
+    placeholder: 'Key milestones:\n- Week 1: X\n- Week 4: Y\n- Week 8: Launch',
+    contextQuery: 'milestone release timeline deadline launch',
+  },
 ];
+
+type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+interface GeneratedSection {
+  number: number;
+  title: string;
+  confidence_percent: number;
+  content?: string;
+  confidence_rationale?: string;
+  needs_validation?: string[];
+  requires_input?: string[];
+  missing_context?: string;
+  context_sources?: string[];
+}
+
+interface GenerationSummary {
+  total_sections?: number;
+  complete_sections?: number;
+  needs_validation_sections?: number;
+  requires_input_sections?: number;
+  context_sources?: {
+    user_sections?: number;
+    workspace_chunks?: {
+      count?: number;
+      details?: string[];
+    };
+    best_practices_sections?: number;
+  };
+  next_steps?: string[];
+}
+
+interface AssembledPRDResult {
+  prd_text: string;
+  sections: GeneratedSection[];
+  summary?: GenerationSummary;
+}
+
+const CONFIDENCE_META: Record<
+  ConfidenceLevel,
+  {
+    label: string;
+    Icon: typeof ShieldCheck;
+    badgeClass: string;
+    containerClass: string;
+  }
+> = {
+  high: {
+    label: 'High confidence',
+    Icon: ShieldCheck,
+    badgeClass: 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+    containerClass: 'border border-emerald-500/20 bg-emerald-500/5',
+  },
+  medium: {
+    label: 'Needs validation',
+    Icon: AlertTriangle,
+    badgeClass: 'border border-amber-400/40 bg-amber-400/10 text-amber-200',
+    containerClass: 'border border-amber-400/25 bg-amber-400/5',
+  },
+  low: {
+    label: 'Requires input',
+    Icon: HelpCircle,
+    badgeClass: 'border border-rose-400/40 bg-rose-500/10 text-rose-200',
+    containerClass: 'border border-rose-400/25 bg-rose-500/5',
+  },
+};
+
+const SECTION_NUMBER_TO_ID: Partial<Record<number, SectionId>> = {
+  1: 'objective',
+  2: 'background',
+  3: 'scope',
+  4: 'requirements',
+  5: 'metrics',
+  11: 'dependencies',
+  14: 'timeline',
+};
+
+const parseSectionsFromMarkdown = (markdown: string): GeneratedSection[] => {
+  if (!markdown) return [];
+  const pattern = /\*\*(\d+)\.\s*([^*]+?)\*\*\s*\n\s*\n([\s\S]+?)(?=\n\s*\n\*\*\d+\.|$)/g;
+  const fallbackSections: GeneratedSection[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(markdown)) !== null) {
+    const number = Number(match[1]);
+    const title = match[2].trim();
+    const content = match[3].trim();
+    fallbackSections.push({
+      number,
+      title,
+      content,
+      confidence_percent: 90,
+      confidence_rationale: 'Parsed from markdown fallback.',
+      needs_validation: [],
+      requires_input: [],
+      missing_context: '',
+      context_sources: ['Markdown output'],
+    });
+  }
+
+  return fallbackSections;
+};
+
+const buildSummaryFromSections = (sections: GeneratedSection[], computeLevel: (percent: number) => ConfidenceLevel): GenerationSummary => {
+  const counts = sections.reduce(
+    (acc, section) => {
+      const level = computeLevel(section.confidence_percent ?? 0);
+      acc[level] += 1;
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0 } as Record<ConfidenceLevel, number>
+  );
+
+  const nextSteps: string[] = [];
+  if (counts.low > 0) {
+    nextSteps.push('Fill sections marked as requiring input.');
+  }
+  if (counts.medium > 0) {
+    nextSteps.push('Review sections flagged for validation.');
+  }
+
+  return {
+    total_sections: sections.length,
+    complete_sections: counts.high,
+    needs_validation_sections: counts.medium,
+    requires_input_sections: counts.low,
+    context_sources: {
+      user_sections: 0,
+      workspace_chunks: { count: 0, details: [] },
+      best_practices_sections: 0,
+    },
+    next_steps: nextSteps,
+  };
+};
 
 const HERO_PROMPT = 'Objective: Clarify the opportunity, the why, and the conviction behind it.';
 
@@ -69,7 +250,15 @@ export default function PRDNew() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('Untitled PRD');
   const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<SectionId, string>>({ objective: '', scope: '', metrics: '', dependencies: '', timeline: '' });
+  const [answers, setAnswers] = useState<Record<SectionId, string>>({
+    objective: '',
+    background: '',
+    scope: '',
+    requirements: '',
+    metrics: '',
+    dependencies: '',
+    timeline: '',
+  });
   const [prdId, setPrdId] = useState<string | null>(null);
   const [contextSuggestions, setContextSuggestions] = useState<any[]>([]);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
@@ -85,14 +274,22 @@ export default function PRDNew() {
   const [isSaving, setIsSaving] = useState(false);
   const [currentQueryHash, setCurrentQueryHash] = useState<string | null>(null);
   const [draftMode, setDraftMode] = useState<'insert' | 'replace'>('replace');
-  const [sectionCitations, setSectionCitations] = useState<Record<SectionId, string[]>>({ objective: [], scope: [], metrics: [], dependencies: [], timeline: [] });
+  const [sectionCitations, setSectionCitations] = useState<Record<SectionId, string[]>>({
+    objective: [],
+    background: [],
+    scope: [],
+    requirements: [],
+    metrics: [],
+    dependencies: [],
+    timeline: [],
+  });
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
   const [exitError, setExitError] = useState('');
-  const [assembledPRD, setAssembledPRD] = useState<string | null>(null);
+  const [assembledPRD, setAssembledPRD] = useState<AssembledPRDResult | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isAssembling, setIsAssembling] = useState(false);
   const [assemblyError, setAssemblyError] = useState<string | null>(null);
@@ -104,6 +301,51 @@ export default function PRDNew() {
   const [sidebarError, setSidebarError] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
+  const getConfidenceLevel = useCallback((percent: number): ConfidenceLevel => {
+    if (percent >= 70) return 'high';
+    if (percent >= 50) return 'medium';
+    return 'low';
+  }, []);
+
+  const handleReturnToSection = useCallback(
+    (sectionNumber: number) => {
+      const targetId = SECTION_NUMBER_TO_ID[sectionNumber];
+      if (!targetId) {
+        setShowPreviewModal(false);
+        return;
+      }
+      const targetIndex = PRD_QUESTIONS.findIndex((q) => q.id === targetId);
+      if (targetIndex >= 0) {
+        setShowPreviewModal(false);
+        setTimeout(() => {
+          setCurrentStep(targetIndex);
+        }, 0);
+      } else {
+        setShowPreviewModal(false);
+      }
+    },
+    [setShowPreviewModal, setCurrentStep]
+  );
+
+  const confidenceCounts = useMemo(() => {
+    const counts = { high: 0, medium: 0, low: 0 };
+    (assembledPRD?.sections || []).forEach((section) => {
+      const level = getConfidenceLevel(section?.confidence_percent ?? 0);
+      counts[level] += 1;
+    });
+    return counts;
+  }, [assembledPRD, getConfidenceLevel]);
+
+  const summaryComplete = assembledPRD?.summary?.complete_sections ?? confidenceCounts.high;
+  const summaryNeedsValidation =
+    assembledPRD?.summary?.needs_validation_sections ?? confidenceCounts.medium;
+  const summaryRequiresInput =
+    assembledPRD?.summary?.requires_input_sections ?? confidenceCounts.low;
+  const totalSectionsGenerated =
+    assembledPRD?.summary?.total_sections ?? (assembledPRD?.sections?.length ?? 0);
+  const summaryNextSteps = assembledPRD?.summary?.next_steps ?? [];
+  const summaryContextSources = assembledPRD?.summary?.context_sources;
 
   const loadSidebarData = useCallback(async () => {
     setIsSidebarLoading(true);
@@ -817,7 +1059,7 @@ export default function PRDNew() {
     // Note: "Complete PRD" button is now replaced by "Generate PRD Document" button
   };
 
-  // Check if all 5 sections have non-empty answers
+  // Check if all required sections have non-empty answers
   const allSectionsFilled = useMemo(() => {
     return PRD_QUESTIONS.every(q => {
       const answer = answers[q.id]?.trim();
@@ -845,7 +1087,9 @@ export default function PRDNew() {
       // Collect all sections
       const sections = {
         objective: answers.objective || '',
+        background: answers.background || '',
         scope: answers.scope || '',
+        requirements: answers.requirements || '',
         metrics: answers.metrics || '',
         dependencies: answers.dependencies || '',
         timeline: answers.timeline || ''
@@ -853,8 +1097,24 @@ export default function PRDNew() {
 
       // Call assembly API
       const result = await ApiClient.assemblePRD(prdId, sections, allCitationIds);
+      console.log('assemble result', result);
 
-      setAssembledPRD(result.prd_text);
+      let structuredSections = Array.isArray(result.structured_sections)
+        ? (result.structured_sections as GeneratedSection[])
+        : [];
+
+      if ((!structuredSections || structuredSections.length === 0) && result.prd_text) {
+        structuredSections = parseSectionsFromMarkdown(result.prd_text);
+      }
+
+      const effectiveSummary = (result.summary as GenerationSummary | undefined) ??
+        (structuredSections.length > 0 ? buildSummaryFromSections(structuredSections, getConfidenceLevel) : undefined);
+
+      setAssembledPRD({
+        prd_text: result.prd_text,
+        sections: structuredSections,
+        summary: effectiveSummary,
+      });
       setShowPreviewModal(true);
       // Success is shown in the modal, no need for separate toast
     } catch (err) {
@@ -1000,7 +1260,7 @@ export default function PRDNew() {
         <div className="mb-10 rounded-2xl border border-white/10 bg-white/[0.06] px-8 py-6 backdrop-blur">
           <div className="flex items-start gap-3 text-white/80">
             <Sparkles className="w-5 h-5 text-white/70 mt-1" />
-            <p className="leading-relaxed">Let's create your PRD. I'll guide you through five deliberate prompts and surface supporting context from your sources.</p>
+            <p className="leading-relaxed">Let's create your PRD. I'll guide you through seven deliberate prompts and surface supporting context from your sources.</p>
           </div>
         </div>
 
@@ -1285,7 +1545,7 @@ export default function PRDNew() {
 
         {currentStep === PRD_QUESTIONS.length - 1 && !allSectionsFilled && (
           <div className="mt-4 rounded-lg border border-yellow-400/40 bg-yellow-400/10 p-3 text-yellow-100">
-            <p className="text-sm">Please fill all five sections before generating the PRD document.</p>
+            <p className="text-sm">Please fill all required sections before generating the PRD document.</p>
           </div>
         )}
       </div>
@@ -1299,11 +1559,187 @@ export default function PRDNew() {
               Review the generated PRD document. You can save it, edit manually, or regenerate.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 p-4 bg-card/80 dark:bg-card/40 rounded-lg border border-border/60">
+          <div className="mt-4 space-y-6">
             {assembledPRD ? (
-              <div className="prose max-w-none text-foreground dark:prose-invert">
-                <ReactMarkdown>{assembledPRD}</ReactMarkdown>
-              </div>
+              <>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Generation summary</h3>
+                      <p className="text-sm text-white/55">
+                        {totalSectionsGenerated} sections processed · confidence snapshot below.
+                      </p>
+                    </div>
+                    <div className="grid w-full gap-3 text-sm sm:grid-cols-3 lg:w-auto">
+                      <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-emerald-100">
+                        <p className="text-xs uppercase tracking-[0.2em] text-emerald-300/70">Complete</p>
+                        <p className="text-2xl font-semibold">{summaryComplete}</p>
+                      </div>
+                      <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-amber-100">
+                        <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">
+                          Needs validation
+                        </p>
+                        <p className="text-2xl font-semibold">{summaryNeedsValidation}</p>
+                      </div>
+                      <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-rose-100">
+                        <p className="text-xs uppercase tracking-[0.2em] text-rose-200/70">Requires input</p>
+                        <p className="text-2xl font-semibold">{summaryRequiresInput}</p>
+                      </div>
+                    </div>
+                  </div>
+                  {(summaryNextSteps.length > 0 ||
+                    (summaryContextSources?.workspace_chunks?.details &&
+                      summaryContextSources.workspace_chunks.details.length > 0) ||
+                    typeof summaryContextSources?.user_sections === 'number' ||
+                    typeof summaryContextSources?.best_practices_sections === 'number') && (
+                    <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                      {summaryNextSteps.length > 0 && (
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-white/40">Next steps</p>
+                          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/70">
+                            {summaryNextSteps.map((step) => (
+                              <li key={step}>{step}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-white/40">Context sources</p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/65">
+                          {typeof summaryContextSources?.user_sections === 'number' && (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                              User sections: {summaryContextSources.user_sections}
+                            </span>
+                          )}
+                          {typeof summaryContextSources?.best_practices_sections === 'number' && (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                              Best practices referenced: {summaryContextSources.best_practices_sections}
+                            </span>
+                          )}
+                          {summaryContextSources?.workspace_chunks?.details?.map((detail) => (
+                            <span
+                              key={detail}
+                              className="rounded-full border border-white/10 bg-white/5 px-3 py-1"
+                            >
+                              {detail}
+                            </span>
+                          ))}
+                          {summaryContextSources?.workspace_chunks?.count &&
+                            (!summaryContextSources.workspace_chunks.details ||
+                              summaryContextSources.workspace_chunks.details.length === 0) && (
+                              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                                Workspace chunks: {summaryContextSources.workspace_chunks.count}
+                              </span>
+                            )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-5">
+                  {assembledPRD.sections.map((section) => {
+                    const confidencePercent = Math.round(section.confidence_percent ?? 0);
+                    const level = getConfidenceLevel(confidencePercent);
+                    const meta = CONFIDENCE_META[level];
+                    const needsValidation = section.needs_validation?.filter(Boolean) ?? [];
+                    const requiresInput = section.requires_input?.filter(Boolean) ?? [];
+                    const hasContent = Boolean(section.content && section.content.trim().length > 0);
+
+                    return (
+                      <div
+                        key={section.number}
+                        className={cn(
+                          'rounded-2xl border border-white/10 bg-white/[0.02] p-6 backdrop-blur-lg transition-all',
+                          meta.containerClass
+                        )}
+                      >
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.28em] text-white/40">
+                              Section {section.number.toString().padStart(2, '0')}
+                            </p>
+                            <h3 className="mt-2 text-xl font-semibold text-white">{section.title}</h3>
+                          </div>
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium',
+                              meta.badgeClass
+                            )}
+                          >
+                            <meta.Icon className="h-3.5 w-3.5" />
+                            {meta.label} · {confidencePercent}%
+                          </span>
+                        </div>
+
+                        {hasContent && (
+                          <div className="mt-4 prose prose-sm max-w-none text-white/85 prose-invert">
+                            <ReactMarkdown>{section.content || ''}</ReactMarkdown>
+                          </div>
+                        )}
+
+                        {level === 'medium' && needsValidation.length > 0 && (
+                          <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-amber-100">
+                            <p className="text-sm font-medium">Validate before finalizing:</p>
+                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                              {needsValidation.map((item) => (
+                                <li key={item}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {level === 'low' && (
+                          <div className="mt-4 rounded-xl border border-rose-400/40 bg-rose-500/10 p-4 text-rose-100">
+                            <p className="text-sm font-medium">This section needs clarification:</p>
+                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                              {requiresInput.length > 0 ? (
+                                requiresInput.map((item) => <li key={item}>{item}</li>)
+                              ) : (
+                                <li>Provide additional guidance for this section.</li>
+                              )}
+                            </ul>
+                            {(section.missing_context || section.confidence_rationale) && (
+                              <p className="mt-3 text-xs text-rose-100/75">
+                                {section.missing_context
+                                  ? `Context gap: ${section.missing_context}`
+                                  : section.confidence_rationale}
+                              </p>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleReturnToSection(section.number)}
+                              className="mt-4 border border-rose-400/40 text-rose-100 hover:bg-rose-500/20 hover:text-rose-50"
+                            >
+                              Return to builder
+                            </Button>
+                          </div>
+                        )}
+
+                        {level !== 'low' && section.confidence_rationale && (
+                          <p className="mt-4 text-xs text-white/45">
+                            Why this confidence: {section.confidence_rationale}
+                          </p>
+                        )}
+
+                        {section.context_sources && section.context_sources.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {section.context_sources.map((source) => (
+                              <span
+                                key={`${section.number}-${source}`}
+                                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/65"
+                              >
+                                {source}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             ) : (
               <p className="text-muted-foreground">No PRD content available.</p>
             )}

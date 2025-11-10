@@ -84,7 +84,7 @@ export default function PRDView() {
     };
 
     // Try to parse by numbered sections: **1. Objective**
-    const sectionPattern = /\*\*(\d+)\.\s*([^*]+?)\*\*\s*\n\n([^*]+?)(?=\n\n\*\*\d+\.|$)/gs;
+    const sectionPattern = /\*\*(\d+)\.\s*([^*]+?)\*\*\s*\n\s*\n([\s\S]+?)(?=\n\s*\n\*\*\d+\.|$)/g;
     let match;
     while ((match = sectionPattern.exec(text)) !== null) {
       const sectionNum = parseInt(match[1]);
@@ -115,7 +115,7 @@ export default function PRDView() {
     for (const [id, keywords] of Object.entries(titleKeywords)) {
       if (!sections[id]) {
         for (const keyword of keywords) {
-          const regex = new RegExp(`\\*\\*[^\\*]*${keyword}[^\\*]*\\*\\*\\s*\\n\\n([^*]+?)(?=\\n\\n\\*\\*|$)`, 'is');
+          const regex = new RegExp(`\\*\\*[^\\*]*${keyword}[^\\*]*\\*\\*\\s*\\n\\s*\\n([\\s\\S]+?)(?=\\n\\s*\\n\\*\\*|$)`, 'i');
           const match = text.match(regex);
           if (match) {
             sections[id] = match[1].trim();
