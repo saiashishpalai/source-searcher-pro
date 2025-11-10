@@ -374,6 +374,49 @@
   }
 }
 
+@keyframes flowPulse {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(300%);
+    opacity: 0;
+  }
+}
+
+@keyframes orbitGlow {
+  0% {
+    transform: rotate(0deg);
+    box-shadow: 0 0 30px rgba(106, 90, 205, 0.35);
+  }
+  50% {
+    transform: rotate(180deg);
+    box-shadow: 0 0 45px rgba(79, 70, 229, 0.45);
+  }
+  100% {
+    transform: rotate(360deg);
+    box-shadow: 0 0 30px rgba(106, 90, 205, 0.35);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
 /* Subtle continuous animations for brand elements */
 .animate-subtle-glow {
   animation: subtleGlow 4s ease-in-out infinite;

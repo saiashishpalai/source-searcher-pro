@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings, Clock, Folder, ChevronRight, ChevronLeft, Menu, ShieldCheck, AlertTriangle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings, Clock, Folder, ChevronRight, ChevronLeft, Menu, ShieldCheck, AlertTriangle, HelpCircle, Check } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -245,6 +245,148 @@ interface PRDGroupSummary {
   totalVersions: number;
   updatedAt: string | null;
 }
+
+const NotionIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.033-.793c1.635-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.747.934 1.213v16.378c0 1.026-.373 1.635-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.68-1.632z"
+    />
+  </svg>
+);
+
+const SlackIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 122.8 122.8"
+    className={className}
+  >
+    <path
+      fill="#36C5F0"
+      d="M30.3 77.7c0 5.6-4.6 10.2-10.2 10.2S10 83.3 10 77.7s4.6-10.2 10.2-10.2h10.1v10.2zm5.1 0c0-5.6 4.6-10.2 10.2-10.2s10.2 4.6 10.2 10.2v25.1c0 5.6-4.6 10.2-10.2 10.2s-10.2-4.6-10.2-10.2V77.7z"
+    />
+    <path
+      fill="#2EB67D"
+      d="M45.6 30.3c-5.6 0-10.2-4.6-10.2-10.2S40 10 45.6 10s10.2 4.6 10.2 10.2v10.1H45.6zm0 5.1c5.6 0 10.2 4.6 10.2 10.2s-4.6 10.2-10.2 10.2H20.5C14.9 55.8 10.3 51.2 10.3 45.6s4.6-10.2 10.2-10.2h25.1z"
+    />
+    <path
+      fill="#ECB22E"
+      d="M92.5 45.6c0-5.6 4.6-10.2 10.2-10.2s10.2 4.6 10.2 10.2-4.6 10.2-10.2 10.2H92.5V45.6zm-5.1 0c0 5.6-4.6 10.2-10.2 10.2s-10.2-4.6-10.2-10.2V20.5C67 14.9 71.6 10.3 77.2 10.3s10.2 4.6 10.2 10.2v25.1z"
+    />
+    <path
+      fill="#E01E5A"
+      d="M77.2 92.5c5.6 0 10.2 4.6 10.2 10.2s-4.6 10.2-10.2 10.2-10.2-4.6-10.2-10.2V92.5h10.2zm0-5.1c-5.6 0-10.2-4.6-10.2-10.2s4.6-10.2 10.2-10.2h25.1c5.6 0 10.2 4.6 10.2 10.2s-4.6 10.2-10.2 10.2H77.2z"
+    />
+  </svg>
+);
+
+const GoogleDriveIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 512 512"
+    className={className}
+  >
+    <path fill="#4285F4" d="M160 32L0 320l96 160 160-288z" />
+    <path fill="#FFBB00" d="M352 32h-192l160 288h192z" />
+    <path fill="#34A853" d="M96 480h320l96-160H192z" />
+  </svg>
+);
+
+const IntegrationFlowGraphic = () => {
+  const sources = [
+    {
+      name: 'Google Drive',
+      Icon: GoogleDriveIcon,
+      gradient: 'from-sky-400 via-fuchsia-500 to-indigo-400',
+    },
+    {
+      name: 'Notion',
+      Icon: NotionIcon,
+      gradient: 'from-indigo-300 via-purple-400 to-sky-400',
+    },
+    {
+      name: 'Slack',
+      Icon: SlackIcon,
+      gradient: 'from-teal-300 via-blue-400 to-purple-500',
+    },
+  ];
+
+  return (
+    <div className="relative hidden w-full max-w-5xl items-center justify-between gap-10 rounded-[32px] border border-white/10 bg-white/[0.04] px-10 py-12 backdrop-blur-xl lg:flex">
+      <div className="absolute inset-0 -z-10 rounded-[32px] bg-gradient-to-r from-white/[0.04] via-white/[0.06] to-white/[0.02] opacity-60" />
+      <div className="flex flex-1 flex-col gap-6">
+        {sources.map(({ name, Icon, gradient }) => (
+          <div key={name} className="flex items-center gap-4">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.07] px-4 py-3 text-white/80 shadow-[0_18px_50px_rgba(88,60,188,0.25)]">
+              <Icon className="h-5 w-5" />
+              <span className="text-sm font-medium tracking-tight text-white/85">{name}</span>
+            </div>
+            <div className="h-[2px] flex-1 overflow-hidden rounded-full bg-white/10">
+              <span
+                className={`block h-full w-full bg-gradient-to-r ${gradient} bg-[length:300%_100%] animate-[gradientShift_6s_linear_infinite]`}
+              >
+                <span className="h-full w-2 rounded-full bg-white/70 mix-blend-screen animate-[flowPulse_2.8s_linear_infinite] block" />
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="relative mx-6 flex items-center justify-center">
+        <div className="absolute h-80 w-80 rounded-full bg-gradient-to-br from-indigo-500/25 via-sky-500/10 to-transparent blur-[120px] animate-[gradientShift_16s_linear_infinite]" />
+        <div className="absolute h-64 w-64 rounded-full border border-white/10 animate-[orbitGlow_12s_linear_infinite]" />
+        <div className="absolute h-56 w-56 rounded-full border border-white/5 animate-[float_10s_ease-in-out_infinite]" />
+        <div className="relative flex h-52 w-52 flex-col items-center justify-center rounded-full border border-white/20 bg-white/10 text-center shadow-[0_0_50px_rgba(96,70,200,0.35)] backdrop-blur-xl">
+          <span className="text-xs uppercase tracking-[0.3em] text-white/45">Haven7</span>
+          <h3 className="mt-2 text-3xl font-semibold tracking-tight text-white">Intelligence</h3>
+          <p className="mt-3 max-w-[12rem] text-sm leading-relaxed text-white/65">
+            Your product knowledge graph, orchestrated into PRD-ready signal.
+          </p>
+          <span className="mt-5 h-10 w-10 rounded-full border border-white/20 bg-white/10 shadow-[0_0_30px_rgba(96,70,200,0.45)] animate-[pulseGlow_3.4s_ease-in-out_infinite]" />
+        </div>
+      </div>
+
+      <div className="flex flex-1 items-center">
+        <div className="flex w-full items-center gap-4">
+          <div className="h-[2px] w-24 overflow-hidden rounded-full bg-white/10">
+            <span className="block h-full w-full bg-gradient-to-r from-indigo-400 via-sky-400 to-purple-500 bg-[length:280%_100%] animate-[gradientShift_5s_linear_infinite]" />
+          </div>
+          <div className="flex flex-col gap-4 rounded-3xl border border-white/15 bg-white/[0.08] px-7 py-8 text-left text-white/80 shadow-[0_22px_60px_rgba(60,40,120,0.35)] backdrop-blur-xl">
+            <p className="text-xs uppercase tracking-[0.28em] text-white/45">PRD Studio</p>
+            <h3 className="text-xl font-semibold text-white">Generate context-aware drafts</h3>
+            <p className="text-sm leading-relaxed text-white/60">
+              Stream intelligence from your Slack, Google Drive, and Notion sources directly into every PRD, complete with traceable context.
+            </p>
+            <ul className="mt-2 space-y-2 text-sm text-white/65">
+              <li className="flex items-start gap-2">
+                <Check className="mt-[2px] h-4 w-4 text-sky-300" />
+                Auto-pull supporting docs and highlights from connected tools.
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="mt-[2px] h-4 w-4 text-sky-300" />
+                Preserve citations so reviewers can jump back to source material instantly.
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="mt-[2px] h-4 w-4 text-sky-300" />
+                Keep drafts grounded in the latest workspace knowledge with every regenerate.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function PRDNew() {
   const navigate = useNavigate();
@@ -1203,7 +1345,7 @@ export default function PRDNew() {
             <div className="grid grid-cols-1 gap-8 text-left md:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
                 <p className="text-sm uppercase tracking-[0.35em] text-white/40">Structured Flow</p>
-                <h3 className="mt-4 text-lg font-medium text-white">Guided 5-step input</h3>
+                <h3 className="mt-4 text-lg font-medium text-white">Guided 7-step input</h3>
                 <p className="mt-3 text-sm leading-relaxed text-white/60">
                   Move through essential prompts that frame intent, context, and conviction—without noise.
                 </p>
@@ -1216,13 +1358,17 @@ export default function PRDNew() {
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                <p className="text-sm uppercase tracking-[0.35em] text-white/40">Refinement Loop</p>
-                <h3 className="mt-4 text-lg font-medium text-white">Collaborate, critique, improve</h3>
+                <p className="text-sm uppercase tracking-[0.35em] text-white/40">Integrated Context</p>
+                <h3 className="mt-4 text-lg font-medium text-white">Grounded in your workspace</h3>
                 <p className="mt-3 text-sm leading-relaxed text-white/60">
-                  Iterate with your team, capture citations, and evolve drafts into crisp, shareable conviction.
+                  Pull source material from Google Drive, Notion, and Slack so every draft stays tied to the docs your team already trusts.
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="mt-24 w-full">
+            <IntegrationFlowGraphic />
           </div>
         </main>
         <footer className="relative flex justify-center px-8 pb-10">
