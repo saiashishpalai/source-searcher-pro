@@ -1710,7 +1710,7 @@ const SearchInterface = () => {
           <div className="flex items-center gap-4 pr-6">
             <button
               onClick={() => navigate('/prd/new')}
-              className="group relative overflow-hidden rounded-xl border border-border/50 bg-background/70 px-5 py-2 text-sm font-semibold text-foreground/80 shadow-[0_12px_30px_rgba(144,96,255,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:bg-accent/10 hover:text-foreground"
+              className="group relative overflow-hidden rounded-xl border border-border/50 bg-background/70 px-3.5 py-1.5 text-sm font-semibold text-foreground/80 shadow-[0_12px_30px_rgba(144,96,255,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:bg-accent/10 hover:text-foreground sm:px-4 sm:py-2"
             >
               <span className="relative z-10 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />

@@ -1774,80 +1774,87 @@ export default function PRDNew() {
       </Dialog>
       {/* Exit confirmation dialog */}
       <AlertDialog open={showExitDialog} onOpenChange={(open) => setShowExitDialog(open)}>
-        <AlertDialogContent className="max-w-md bg-card border border-border/60">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Leave PRD builder?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You can discard this draft or save it and return later. {(!title || title === 'Untitled PRD') && 'Please enter a title to save this PRD.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {(!title || title === 'Untitled PRD') && (
-            <div className="mt-3">
-              <label className="block text-sm text-muted-foreground mb-1">PRD Title</label>
-              <input
-                type="text"
-                value={tempTitle}
-                onChange={(e) => setTempTitle(e.target.value)}
-                placeholder="Enter a title"
-                className="w-full bg-card/80 dark:bg-card/40 border border-border/60 rounded px-3 py-2 text-sm outline-none focus:border-primary"
-              />
-              {exitError && <p className="text-xs text-red-400 mt-1">{exitError}</p>}
-            </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowExitDialog(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              onClick={async () => {
-                try {
-                  if (prdId) {
-                    await ApiClient.deletePRDVersion(prdId);
-                  }
-                } catch (e) {
-                  // ignore errors on discard
-                } finally {
-                  setShowExitDialog(false);
-                  navigate('/dashboard');
-                }
-              }}
-            >
-              Discard
-            </AlertDialogAction>
-            <AlertDialogAction
-              onClick={async () => {
-                try {
-                  setExitError('');
-                  if (!prdId) {
+        <AlertDialogContent className="max-w-lg border border-white/15 bg-[#0b0616]/95 text-white shadow-[0_32px_120px_rgba(45,20,80,0.55)] backdrop-blur-xl">
+          <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-violet-500/15 via-sky-400/10 to-transparent opacity-70 blur-xl" />
+          <div className="relative">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-lg font-semibold text-white tracking-tight">Leave PRD builder?</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm leading-relaxed text-white/60">
+                You can discard this draft or save it and return later. {(!title || title === 'Untitled PRD') && 'Please enter a title to save this PRD.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {(!title || title === 'Untitled PRD') && (
+              <div className="mt-4 rounded-2xl border border-white/15 bg-white/5 p-4">
+                <label className="block text-xs uppercase tracking-[0.3em] text-white/40 mb-2">PRD Title</label>
+                <input
+                  type="text"
+                  value={tempTitle}
+                  onChange={(e) => setTempTitle(e.target.value)}
+                  placeholder="Enter a title"
+                  className="w-full rounded-xl border border-white/15 bg-[#0d081c]/70 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/40 focus:outline-none"
+                />
+                {exitError && <p className="mt-2 text-xs text-rose-300">{exitError}</p>}
+              </div>
+            )}
+            <AlertDialogFooter className="mt-6 flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
+              <AlertDialogCancel className="rounded-xl border border-white/10 bg-white/5 px-5 py-2 text-sm text-white/70 transition-colors hover:bg-white/10">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="rounded-xl border border-white/10 bg-rose-500/80 px-5 py-2 text-sm font-semibold text-white shadow-[0_15px_40px_rgba(244,114,182,0.35)] transition-all hover:bg-rose-500"
+                onClick={async () => {
+                  try {
+                    if (prdId) {
+                      await ApiClient.deletePRDVersion(prdId);
+                    }
+                  } catch (e) {
+                    // ignore errors on discard
+                  } finally {
                     setShowExitDialog(false);
                     navigate('/dashboard');
-                    return;
                   }
-                  const effectiveTitle = (title && title !== 'Untitled PRD') ? title : tempTitle.trim();
-                  if (!effectiveTitle) {
-                    setExitError('Title is required to save.');
-                    return;
-                  }
-                  if (effectiveTitle !== title) {
-                    await ApiClient.updatePRDTitle(prdId, effectiveTitle);
-                  }
-                  // Quick save sections
-                  for (const [sid, content] of Object.entries(answers)) {
-                    const sectionId = sid as SectionId;
-                    if (content && content.trim()) {
-                      const citations = sectionCitations[sectionId] || [];
-                      await ApiClient.savePRDSection(prdId, sectionId, content, undefined, citations);
+                }}
+              >
+                Discard
+              </AlertDialogAction>
+              <AlertDialogAction
+                className="rounded-xl border border-white/10 bg-gradient-to-r from-indigo-500 via-sky-500 to-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(88,70,200,0.35)] transition-transform hover:-translate-y-0.5"
+                onClick={async () => {
+                  try {
+                    setExitError('');
+                    if (!prdId) {
+                      setShowExitDialog(false);
+                      navigate('/dashboard');
+                      return;
                     }
+                    const effectiveTitle = (title && title !== 'Untitled PRD') ? title : tempTitle.trim();
+                    if (!effectiveTitle) {
+                      setExitError('Title is required to save.');
+                      return;
+                    }
+                    if (effectiveTitle !== title) {
+                      await ApiClient.updatePRDTitle(prdId, effectiveTitle);
+                    }
+                    // Quick save sections
+                    for (const [sid, content] of Object.entries(answers)) {
+                      const sectionId = sid as SectionId;
+                      if (content && content.trim()) {
+                        const citations = sectionCitations[sectionId] || [];
+                        await ApiClient.savePRDSection(prdId, sectionId, content, undefined, citations);
+                      }
+                    }
+                    setShowExitDialog(false);
+                    navigate('/dashboard');
+                  } catch (error) {
+                    console.error(error);
+                    setExitError('Failed to save draft. Please try again.');
                   }
-                  setShowExitDialog(false);
-                  navigate('/dashboard');
-                } catch (e) {
-                  setExitError('Failed to save. Please try again.');
-                }
-              }}
-            >
-              Save & Exit
-            </AlertDialogAction>
-          </AlertDialogFooter>
+                }}
+              >
+                Save draft & exit
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </div>
