@@ -1,10 +1,14 @@
 
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Sparkles } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
+
+import { ArrowRight, Sparkles } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+
 import SEO from "@/components/SEO";
 import ThemeToggle from "@/components/ThemeToggle";
+import { Button } from "@/components/ui/button";
+import { BackgroundPaths } from "@/components/ui/background-paths";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Landing = () => {
   const { user, loading } = useAuth();
@@ -38,75 +42,43 @@ const Landing = () => {
         url="https://source-searcher-pro.vercel.app/"
         image="https://source-searcher-pro.vercel.app/main_preview.jpg"
       />
-      <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-hidden transition-colors">
-      {/* Radial gradient overlay from center */}
-      <div className="absolute inset-0 bg-gradient-radial from-primary/10 via-transparent to-transparent dark:from-[#1a0a2e]/40 dark:via-black dark:to-black pointer-events-none transition-colors" />
-      
-      {/* Soft purple glow accents */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary/20 dark:bg-purple-600/20 rounded-full blur-[128px] transition-colors" />
-        <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-accent/25 dark:bg-fuchsia-600/15 rounded-full blur-[128px] transition-colors" />
+      <div className="relative min-h-screen overflow-hidden bg-background text-foreground transition-colors">
+        <BackgroundPaths
+          title="Stop Tab-Switching. Start Shipping."
+          description="Search your workspace, speak your ideas, and build AI-crafted PRDs with conviction."
+          cta={
+            <div className="flex flex-col items-center gap-6">
+              <div className="group relative inline-flex overflow-hidden rounded-2xl bg-gradient-to-b from-primary/15 to-primary/5 p-px shadow-lg transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:from-primary/20 dark:to-primary/5">
+                <Button
+                  asChild
+                  size="lg"
+                  className="rounded-[1.15rem] border border-primary/20 bg-primary px-8 py-6 text-lg font-semibold text-primary-foreground shadow-none transition-all duration-300 hover:bg-primary/90 dark:border-primary/30"
+                >
+                  <Link to="/signup" className="flex items-center gap-3">
+                    <Sparkles className="h-5 w-5 animate-pulse" />
+                    Get Early Access
+                    <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Join 500+ product managers already using Haven7
+              </p>
+            </div>
+          }
+        />
+
+        <header className="absolute inset-x-0 top-0 z-20 p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-2xl font-bold">Haven7</div>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <footer className="absolute inset-x-0 bottom-0 z-20 p-6">
+          <div className="text-center text-muted-foreground">Built for Product Managers</div>
+        </footer>
       </div>
-
-      {/* Header with Logo */}
-      <header className="p-6 relative z-10">
-        <div className="flex items-center justify-between">
-          <div className="text-2xl font-bold text-foreground animate-fade-in">
-            Haven7
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* Main Content - Centered */}
-      <main className="flex-1 flex items-center justify-center px-6 relative z-10">
-        <div className="text-center max-w-2xl mx-auto">
-          {/* Headline */}
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight animate-fade-in-up">
-            Search Your Work Knowledge in Seconds
-          </h1>
-          
-          {/* Subheadline */}
-          <p className="text-xl md:text-2xl text-muted-foreground mb-12 leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            AI-powered search across Slack, Notion, and Google Drive. Find what you need without switching apps.
-          </p>
-          
-          {/* CTA Button with Enhanced Animations */}
-          <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-          <Link 
-            to="/signup"
-              className="group relative inline-flex items-center gap-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-8 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-primary/25 active:scale-95 overflow-hidden"
-            >
-              {/* Animated background shimmer */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-              
-              {/* Button content */}
-              <span className="relative flex items-center gap-3">
-            <Sparkles className="w-5 h-5 animate-pulse" />
-                Get Early Access
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
-              </span>
-              
-              {/* Ripple effect on click */}
-              <div className="absolute inset-0 rounded-xl bg-white/20 scale-0 group-active:scale-100 transition-transform duration-150 ease-out" />
-            </Link>
-          </div>
-          
-          {/* Additional CTA hint */}
-          <p className="text-sm text-muted-foreground mt-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            Join 500+ product managers already using Haven7
-          </p>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="p-6 relative z-10">
-        <div className="text-center text-muted-foreground animate-fade-in" style={{ animationDelay: '0.8s' }}>
-          Built for Product Managers
-        </div>
-      </footer>
-
-    </div>
     </>
   );
 };
