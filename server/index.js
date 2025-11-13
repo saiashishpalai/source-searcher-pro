@@ -84,6 +84,36 @@ const supabaseAdmin = createClient(
   { auth: { persistSession: false } }
 );
 
+async function ensureWireframesBucket() {
+  try {
+    const { data: bucket, error } = await supabaseAdmin.storage.getBucket('wireframes');
+    if (bucket) {
+      return;
+    }
+    if (error && error.message && !error.message.toLowerCase().includes('not found')) {
+      console.error('Error checking wireframes bucket:', error);
+    }
+
+    const { error: createError } = await supabaseAdmin.storage.createBucket('wireframes', {
+      public: true,
+      fileSizeLimit: 10 * 1024 * 1024, // 10 MB
+      allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf']
+    });
+
+    if (createError) {
+      console.error('Failed to create wireframes bucket:', createError);
+    } else {
+      console.log('✓ Wireframes bucket ensured (created)');
+    }
+  } catch (bucketError) {
+    console.error('Unexpected error ensuring wireframes bucket:', bucketError);
+  }
+}
+
+ensureWireframesBucket().catch((err) => {
+  console.error('Failed to ensure wireframes bucket on startup:', err);
+});
+
 // Initialize services
 const documentSync = new DocumentSync(process.env.OPENAI_API_KEY);
 const googleDriveSync = new GoogleDriveSync(process.env.OPENAI_API_KEY, supabaseAdmin);
@@ -2581,6 +2611,24 @@ Generate a comprehensive ${sectionTitle} section now.`;
   } catch (e) {
     console.error('Generate section draft error:', e);
     res.status(500).json({ error: e.message || 'Failed to generate section draft' });
+  }
+});
+
+// System: Ensure wireframes bucket exists
+app.post('/api/system/ensure-wireframes-bucket', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    await ensureWireframesBucket();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to ensure wireframes bucket (endpoint):', error);
+    res.status(500).json({ error: 'Failed to ensure wireframes bucket' });
   }
 });
 

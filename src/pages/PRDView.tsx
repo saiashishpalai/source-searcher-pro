@@ -44,7 +44,7 @@ export default function PRDView() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [editingRequirements, setEditingRequirements] = useState(false);
-  const [requirementsWireframe, setRequirementsWireframe] = useState<{ file: File; preview: string; storageUrl?: string } | null>(null);
+  const [requirementsWireframe, setRequirementsWireframe] = useState<{ file: File; preview: string; storageUrl?: string; storagePath?: string } | null>(null);
   const [isGeneratingFromWireframe, setIsGeneratingFromWireframe] = useState(false);
   const [generatedRequirements, setGeneratedRequirements] = useState<string | null>(null);
   const [generatedConfidence, setGeneratedConfidence] = useState<number | null>(null);
@@ -235,8 +235,8 @@ export default function PRDView() {
     setEditedSections(sections);
   };
 
-  const handleWireframeUpload = (file: File, preview: string, storageUrl: string) => {
-    setRequirementsWireframe({ file, preview, storageUrl });
+  const handleWireframeUpload = (file: File, preview: string, storage: { storageUrl?: string; storagePath?: string }) => {
+    setRequirementsWireframe({ file, preview, storageUrl: storage.storageUrl, storagePath: storage.storagePath });
     toast({
       title: 'Wireframe uploaded',
       description: 'Click "Generate Requirements" to analyze the wireframe.',
