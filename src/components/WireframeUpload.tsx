@@ -66,20 +66,17 @@ export function WireframeUpload({
       }
 
       const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = fileName; // Just the filename, not wireframes/filename
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('wireframes')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { upsert: false });
 
       if (uploadError) {
-        // If bucket doesn't exist, fall back to graceful handling
         console.error('Supabase storage upload error:', uploadError);
-        // Continue anyway - user can still generate requirements from base64
+        throw new Error(uploadError.message || 'Unable to upload wireframe');
       }
 
-      // Get public URL (even if upload failed, we'll use base64 fallback)
       const { data: { publicUrl } } = supabase.storage
         .from('wireframes')
         .getPublicUrl(filePath);
