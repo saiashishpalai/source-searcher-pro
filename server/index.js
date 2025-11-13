@@ -24,6 +24,7 @@ import { DocumentSync } from './services/document-sync.js';
 import { GoogleDriveSync } from './services/google-drive-sync.js';
 import { SearchService } from './services/search-service.js';
 import { PRDAssemblyService } from './services/prd-assembly.js';
+import { WireframeAnalysisService } from './services/wireframe-analysis-service.js';
 import { NotionSync } from './services/notion-sync.js';
 import { SlackSync } from './services/slack-sync.js';
 import multer from 'multer';
@@ -45,7 +46,9 @@ app.use(cors({
   ],
   credentials: true 
 }));
-app.use(express.json());
+// Increase body size limits to accommodate base64-encoded wireframe uploads (default is 100kb)
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Minimal request logger for sync endpoints to aid debugging during development
 app.use((req, _res, next) => {
@@ -86,6 +89,7 @@ const documentSync = new DocumentSync(process.env.OPENAI_API_KEY);
 const googleDriveSync = new GoogleDriveSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const searchService = new SearchService(process.env.OPENAI_API_KEY);
 const prdAssemblyService = new PRDAssemblyService(process.env.OPENAI_API_KEY);
+const wireframeAnalysisService = new WireframeAnalysisService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -1846,7 +1850,7 @@ app.post('/api/prd/sections', async (req, res) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { prd_version_id, section_id, content, metadata, citation_chunk_ids = [] } = req.body || {};
+    const { prd_version_id, section_id, content, metadata, citation_chunk_ids = [], wireframe_url, wireframe_metadata } = req.body || {};
     if (!prd_version_id || !section_id || !content) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -1867,6 +1871,8 @@ app.post('/api/prd/sections', async (req, res) => {
         section_id,
         content,
         ...(metadata ? { metadata } : {}),
+        ...(wireframe_url ? { wireframe_url } : {}),
+        ...(wireframe_metadata ? { wireframe_metadata } : {}),
       }, { onConflict: 'prd_version_id,section_id' })
       .select()
       .single();
@@ -2379,6 +2385,202 @@ app.post('/api/prd/:id/version', async (req, res) => {
     console.error('Create version error:', e);
     console.error('Error details:', JSON.stringify(e, Object.getOwnPropertyNames(e)));
     res.status(500).json({ error: e?.message || 'Failed to create version. Make sure the database migration has been run.' });
+  }
+});
+
+// PRD: Generate requirements from wireframe (during creation flow)
+app.post('/api/prd/generate-requirements-from-wireframe', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { wireframe, context = {}, retrievedChunks = [] } = req.body || {};
+
+    if (!wireframe) {
+      return res.status(400).json({ error: 'Wireframe image is required' });
+    }
+
+    // Validate wireframe is base64
+    const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
+    if (!base64Pattern.test(wireframe)) {
+      return res.status(400).json({ error: 'Invalid wireframe format. Expected base64 string.' });
+    }
+
+    console.log('✓ Generating requirements from wireframe for user:', user.id);
+
+    // Call wireframe analysis service
+    const result = await wireframeAnalysisService.generateRequirements(
+      wireframe,
+      context,
+      retrievedChunks
+    );
+
+    res.json({
+      requirements: result.requirements,
+      confidence: result.confidence,
+      metadata: result.metadata
+    });
+  } catch (e) {
+    console.error('Generate requirements from wireframe error:', e);
+    res.status(500).json({ error: e.message || 'Failed to generate requirements from wireframe' });
+  }
+});
+
+// PRD: Regenerate requirements from wireframe (for existing PRD)
+app.post('/api/prd/regenerate-requirements-from-wireframe', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { prdId, wireframe, existingPRD = {} } = req.body || {};
+
+    if (!wireframe) {
+      return res.status(400).json({ error: 'Wireframe image is required' });
+    }
+
+    if (!prdId) {
+      return res.status(400).json({ error: 'PRD ID is required' });
+    }
+
+    // Validate wireframe is base64
+    const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
+    if (!base64Pattern.test(wireframe)) {
+      return res.status(400).json({ error: 'Invalid wireframe format. Expected base64 string.' });
+    }
+
+    // Verify PRD ownership
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id, user_id')
+      .eq('id', prdId)
+      .eq('user_id', user.id)
+      .single();
+    
+    if (prdError || !prd) {
+      return res.status(403).json({ error: 'PRD not found or access denied' });
+    }
+
+    console.log('✓ Regenerating requirements from wireframe for PRD:', prdId);
+
+    // Fetch RAG chunks if any citations exist
+    let retrievedChunks = [];
+    if (existingPRD.citations && existingPRD.citations.length > 0) {
+      const citationContents = await prdAssemblyService.fetchCitationContents(
+        existingPRD.citations,
+        supabaseAdmin,
+        user.id
+      );
+      retrievedChunks = citationContents.map(content => ({ content }));
+    }
+
+    // Call wireframe analysis service for regeneration
+    const result = await wireframeAnalysisService.regenerateRequirements(
+      wireframe,
+      existingPRD,
+      retrievedChunks
+    );
+
+    res.json({
+      requirements: result.requirements,
+      confidence: result.confidence,
+      metadata: result.metadata
+    });
+  } catch (e) {
+    console.error('Regenerate requirements from wireframe error:', e);
+    res.status(500).json({ error: e.message || 'Failed to regenerate requirements from wireframe' });
+  }
+});
+
+// PRD: Generate AI-enhanced section draft
+app.post('/api/prd/generate-section-draft', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { section_id, context } = req.body || {};
+
+    if (!section_id) {
+      return res.status(400).json({ error: 'Section ID is required' });
+    }
+
+    console.log(`✓ Generating AI draft for section: ${section_id}`);
+
+    // Section titles for context
+    const sectionTitles = {
+      objective: 'Objective',
+      background: 'Background',
+      scope: 'Scope',
+      requirements: 'Requirements',
+      metrics: 'Success Metrics',
+      access_permissions: 'Access Permissions',
+      notifications: 'Notifications',
+      reporting: 'Reporting',
+      analytics_events: 'Analytics Events',
+      filters: 'Filters',
+      dependencies: 'Dependencies',
+      backward_compatibility: 'Backward Compatibility',
+      release_plan: 'Release Plan',
+      timeline: 'Timeline'
+    };
+
+    const sectionTitle = sectionTitles[section_id] || section_id;
+
+    // Build the prompt
+    const systemPrompt = `You are an expert Product Manager and technical writer. Generate a comprehensive, detailed draft for the "${sectionTitle}" section of a Product Requirements Document.
+
+Guidelines:
+- Use clear, professional language
+- Be specific and actionable
+- Include relevant details and examples
+- Format using Markdown (use **bold**, bullet points, numbered lists)
+- For Requirements, include Functional Requirements (FR-X) and Non-Functional Requirements (NFR-X)
+- For Timeline, include specific phases with milestones
+- For Success Metrics, include quantifiable KPIs`;
+
+    const userPrompt = `Based on the following PRD context, generate a detailed "${sectionTitle}" section:
+
+**PRD Context:**
+${context.objective ? `**Objective:** ${context.objective}` : ''}
+${context.background ? `\n**Background:** ${context.background}` : ''}
+${context.scope ? `\n**Scope:** ${context.scope}` : ''}
+${context.requirements ? `\n**Requirements:** ${context.requirements}` : ''}
+${context.currentSection ? `\n\n**Current ${sectionTitle} content (enhance this):**\n${context.currentSection}` : ''}
+
+Generate a comprehensive ${sectionTitle} section now.`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+
+    const draft = completion.choices[0]?.message?.content || '';
+
+    console.log(`✓ Generated ${draft.length} characters for ${section_id}`);
+
+    res.json({
+      draft,
+      confidence: 85 // Default confidence for AI-generated drafts
+    });
+  } catch (e) {
+    console.error('Generate section draft error:', e);
+    res.status(500).json({ error: e.message || 'Failed to generate section draft' });
   }
 });
 

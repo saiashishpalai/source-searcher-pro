@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, Menu } from 'lucide-react';
+import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, Menu, Sparkles, Loader2, Image as ImageIcon, Mic, Square, RotateCcw, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApiClient } from '@/lib/api-client';
+import { WireframeUpload } from '@/components/WireframeUpload';
+import { analytics } from '@/lib/analytics';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const SECTION_DEFINITIONS = [
   { id: 'objective', title: 'Objective' },
@@ -38,6 +43,21 @@ export default function PRDView() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [editingRequirements, setEditingRequirements] = useState(false);
+  const [requirementsWireframe, setRequirementsWireframe] = useState<{ file: File; preview: string; storageUrl?: string } | null>(null);
+  const [isGeneratingFromWireframe, setIsGeneratingFromWireframe] = useState(false);
+  const [generatedRequirements, setGeneratedRequirements] = useState<string | null>(null);
+  const [generatedConfidence, setGeneratedConfidence] = useState<number | null>(null);
+  const { toast } = useToast();
+  
+  // Mic and AI features for section editing
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [draftMode, setDraftMode] = useState<'insert' | 'replace'>('replace');
+  const [currentEditingSection, setCurrentEditingSection] = useState<SectionId | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -177,6 +197,10 @@ export default function PRDView() {
   const handleCancel = () => {
     setIsEditing(false);
     setChangeSummary('');
+    setEditingRequirements(false);
+    setRequirementsWireframe(null);
+    setGeneratedRequirements(null);
+    setGeneratedConfidence(null);
     // Reset to original sections
     const sections: Record<string, string> = {
       'objective': '',
@@ -209,6 +233,257 @@ export default function PRDView() {
     });
     
     setEditedSections(sections);
+  };
+
+  const handleWireframeUpload = (file: File, preview: string, storageUrl: string) => {
+    setRequirementsWireframe({ file, preview, storageUrl });
+    toast({
+      title: 'Wireframe uploaded',
+      description: 'Click "Generate Requirements" to analyze the wireframe.',
+    });
+  };
+
+  const handleWireframeRemove = () => {
+    setRequirementsWireframe(null);
+    setGeneratedRequirements(null);
+    setGeneratedConfidence(null);
+  };
+
+  // Mic recording handlers
+  const startRecording = async (sectionId: SectionId) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      setCurrentEditingSection(sectionId);
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await transcribeAudio(audioBlob, sectionId);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast({
+        title: 'Recording started',
+        description: 'Speak your thoughts...',
+      });
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      toast({
+        title: 'Microphone access denied',
+        description: 'Please allow microphone access to use voice input.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob, sectionId: SectionId) => {
+    setIsTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+      
+      const result = await ApiClient.transcribeAudio(formData);
+      const transcript = result.text || '';
+      
+      // Apply based on draft mode
+      if (draftMode === 'replace') {
+        setEditedSections({ ...editedSections, [sectionId]: transcript });
+      } else {
+        const current = editedSections[sectionId] || '';
+        setEditedSections({ ...editedSections, [sectionId]: current + '\n\n' + transcript });
+      }
+      
+      toast({
+        title: 'Transcription complete',
+        description: `Added to ${SECTION_DEFINITIONS.find(s => s.id === sectionId)?.title}`,
+      });
+    } catch (error) {
+      console.error('Transcription error:', error);
+      toast({
+        title: 'Transcription failed',
+        description: 'Could not transcribe audio. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTranscribing(false);
+      setCurrentEditingSection(null);
+    }
+  };
+
+  // AI draft generation
+  const generateAIDraft = async (sectionId: SectionId) => {
+    setIsGeneratingDraft(true);
+    setCurrentEditingSection(sectionId);
+    
+    try {
+      // Prepare context from the entire PRD
+      const context = {
+        objective: editedSections.objective || prd?.objective || '',
+        background: editedSections.background || prd?.background || '',
+        scope: editedSections.scope || prd?.scope || '',
+        requirements: editedSections.requirements || prd?.requirements || '',
+        currentSection: editedSections[sectionId] || '',
+        sectionTitle: SECTION_DEFINITIONS.find(s => s.id === sectionId)?.title || sectionId,
+      };
+      
+      // Call the draft generation API
+      const result = await ApiClient.generateSectionDraft(sectionId, context);
+      const draft = result.draft || '';
+      
+      // Apply based on draft mode
+      if (draftMode === 'replace') {
+        setEditedSections({ ...editedSections, [sectionId]: draft });
+      } else {
+        const current = editedSections[sectionId] || '';
+        setEditedSections({ ...editedSections, [sectionId]: current + '\n\n' + draft });
+      }
+      
+      toast({
+        title: 'AI draft generated',
+        description: `Enhanced ${SECTION_DEFINITIONS.find(s => s.id === sectionId)?.title}`,
+      });
+    } catch (error) {
+      console.error('AI draft generation error:', error);
+      toast({
+        title: 'Draft generation failed',
+        description: 'Could not generate AI draft. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingDraft(false);
+      setCurrentEditingSection(null);
+    }
+  };
+
+  const handleGenerateRequirementsFromWireframe = async () => {
+    if (!requirementsWireframe || !id) return;
+
+    setIsGeneratingFromWireframe(true);
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          const base64Data = base64.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(requirementsWireframe.file);
+
+      const base64Data = await base64Promise;
+
+      // Prepare existing PRD context
+      const existingPRD = {
+        objective: editedSections.objective || '',
+        background: editedSections.background || '',
+        scope: editedSections.scope || '',
+        requirements: editedSections.requirements || ''
+      };
+
+      // Track analytics
+      analytics.trackGenerationStart(
+        !!(existingPRD.objective || existingPRD.background),
+        false
+      );
+
+      // Call API
+      const result = await ApiClient.regenerateRequirementsFromWireframe(
+        id,
+        base64Data,
+        existingPRD
+      );
+
+      setGeneratedRequirements(result.requirements);
+      setGeneratedConfidence(result.confidence);
+
+      // Track success
+      analytics.trackGenerationSuccess(
+        result.confidence,
+        result.metadata.word_count || 0,
+        result.metadata.components_detected || 0
+      );
+
+      // Show confidence toast
+      if (result.confidence < 70) {
+        toast({
+          title: `Requirements generated (${result.confidence}% confidence)`,
+          description: 'The generated requirements may need review. Please validate the details.',
+        });
+      } else {
+        toast({
+          title: `Requirements generated (${result.confidence}% confidence)`,
+          description: 'Review the generated requirements and choose an action below.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Generate from wireframe error:', error);
+      analytics.trackGenerationFailure(error.message || 'Unknown error');
+      toast({
+        title: 'Generation failed',
+        description: error.message || 'Failed to generate requirements from wireframe',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingFromWireframe(false);
+    }
+  };
+
+  const handleReplaceRequirements = () => {
+    if (generatedRequirements) {
+      setEditedSections(prev => ({ ...prev, requirements: generatedRequirements }));
+      toast({
+        title: 'Requirements replaced',
+        description: 'The requirements section has been replaced with the generated content.',
+      });
+      setEditingRequirements(false);
+      setRequirementsWireframe(null);
+      setGeneratedRequirements(null);
+      setGeneratedConfidence(null);
+    }
+  };
+
+  const handleInsertRequirements = () => {
+    if (generatedRequirements) {
+      const existingRequirements = editedSections.requirements || '';
+      const separator = existingRequirements ? '\n\n---\n\n' : '';
+      setEditedSections(prev => ({
+        ...prev,
+        requirements: existingRequirements + separator + generatedRequirements
+      }));
+      toast({
+        title: 'Requirements inserted',
+        description: 'The generated requirements have been added below existing content.',
+      });
+      setEditingRequirements(false);
+      setRequirementsWireframe(null);
+      setGeneratedRequirements(null);
+      setGeneratedConfidence(null);
+    }
+  };
+
+  const handleCancelGeneration = () => {
+    setGeneratedRequirements(null);
+    setGeneratedConfidence(null);
+    setRequirementsWireframe(null);
   };
 
   const handleSave = async () => {
@@ -497,6 +772,7 @@ export default function PRDView() {
           <div className="space-y-6">
             {SECTION_DEFINITIONS.map((section, index) => {
               const content = editedSections[section.id] ?? '';
+              const isRequirements = section.id === 'requirements';
               return (
                 <section
                   key={section.id}
@@ -513,19 +789,293 @@ export default function PRDView() {
               variant="ghost"
                         size="icon"
                         className="rounded-full border border-white/10 bg-white/5 text-white/60 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
-                        onClick={() => setIsEditing(true)}
+                        onClick={() => {
+                          if (isRequirements) {
+                            setEditingRequirements(true);
+                          }
+                          setIsEditing(true);
+                        }}
                       >
                         <Edit className="h-4 w-4" />
             </Button>
           )}
                   </div>
                     {isEditing ? (
-                      <textarea 
-                        value={content} 
-                        onChange={(e) => setEditedSections({ ...editedSections, [section.id]: e.target.value })} 
-                      className="w-full min-h-[220px] rounded-xl border border-white/15 bg-white/5 p-4 text-white focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-                      placeholder={`Document the ${section.title.toLowerCase()}…`}
-                      />
+                      isRequirements && editingRequirements ? (
+                        <div className="rounded-xl border border-white/15 bg-white/[0.03] p-1">
+                          <Tabs defaultValue="manual" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 bg-white/5">
+                              <TabsTrigger value="manual">Manual Edit</TabsTrigger>
+                              <TabsTrigger value="wireframe">Generate from Wireframe</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="manual" className="p-4">
+                              <div className="rounded-xl border border-white/15 bg-white/[0.03] overflow-hidden">
+                                {/* Editor Toolbar */}
+                                <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-white/[0.02] border-b border-white/10">
+                                  <div className="flex items-center gap-2">
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => isRecording && currentEditingSection === 'requirements' ? stopRecording() : startRecording('requirements')}
+                                            disabled={isTranscribing || (isRecording && currentEditingSection !== 'requirements')}
+                                            className={`h-8 px-3 rounded-md border transition-colors ${
+                                              isRecording && currentEditingSection === 'requirements'
+                                                ? 'border-rose-500/50 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                                                : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                                            }`}
+                                          >
+                                            {isRecording && currentEditingSection === 'requirements' ? (
+                                              <><Square className="h-3.5 w-3.5 mr-1.5 fill-current" /> Stop</>
+                                            ) : isTranscribing && currentEditingSection === 'requirements' ? (
+                                              <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Transcribing...</>
+                                            ) : (
+                                              <><Mic className="h-3.5 w-3.5 mr-1.5" /> Voice</>
+                                            )}
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Record voice input for requirements</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => generateAIDraft('requirements')}
+                                            disabled={isGeneratingDraft || isRecording || isTranscribing}
+                                            className="h-8 px-3 rounded-md border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                                          >
+                                            {isGeneratingDraft && currentEditingSection === 'requirements' ? (
+                                              <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Generating...</>
+                                            ) : (
+                                              <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Improve with AI</>
+                                            )}
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Generate AI-enhanced requirements draft</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+
+                                  {/* Insert/Replace Mode Toggle */}
+                                  <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 p-0.5">
+                                    <button
+                                      onClick={() => setDraftMode('replace')}
+                                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                                        draftMode === 'replace'
+                                          ? 'bg-white/15 text-white'
+                                          : 'text-white/50 hover:text-white/70'
+                                      }`}
+                                    >
+                                      <RotateCcw className="inline h-3 w-3 mr-1" />
+                                      Replace
+                                    </button>
+                                    <button
+                                      onClick={() => setDraftMode('insert')}
+                                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                                        draftMode === 'insert'
+                                          ? 'bg-white/15 text-white'
+                                          : 'text-white/50 hover:text-white/70'
+                                      }`}
+                                    >
+                                      <Plus className="inline h-3 w-3 mr-1" />
+                                      Insert
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Textarea */}
+                                <textarea 
+                                  value={content} 
+                                  onChange={(e) => setEditedSections({ ...editedSections, [section.id]: e.target.value })} 
+                                  className="w-full min-h-[220px] bg-transparent p-4 text-white focus:outline-none resize-y"
+                                  placeholder={`Document the ${section.title.toLowerCase()}…`}
+                                />
+                              </div>
+                            </TabsContent>
+                            <TabsContent value="wireframe" className="p-4 space-y-4">
+                              <p className="text-sm text-white/60">Upload a wireframe to generate detailed requirements automatically.</p>
+                              
+                              <WireframeUpload
+                                onUpload={handleWireframeUpload}
+                                onRemove={handleWireframeRemove}
+                                uploadedFile={requirementsWireframe}
+                                maxSizeMB={10}
+                                acceptedFormats={['image/png', 'image/jpeg', 'image/jpg', 'application/pdf']}
+                              />
+
+                              {requirementsWireframe && !generatedRequirements && (
+                                <Button
+                                  onClick={handleGenerateRequirementsFromWireframe}
+                                  disabled={isGeneratingFromWireframe}
+                                  className="w-full rounded-md border border-white/15 bg-white/90 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
+                                >
+                                  {isGeneratingFromWireframe ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Analyzing wireframe...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="w-4 h-4 mr-2" />
+                                      Generate Requirements
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+
+                              {generatedRequirements && (
+                                <div className="space-y-4">
+                                  <div className="rounded-lg border border-white/15 bg-white/[0.03] p-4 max-h-96 overflow-y-auto">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <p className="text-sm font-medium text-white">Generated Requirements</p>
+                                      {generatedConfidence !== null && (
+                                        <span className={`text-xs px-2 py-1 rounded-full ${
+                                          generatedConfidence >= 70 
+                                            ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+                                            : generatedConfidence >= 50
+                                            ? 'bg-amber-400/10 text-amber-200 border border-amber-400/30'
+                                            : 'bg-rose-500/10 text-rose-200 border border-rose-500/30'
+                                        }`}>
+                                          {generatedConfidence}% confidence
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="prose prose-sm prose-invert max-w-none text-white/85">
+                                      <ReactMarkdown>{generatedRequirements}</ReactMarkdown>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <Button
+                                      onClick={handleReplaceRequirements}
+                                      className="flex-1 rounded-md border border-white/15 bg-white/90 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
+                                    >
+                                      Replace All
+                                    </Button>
+                                    <Button
+                                      onClick={handleInsertRequirements}
+                                      variant="outline"
+                                      className="flex-1 rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                                    >
+                                      Insert Below
+                                    </Button>
+                                    <Button
+                                      onClick={handleCancelGeneration}
+                                      variant="ghost"
+                                      className="rounded-md px-4 py-2 text-sm text-white/60 hover:text-white"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </TabsContent>
+                          </Tabs>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-white/15 bg-white/[0.03] overflow-hidden">
+                          {/* Editor Toolbar */}
+                          <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-white/[0.02] border-b border-white/10">
+                            <div className="flex items-center gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => isRecording && currentEditingSection === section.id ? stopRecording() : startRecording(section.id as SectionId)}
+                                      disabled={isTranscribing || (isRecording && currentEditingSection !== section.id)}
+                                      className={`h-8 px-3 rounded-md border transition-colors ${
+                                        isRecording && currentEditingSection === section.id
+                                          ? 'border-rose-500/50 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                                          : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                                      }`}
+                                    >
+                                      {isRecording && currentEditingSection === section.id ? (
+                                        <><Square className="h-3.5 w-3.5 mr-1.5 fill-current" /> Stop</>
+                                      ) : isTranscribing && currentEditingSection === section.id ? (
+                                        <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Transcribing...</>
+                                      ) : (
+                                        <><Mic className="h-3.5 w-3.5 mr-1.5" /> Voice</>
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Record voice input for this section</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => generateAIDraft(section.id as SectionId)}
+                                      disabled={isGeneratingDraft || isRecording || isTranscribing}
+                                      className="h-8 px-3 rounded-md border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                                    >
+                                      {isGeneratingDraft && currentEditingSection === section.id ? (
+                                        <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Generating...</>
+                                      ) : (
+                                        <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Improve with AI</>
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Generate AI-enhanced draft for this section</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+
+                            {/* Insert/Replace Mode Toggle */}
+                            <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 p-0.5">
+                              <button
+                                onClick={() => setDraftMode('replace')}
+                                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                                  draftMode === 'replace'
+                                    ? 'bg-white/15 text-white'
+                                    : 'text-white/50 hover:text-white/70'
+                                }`}
+                              >
+                                <RotateCcw className="inline h-3 w-3 mr-1" />
+                                Replace
+                              </button>
+                              <button
+                                onClick={() => setDraftMode('insert')}
+                                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                                  draftMode === 'insert'
+                                    ? 'bg-white/15 text-white'
+                                    : 'text-white/50 hover:text-white/70'
+                                }`}
+                              >
+                                <Plus className="inline h-3 w-3 mr-1" />
+                                Insert
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Textarea */}
+                          <textarea 
+                            value={content} 
+                            onChange={(e) => setEditedSections({ ...editedSections, [section.id]: e.target.value })} 
+                            className="w-full min-h-[220px] bg-transparent p-4 text-white focus:outline-none resize-y"
+                            placeholder={`Document the ${section.title.toLowerCase()}…`}
+                          />
+                        </div>
+                      )
                     ) : (
                     <div className="prose prose-invert max-w-none text-white/85">
                         {content ? (

@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      prd_sections: {
+        Row: {
+          id: string
+          prd_version_id: string
+          section_id: string
+          content: string
+          metadata: Json
+          created_at: string
+          wireframe_url: string | null
+          wireframe_metadata: Json
+        }
+        Insert: {
+          id?: string
+          prd_version_id: string
+          section_id: string
+          content: string
+          metadata?: Json
+          created_at?: string
+          wireframe_url?: string | null
+          wireframe_metadata?: Json
+        }
+        Update: {
+          id?: string
+          prd_version_id?: string
+          section_id?: string
+          content?: string
+          metadata?: Json
+          created_at?: string
+          wireframe_url?: string | null
+          wireframe_metadata?: Json
+        }
+        Relationships: []
+      }
       waitlist_signups: {
         Row: {
           id: string

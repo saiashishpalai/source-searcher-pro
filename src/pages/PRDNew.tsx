@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings, Clock, Folder, ChevronRight, ChevronLeft, Menu, ShieldCheck, AlertTriangle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Pin, Loader2, RotateCcw, Plus, Mic, Square, FileText, Edit, Save, Settings, Clock, Folder, ChevronRight, ChevronLeft, Menu, ShieldCheck, AlertTriangle, HelpCircle, Image } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -34,6 +34,9 @@ import {
 import ReactMarkdown from 'react-markdown';
 import nlp from 'compromise';
 import { cn } from '@/lib/utils';
+import { WireframeUpload } from '@/components/WireframeUpload';
+import { analytics } from '@/lib/analytics';
+import { useToast } from '@/hooks/use-toast';
 
 type SectionId =
   | 'objective'
@@ -301,6 +304,9 @@ export default function PRDNew() {
   const [sidebarError, setSidebarError] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [uploadedWireframe, setUploadedWireframe] = useState<{ file: File; preview: string; storageUrl?: string } | null>(null);
+  const [isGeneratingFromWireframe, setIsGeneratingFromWireframe] = useState(false);
+  const { toast } = useToast();
 
   const getConfidenceLevel = useCallback((percent: number): ConfidenceLevel => {
     if (percent >= 70) return 'high';
@@ -784,12 +790,30 @@ export default function PRDNew() {
       if (isSaving) return;
       try {
         setIsSaving(true);
-        // save sections with citations
+        // save sections with citations and wireframe metadata
         for (const [sid, content] of Object.entries(answers)) {
           const sectionId = sid as SectionId;
           if (content && content.trim()) {
             const citations = sectionCitations[sectionId] || [];
-            await ApiClient.savePRDSection(prdId, sectionId, content, undefined, citations);
+            // If this is the requirements section and we have a wireframe, save it too
+            if (sectionId === 'requirements' && uploadedWireframe) {
+              const wireframeMetadata = {
+                filename: uploadedWireframe.file.name,
+                size: uploadedWireframe.file.size,
+                uploaded_at: new Date().toISOString()
+              };
+              await ApiClient.savePRDSectionWithWireframe(
+                prdId,
+                sectionId,
+                content,
+                uploadedWireframe.storageUrl,
+                wireframeMetadata,
+                undefined,
+                citations
+              );
+            } else {
+              await ApiClient.savePRDSection(prdId, sectionId, content, undefined, citations);
+            }
           }
         }
         // save title if edited
@@ -802,7 +826,7 @@ export default function PRDNew() {
       }
     }, 2000);
     return () => clearInterval(timer);
-  }, [prdId, answers, title, isSaving, sectionCitations, hasStarted]);
+  }, [prdId, answers, title, isSaving, sectionCitations, hasStarted, uploadedWireframe]);
 
   const insertContext = (chunk: any) => {
     const text = chunk.snippet || chunk.content || '';
@@ -1039,6 +1063,99 @@ export default function PRDNew() {
     setPinnedChunksGlobal(new Set());
     setPriorAnswerSummaries([]);
     setConsecutiveLowResults(0);
+  };
+
+  const handleWireframeUpload = (file: File, preview: string, storageUrl: string) => {
+    setUploadedWireframe({ file, preview, storageUrl });
+    toast({
+      title: 'Wireframe uploaded',
+      description: 'You can now generate requirements from this wireframe in the next step.',
+    });
+  };
+
+  const handleWireframeRemove = () => {
+    setUploadedWireframe(null);
+  };
+
+  const handleGenerateFromWireframe = async () => {
+    if (!uploadedWireframe || !prdId) return;
+
+    setIsGeneratingFromWireframe(true);
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          // Remove data URL prefix to get pure base64
+          const base64Data = base64.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(uploadedWireframe.file);
+
+      const base64Data = await base64Promise;
+
+      // Prepare context
+      const context = {
+        objective: answers.objective || '',
+        background: answers.background || '',
+        scope: answers.scope || ''
+      };
+
+      // Prepare retrieved chunks (top 5-8 from context suggestions)
+      const topChunks = contextSuggestions
+        .sort((a, b) => (b.relevance || 0) - (a.relevance || 0))
+        .slice(0, 8);
+
+      // Track analytics
+      analytics.trackGenerationStart(
+        !!(context.objective || context.background || context.scope),
+        topChunks.length > 0
+      );
+
+      // Call API
+      const result = await ApiClient.generateRequirementsFromWireframe(
+        base64Data,
+        context,
+        topChunks
+      );
+
+      // Update requirements textarea
+      setAnswers(prev => ({ ...prev, requirements: result.requirements }));
+
+      // Track success
+      analytics.trackGenerationSuccess(
+        result.confidence,
+        result.metadata.word_count || 0,
+        result.metadata.components_detected || 0
+      );
+
+      // Show confidence toast
+      if (result.confidence < 70) {
+        toast({
+          title: `Requirements generated (${result.confidence}% confidence)`,
+          description: 'The generated requirements may need review. Please validate the details.',
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: `Requirements generated (${result.confidence}% confidence)`,
+          description: 'You can now review and edit the generated requirements.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Generate from wireframe error:', error);
+      analytics.trackGenerationFailure(error.message || 'Unknown error');
+      toast({
+        title: 'Generation failed',
+        description: error.message || 'Failed to generate requirements from wireframe',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingFromWireframe(false);
+    }
   };
 
   const handleNext = () => {
@@ -1487,6 +1604,70 @@ export default function PRDNew() {
             </Button>
           </div>
         </div>
+
+        {/* Wireframe Upload - Show on Step 3 (Scope) */}
+        {currentStep === 2 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Image className="w-4 h-4 text-white/70" />
+              <label className="text-sm font-medium text-white/70">Upload Wireframe (Optional)</label>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs text-white/50 mb-4">
+                Upload a wireframe or sketch to generate detailed requirements in the next step.
+              </p>
+              <WireframeUpload
+                onUpload={handleWireframeUpload}
+                onRemove={handleWireframeRemove}
+                uploadedFile={uploadedWireframe}
+                maxSizeMB={10}
+                acceptedFormats={['image/png', 'image/jpeg', 'image/jpg', 'application/pdf']}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Wireframe-based Generation - Show on Step 4 (Requirements) */}
+        {currentStep === 3 && uploadedWireframe && (
+          <div className="mb-6 rounded-xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="flex items-start gap-4">
+              <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+                {uploadedWireframe.file.type.startsWith('image/') ? (
+                  <img
+                    src={uploadedWireframe.preview}
+                    alt="Wireframe"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Image className="h-6 w-6 text-white/40" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white mb-1">📷 Wireframe Uploaded</p>
+                <p className="text-xs text-white/50 mb-3">{uploadedWireframe.file.name}</p>
+                <Button
+                  onClick={handleGenerateFromWireframe}
+                  disabled={isGeneratingFromWireframe}
+                  className="rounded-md border border-white/15 bg-white/90 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
+                >
+                  {isGeneratingFromWireframe ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing wireframe...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generate Requirements from Wireframe
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className={`flex items-center ${currentStep === 0 ? 'justify-end' : 'justify-between'}`}>
           {currentStep > 0 && (

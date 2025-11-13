@@ -206,4 +206,77 @@ export class ApiClient {
   static async dismissDuplicateDocument(documentId: string, duplicateId: string): Promise<{ success: boolean; message: string }> {
     return this.post('/api/documents/dismiss-duplicate', { documentId, duplicateId });
   }
+
+  // Wireframe-based requirements generation
+  static async generateRequirementsFromWireframe(
+    wireframe: string, 
+    context: { objective?: string; background?: string; scope?: string }, 
+    retrievedChunks?: any[]
+  ): Promise<{ requirements: string; confidence: number; metadata: any }> {
+    return this.post('/api/prd/generate-requirements-from-wireframe', { 
+      wireframe, 
+      context, 
+      retrievedChunks: retrievedChunks || [] 
+    });
+  }
+
+  static async regenerateRequirementsFromWireframe(
+    prdId: string,
+    wireframe: string, 
+    existingPRD: any
+  ): Promise<{ requirements: string; confidence: number; metadata: any }> {
+    return this.post('/api/prd/regenerate-requirements-from-wireframe', { 
+      prdId, 
+      wireframe, 
+      existingPRD 
+    });
+  }
+
+  static async savePRDSectionWithWireframe(
+    prdVersionId: string, 
+    sectionId: string, 
+    content: string, 
+    wireframeUrl?: string,
+    wireframeMetadata?: any,
+    metadata?: Record<string, any>, 
+    citationChunkIds?: string[]
+  ): Promise<{ section: any }> {
+    return this.post('/api/prd/sections', { 
+      prd_version_id: prdVersionId, 
+      section_id: sectionId, 
+      content, 
+      wireframe_url: wireframeUrl,
+      wireframe_metadata: wireframeMetadata,
+      metadata, 
+      citation_chunk_ids: citationChunkIds 
+    });
+  }
+
+  // Audio transcription
+  static async transcribeAudio(formData: FormData): Promise<{ text: string }> {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    const response = await fetch(`${API_BASE_URL}/api/speech/transcribe`, {
+      method: 'POST',
+      headers: {
+        ...(session?.access_token && {
+          'Authorization': `Bearer ${session.access_token}`
+        }),
+      },
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Transcription failed' }));
+      throw new Error(error.message || 'Transcription request failed');
+    }
+
+    return response.json();
+  }
+
+  // AI section draft generation
+  static async generateSectionDraft(sectionId: string, context: any): Promise<{ draft: string; confidence?: number }> {
+    return this.post('/api/prd/generate-section-draft', { section_id: sectionId, context });
+  }
 }
