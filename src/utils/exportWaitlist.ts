@@ -2,10 +2,10 @@
 
 export interface WaitlistSignup {
   id: string;
-  full_name: string;
+  full_name: string | null;
   email: string;
-  company_name: string;
-  job_title: string;
+  company_name: string | null;
+  job_title: string | null;
   whatsapp_number: string | null;
   whatsapp_country_code: string | null;
   company_size: string;
@@ -49,10 +49,10 @@ export function exportToCSV(data: WaitlistSignup[]): void {
 
   // Convert data to CSV rows
   const rows = data.map(item => [
-    `"${escapeCSV(item.full_name)}"`,
+    `"${escapeCSV(item.full_name || 'N/A')}"`,
     `"${escapeCSV(item.email)}"`,
-    `"${escapeCSV(item.company_name)}"`,
-    `"${escapeCSV(item.job_title)}"`,
+    `"${escapeCSV(item.company_name || 'N/A')}"`,
+    `"${escapeCSV(item.job_title || 'N/A')}"`,
     `"${formatWhatsApp(item.whatsapp_country_code, item.whatsapp_number)}"`,
     `"${escapeCSV(item.company_size)}"`,
     `"${escapeCSV(item.primary_use_case)}"`,
@@ -115,8 +115,8 @@ export function exportToJSON(data: WaitlistSignup[]): void {
 /**
  * Escape special characters for CSV
  */
-function escapeCSV(value: string): string {
-  if (!value) return '';
+function escapeCSV(value: string | null | undefined): string {
+  if (!value) return 'N/A';
   // Replace double quotes with two double quotes
   return value.replace(/"/g, '""');
 }

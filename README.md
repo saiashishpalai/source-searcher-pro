@@ -104,6 +104,15 @@ Supabase migrations live in `database/migrations`. Apply them in order to provis
 └── tools/               # Evaluation utilities
 ```
 
+## 🎫 Waitlist System
+
+Haven7 includes an email-only waitlist signup page with admin dashboard:
+
+- **Public Signup:** `/waitlist` - Minimalist email-only signup with animated hero design
+- **Admin Dashboard:** `/admin/waitlist` - PIN-protected dashboard (PIN: `9979`) to view and export signups
+- **Database:** See `database/schema/waitlist-schema.sql` for setup
+- **Documentation:** See `database/Waitlist_README.md` for detailed guide
+
 Legacy `backend/` artifacts have been removed in favor of the unified `server/` directory.
 
 ---

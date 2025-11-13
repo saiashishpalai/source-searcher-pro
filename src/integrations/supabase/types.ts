@@ -50,10 +50,10 @@ export type Database = {
       waitlist_signups: {
         Row: {
           id: string
-          full_name: string
+          full_name: string | null
           email: string
-          company_name: string
-          job_title: string
+          company_name: string | null
+          job_title: string | null
           whatsapp_number: string | null
           whatsapp_country_code: string | null
           company_size: string
@@ -68,16 +68,16 @@ export type Database = {
         }
         Insert: {
           id?: string
-          full_name: string
+          full_name?: string | null
           email: string
-          company_name: string
-          job_title: string
+          company_name?: string | null
+          job_title?: string | null
           whatsapp_number?: string | null
           whatsapp_country_code?: string | null
-          company_size: string
-          primary_use_case: string
-          pain_level: string
-          agree_to_contact: boolean
+          company_size?: string
+          primary_use_case?: string
+          pain_level?: string
+          agree_to_contact?: boolean
           utm_source?: string | null
           utm_medium?: string | null
           utm_campaign?: string | null
@@ -86,10 +86,10 @@ export type Database = {
         }
         Update: {
           id?: string
-          full_name?: string
+          full_name?: string | null
           email?: string
-          company_name?: string
-          job_title?: string
+          company_name?: string | null
+          job_title?: string | null
           whatsapp_number?: string | null
           whatsapp_country_code?: string | null
           company_size?: string

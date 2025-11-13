@@ -1,189 +1,123 @@
-# Haven7 Waitlist Setup Guide
+# Haven7 Waitlist System
 
 ## Overview
-This document explains how to set up and use the Haven7 waitlist system for early access signups.
+Email-only waitlist signup system for Haven7 early access. Minimalist design with modern animations and glass-morphism effects.
 
 ## Database Setup
 
-### 1. Run the Schema Migration
-Execute the waitlist schema SQL in your Supabase SQL editor:
+### Initial Setup
+Run the schema in Supabase SQL Editor:
 
-```bash
-# Copy the contents of database/schema/waitlist-schema.sql
-# Paste into Supabase SQL Editor and execute
-```
+**File:** `database/schema/waitlist-schema.sql`
 
-Or via Supabase CLI:
+Or run directly:
 
-```bash
-supabase db push
-```
-
-### 2. Verify RLS Policies
-The schema creates the following security policies:
-- ✅ Public can INSERT (anyone can sign up)
-- ❌ Public cannot SELECT, UPDATE, or DELETE (admin only via dashboard)
-
-### 3. Verify Table Structure
 ```sql
--- Check table exists
-SELECT * FROM waitlist_signups LIMIT 1;
+CREATE TABLE IF NOT EXISTS waitlist_signups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  full_name TEXT DEFAULT '',
+  company_name TEXT DEFAULT '',
+  job_title TEXT DEFAULT '',
+  whatsapp_number TEXT,
+  whatsapp_country_code TEXT DEFAULT '+1',
+  company_size TEXT NOT NULL DEFAULT 'Unknown',
+  primary_use_case TEXT NOT NULL DEFAULT 'Unknown',
+  pain_level TEXT NOT NULL DEFAULT 'Unknown',
+  agree_to_contact BOOLEAN NOT NULL DEFAULT true,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- View table structure
-\d waitlist_signups;
+-- Indexes
+CREATE INDEX idx_waitlist_email ON waitlist_signups(email);
+CREATE INDEX idx_waitlist_created_at ON waitlist_signups(created_at DESC);
+
+-- RLS
+ALTER TABLE waitlist_signups ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+CREATE POLICY "Allow public insert on waitlist_signups"
+  ON waitlist_signups FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow public select on waitlist_signups"
+  ON waitlist_signups FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Deny public update on waitlist_signups"
+  ON waitlist_signups FOR UPDATE TO anon, authenticated USING (false);
+
+CREATE POLICY "Deny public delete on waitlist_signups"
+  ON waitlist_signups FOR DELETE TO anon, authenticated USING (false);
+
+-- Permissions
+GRANT SELECT, INSERT ON waitlist_signups TO anon;
+GRANT SELECT, INSERT ON waitlist_signups TO authenticated;
 ```
 
 ## Routes
 
-### Public Routes
-- `/waitlist` - Waitlist signup page
-- Supports UTM parameters: `?utm_source=X&utm_medium=Y&utm_campaign=Z`
+- **Public:** `/waitlist` - Email-only signup page
+- **Admin:** `/admin/waitlist` - Dashboard (PIN: `9979`)
 
-### Admin Routes
-- `/admin/waitlist` - Admin dashboard (PIN: 9979)
-  - View all signups
-  - Search and filter
-  - Export to CSV/JSON
+## Features
 
-## Admin Dashboard Access
+- ✅ Email-only signup (minimal friction)
+- ✅ Modern animated hero design
+- ✅ UTM parameter tracking
+- ✅ Admin dashboard with PIN protection
+- ✅ CSV/JSON export
+- ✅ Responsive mobile design
 
-### PIN Protection
-The admin dashboard is protected by a 4-digit PIN:
-- **PIN:** `9979`
-- Stored in sessionStorage for browser session
-- No server-side authentication required
+## Admin Dashboard
 
-### Features
-1. **Total Count** - See total signups at a glance
-2. **Search** - Filter by name, email, or company
-3. **Sort** - By date (newest first), name, or company
-4. **Export**
-   - CSV format for Excel/Sheets
-   - JSON format for programmatic access
-5. **Responsive** - Works on mobile and desktop
+**URL:** `/admin/waitlist`  
+**PIN:** `9979`
+
+Features:
+- View all signups in sortable table
+- Search by email, name, or company
+- Export to CSV or JSON
+- Responsive card view on mobile
 
 ## Form Fields
 
-### Required Fields
-- Full Name
-- Email (validated, unique)
-- Company Name
-- Job Title / Position
-- Company Size
-- Primary Use Case
-- Pain Level
-- Agree to Contact (checkbox)
+**Required:**
+- Email address
 
-### Optional Fields
-- WhatsApp Number (with country code)
-- Expected Team Size
-
-### Auto-Captured Fields
-- UTM Source, Medium, Campaign (from URL parameters)
-- User Agent (device/browser info)
-- Timestamp
-
-## Marketing Campaigns
-
-### UTM Parameter Tracking
-Track signup sources using UTM parameters:
-
-```
-/waitlist?utm_source=linkedin&utm_medium=social&utm_campaign=launch
-/waitlist?utm_source=product_hunt&utm_medium=referral&utm_campaign=launch_week
-```
-
-### Exporting Data
-1. Navigate to `/admin/waitlist`
-2. Enter PIN: `9979`
-3. Use search/filter to narrow results
-4. Click **CSV** or **JSON** to export
-
-## Database Schema
-
-### Table: `waitlist_signups`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| full_name | TEXT | User's full name |
-| email | TEXT | Unique email |
-| company_name | TEXT | Company name |
-| job_title | TEXT | Job title/position |
-| whatsapp_number | TEXT | Optional WhatsApp |
-| whatsapp_country_code | TEXT | Country code (default: +1) |
-| company_size | TEXT | One of: 1-10, 11-50, 51-200, 201-1000, 1000+ |
-| primary_use_case | TEXT | Main use case |
-| pain_level | TEXT | One of: Daily, Weekly, Monthly, Rarely |
-| expected_team_size | TEXT | Optional |
-| agree_to_contact | BOOLEAN | Consent checkbox |
-| utm_source | TEXT | Tracking |
-| utm_medium | TEXT | Tracking |
-| utm_campaign | TEXT | Tracking |
-| user_agent | TEXT | Device info |
-| created_at | TIMESTAMP | Signup time |
-
-### Indexes
-- `idx_waitlist_email` - Fast duplicate checks
-- `idx_waitlist_created_at` - Fast sorting by date
-- `idx_waitlist_company_size` - Analytics
-- `idx_waitlist_primary_use_case` - Analytics
-
-## Styling
-
-The waitlist pages use Haven7's dark theme:
-- Background: `#0f0f11`
-- Cards: `#1f1f23`
-- Accent: `#a855f7` (purple)
-- Glass-morphism effects
-- Smooth animations
+**Auto-filled:**
+- Full Name: `""` (empty string)
+- Company Name: `""` (empty string)
+- Job Title: `""` (empty string)
+- Company Size: `"Unknown"`
+- Primary Use Case: `"Unknown"`
+- Pain Level: `"Unknown"`
+- Agree to Contact: `true`
+- User Agent (from browser)
+- UTM parameters (from URL)
 
 ## Troubleshooting
 
-### "Duplicate email" error
-- The email is already in the waitlist
-- Database constraint prevents duplicates
-- Shows user-friendly error message
+### Form submission errors
+1. Verify table exists: `SELECT * FROM waitlist_signups LIMIT 1;`
+2. Check RLS policies: `SELECT * FROM pg_policies WHERE tablename = 'waitlist_signups';`
+3. Refresh schema cache: `NOTIFY pgrst, 'reload schema';`
 
 ### Admin dashboard won't load
-- Clear sessionStorage
-- Refresh page
-- Re-enter PIN
+1. Clear browser sessionStorage
+2. Refresh page
+3. Re-enter PIN: `9979`
 
-### Missing data in exports
-- Check search/filter settings
-- Ensure data exists in database
-- Verify Supabase connection
+### Export not working
+1. Check browser console for errors
+2. Ensure data exists in table
+3. Try refreshing the dashboard
 
-### RLS policy issues
-- Verify policies in Supabase dashboard
-- Check that RLS is enabled
-- Ensure `anon` and `authenticated` roles exist
+## Security Notes
 
-## Next Steps
-
-1. ✅ Database schema created
-2. ✅ Frontend pages implemented
-3. ✅ Admin dashboard ready
-4. 🔲 Run schema migration in production
-5. 🔲 Test signup flow
-6. 🔲 Set up email notifications (optional)
-7. 🔲 Add to marketing site
-
-## Future Enhancements
-
-- [ ] Email confirmation on signup
-- [ ] Referral code system
-- [ ] Automatic analytics dashboard
-- [ ] Integration with CRM (e.g., HubSpot)
-- [ ] Automated welcome emails
-- [ ] A/B testing different value propositions
-
-## Support
-
-For issues or questions:
-1. Check this README
-2. Review database schema
-3. Check browser console for errors
-4. Verify Supabase connection
-
+- Public can insert (anyone can sign up)
+- Public can read (for admin dashboard - protected by PIN)
+- Public cannot update or delete
+- All fields except email use defaults/empty strings for email-only signup
