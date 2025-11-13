@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, Menu, Sparkles, Loader2, Image as ImageIcon, Mic, Square, RotateCcw, Plus } from 'lucide-react';
+import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, Menu, Sparkles, Loader2, Image as ImageIcon, Mic, Square, RotateCcw, Plus, Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApiClient } from '@/lib/api-client';
 import { WireframeUpload } from '@/components/WireframeUpload';
@@ -35,6 +35,7 @@ export default function PRDView() {
   const [prd, setPrd] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedSections, setEditedSections] = useState<Record<string, string>>({});
+  const [editedTitle, setEditedTitle] = useState('');
   const [changeSummary, setChangeSummary] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
@@ -193,9 +194,13 @@ export default function PRDView() {
     setVersions(versions || []);
   };
 
-  const handleEdit = () => setIsEditing(true);
+  const handleEdit = () => {
+    setEditedTitle(prd?.title || '');
+    setIsEditing(true);
+  };
   const handleCancel = () => {
     setIsEditing(false);
+    setEditedTitle('');
     setChangeSummary('');
     setEditingRequirements(false);
     setRequirementsWireframe(null);
@@ -490,17 +495,98 @@ export default function PRDView() {
     if (!id) return;
     setIsSaving(true);
     try {
-      const { prd: newPrd } = await ApiClient.createPRDVersion(id, changeSummary || 'Updated PRD');
-      for (const [sectionId, content] of Object.entries(editedSections)) {
-        await ApiClient.savePRDSection(newPrd.id, sectionId as SectionId, content || '');
+      // Update title if it changed
+      if (editedTitle.trim() && editedTitle.trim() !== prd?.title) {
+        await ApiClient.updatePRDTitle(id, editedTitle.trim());
       }
+      
+      // Save all sections to current version (stays as draft)
+      for (const [sectionId, content] of Object.entries(editedSections)) {
+        await ApiClient.savePRDSection(id, sectionId as SectionId, content || '');
+      }
+      
+      // Refresh PRD data
+      await fetchPRD();
+      
       setIsEditing(false);
+      setEditedTitle('');
       setChangeSummary('');
-      navigate(`/prd/${newPrd.id}`);
+      
+      toast({
+        title: 'Changes saved',
+        description: 'Your edits have been saved. Click Publish when ready.',
+      });
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast({
+        title: 'Failed to save PRD',
+        description: error.message || 'Could not save PRD. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handlePublish = async () => {
+    if (!id || !prd) return;
+    setIsSaving(true);
+    try {
+      // First, save any pending changes
+      if (editedTitle.trim() && editedTitle.trim() !== prd?.title) {
+        await ApiClient.updatePRDTitle(id, editedTitle.trim());
+      }
+      
+      // Save all sections to current version
+      for (const [sectionId, content] of Object.entries(editedSections)) {
+        await ApiClient.savePRDSection(id, sectionId as SectionId, content || '');
+      }
+      
+      // Publish the current version
+      await ApiClient.updatePRDStatus(id, 'published');
+      
+      // Refresh PRD data to show updated status
+      await fetchPRD();
+      
+      // Create a new version automatically (for continued editing)
+      const { prd: newPrd } = await ApiClient.createPRDVersion(id, changeSummary || 'Published and created new version');
+      
+      // Copy title to new version if it was changed
+      if (editedTitle.trim() && editedTitle.trim() !== prd?.title) {
+        await ApiClient.updatePRDTitle(newPrd.id, editedTitle.trim());
+      }
+      
+      // Copy all sections to the new version
+      for (const [sectionId, content] of Object.entries(editedSections)) {
+        await ApiClient.savePRDSection(newPrd.id, sectionId as SectionId, content || '');
+      }
+      
+      setIsEditing(false);
+      setEditedTitle('');
+      setChangeSummary('');
+      
+      // Show published status briefly, then navigate to new version
+      toast({
+        title: 'PRD Published',
+        description: `Version ${prd.version} has been published. You're now editing version ${newPrd.version}.`,
+      });
+      
+      // Navigate to the new version (draft) after a short delay to show published status
+      setTimeout(() => {
+        navigate(`/prd/${newPrd.id}`);
+      }, 1500);
+    } catch (error: any) {
+      console.error('Publish error:', error);
+      toast({
+        title: 'Failed to publish PRD',
+        description: error.message || 'Could not publish PRD. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
 
   const copyMarkdown = async () => {
     if (!prd) return;
@@ -619,12 +705,38 @@ export default function PRDView() {
                     <ArrowLeft className="mr-2 h-4 w-4" /> All PRDs
             </Button>
                   {!isEditing ? (
-                    <Button
-                      onClick={handleEdit}
-                      className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:bg-white/15 hover:text-white"
-                    >
-                      <Edit className="mr-2 h-4 w-4" /> Edit
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleEdit}
+                        className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:bg-white/15 hover:text-white"
+                      >
+                        <Edit className="mr-2 h-4 w-4" /> Edit
+                      </Button>
+                      {prd?.status === 'draft' ? (
+                        <Button
+                          onClick={handlePublish}
+                          disabled={isSaving}
+                          className="rounded-full border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 transition-colors hover:bg-green-500/20 hover:border-green-500/50"
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing…
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-2 h-4 w-4" /> Publish
+                            </>
+                          )}
+                        </Button>
+                      ) : prd?.status === 'published' ? (
+                        <Button
+                          disabled
+                          className="rounded-full border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 opacity-100 cursor-default"
+                        >
+                          <Check className="mr-2 h-4 w-4" /> Published
+                        </Button>
+                      ) : null}
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <Button
@@ -639,7 +751,7 @@ export default function PRDView() {
                         disabled={isSaving}
                         className="rounded-full border border-white/20 bg-white/90 px-4 py-2 text-sm text-gray-900 transition-colors hover:bg-white"
                       >
-                        <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Saving…' : `Save v${prd.version + 1}`}
+                        <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Saving…' : 'Save'}
                       </Button>
                     </div>
                   )}
@@ -706,7 +818,32 @@ export default function PRDView() {
 
         <main className="relative flex-1 overflow-y-auto px-6 pb-16 pt-4 sm:px-8 lg:px-10">
           <div className="mb-6 flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold text-white">{prd.title || 'Untitled PRD'}</h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  placeholder="PRD Title"
+                  className="text-3xl font-semibold text-white bg-transparent border-b-2 border-white/20 focus:border-white/40 focus:outline-none pb-2 transition-colors"
+                  autoFocus
+                />
+              ) : (
+                <h1 className="text-3xl font-semibold text-white">{prd.title || 'Untitled PRD'}</h1>
+              )}
+              {prd?.status === 'published' && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/30">
+                  <Check className="w-3 h-3" />
+                  Published
+                </span>
+              )}
+              {isEditing && prd?.status === 'draft' && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                  <Edit className="w-3 h-3" />
+                  Draft
+                </span>
+              )}
+            </div>
             <p className="text-sm text-white/60">v{prd.version} • Updated {new Date(prd.updated_at).toLocaleString()}</p>
           </div>
 

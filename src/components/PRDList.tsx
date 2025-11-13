@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { FileText, GitBranch, Calendar, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { FileText, GitBranch, Calendar, CheckCircle, Trash2, FileEdit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -99,7 +99,9 @@ export default function PRDList() {
       case 'published':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'draft':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <FileEdit className="w-4 h-4 text-amber-500" />;
+      case 'archived':
+        return <FileText className="w-4 h-4 text-gray-500" />;
       default:
         return <FileText className="w-4 h-4 text-gray-500" />;
     }

@@ -173,6 +173,35 @@ export class ApiClient {
     return response.json();
   }
 
+  static async updatePRDStatus(prdId: string, status: 'draft' | 'published' | 'archived'): Promise<{ prd: any }> {
+    const headers = await this.getAuthHeaders();
+    
+    console.log('Updating PRD status:', { prdId, status });
+    
+    const response = await fetch(`${API_BASE_URL}/api/prd/${prdId}`, {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ status }),
+    });
+
+    console.log('Update status response:', response.status, response.ok);
+
+    if (!response.ok) {
+      let errorMessage = 'API request failed';
+      try {
+        const errorData = await response.json();
+        console.error('Update status error data:', errorData);
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        // If response is not JSON, use status text
+        errorMessage = response.statusText || `HTTP ${response.status}`;
+      }
+      throw new Error(errorMessage);
+    }
+    return response.json();
+  }
+
   static async comparePRDs(v1Id: string, v2Id: string): Promise<{ v1: any; v2: any; diff: any }> {
     return this.get(`/api/prd/compare?v1=${v1Id}&v2=${v2Id}`);
   }

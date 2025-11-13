@@ -2112,6 +2112,21 @@ export default function PRDNew() {
 
       {!sidebarCollapsed && (
         <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8">
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase tracking-[0.45em] text-white/40">Navigation</span>
+            </div>
+            <Button
+              variant="ghost"
+              className="w-full justify-start rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/70 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              onClick={() => {
+                navigate('/dashboard');
+              }}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </section>
           <section>
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[11px] uppercase tracking-[0.45em] text-white/40">Recent PRDs</p>

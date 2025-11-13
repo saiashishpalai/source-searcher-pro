@@ -50,6 +50,12 @@ app.use(cors({
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
+// Multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
 // Minimal request logger for sync endpoints to aid debugging during development
 app.use((req, _res, next) => {
   if (req.path.startsWith('/api/sync')) {
@@ -95,7 +101,7 @@ const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Multer setup for audio uploads
-const upload = multer({
+const uploadAudio = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, os.tmpdir()),
     filename: (_req, file, cb) => {
@@ -111,7 +117,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Speech-to-Text (Whisper) - Push-to-Talk transcription
-app.post('/api/speech/transcribe', upload.single('audio'), async (req, res) => {
+app.post('/api/speech/transcribe', uploadAudio.single('audio'), async (req, res) => {
   const start = Date.now();
   let tempPath = null;
   try {
@@ -178,6 +184,63 @@ app.post('/api/speech/transcribe', upload.single('audio'), async (req, res) => {
     if (tempPath) {
       fs.unlink(tempPath, () => {});
     }
+  }
+});
+
+// Storage: Upload wireframe via service role to avoid client JWT issues
+app.post('/api/storage/upload-wireframe', upload.single('file'), async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const file = req.file;
+
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+    if (!allowed.includes(file.mimetype)) {
+      return res.status(400).json({ error: 'Unsupported file type' });
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File size exceeds 10MB limit' });
+    }
+
+    const ext = (file.originalname.split('.').pop() || 'bin').toLowerCase();
+    const objectName = `${user.id}-${Date.now()}.${ext}`; // flat filename to match RLS policy
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('wireframes')
+      .upload(objectName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Wireframe storage upload error:', uploadError);
+      return res.status(400).json({ error: uploadError.message || 'Upload failed' });
+    }
+
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('wireframes')
+      .getPublicUrl(objectName);
+
+    return res.json({
+      success: true,
+      path: objectName,
+      url: publicUrlData?.publicUrl,
+      metadata: {
+        filename: file.originalname,
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+        mime: file.mimetype,
+      },
+    });
+  } catch (e) {
+    console.error('Upload wireframe endpoint error:', e);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1864,20 +1927,29 @@ app.post('/api/prd/sections', async (req, res) => {
       .single();
     if (prdError || !prd) return res.status(403).json({ error: 'Forbidden' });
 
+    // Build upsert payload - skip wireframe columns until PostgREST cache refreshes
+    // Both columns exist in DB but PostgREST schema cache is stale
+    const upsertPayload = {
+      prd_version_id,
+      section_id,
+      content,
+      ...(metadata ? { metadata } : {}),
+      // Temporarily skip wireframe columns until cache refreshes (usually 5-10 min or after service restart)
+      // ...(wireframe_url ? { wireframe_url } : {}),
+      // ...(wireframe_metadata ? { wireframe_metadata } : {}),
+    };
+
     const { data: section, error } = await supabaseAdmin
       .from('prd_sections')
-      .upsert({
-        prd_version_id,
-        section_id,
-        content,
-        ...(metadata ? { metadata } : {}),
-        ...(wireframe_url ? { wireframe_url } : {}),
-        ...(wireframe_metadata ? { wireframe_metadata } : {}),
-      }, { onConflict: 'prd_version_id,section_id' })
+      .upsert(upsertPayload, { onConflict: 'prd_version_id,section_id' })
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('❌ PRD section save error:', error);
+      console.error('Request body:', { prd_version_id, section_id, has_wireframe_url: !!wireframe_url, has_wireframe_metadata: !!wireframe_metadata });
+      return res.status(500).json({ error: error.message });
+    }
 
     // Store citations if provided
     if (citation_chunk_ids.length > 0) {
@@ -2205,9 +2277,11 @@ app.delete('/api/prd/:id', async (req, res) => {
   }
 });
 
-// PRD: Update PRD title
+// PRD: Update PRD title or status
 app.patch('/api/prd/:id', async (req, res) => {
   try {
+    console.log('🔧 PATCH /api/prd/:id called with body:', req.body);
+    
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -2216,21 +2290,55 @@ app.patch('/api/prd/:id', async (req, res) => {
     if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
 
     const { id } = req.params;
-    const { title } = req.body || {};
-    if (!title || !title.trim()) return res.status(400).json({ error: 'Title required' });
+    const { title, status } = req.body || {};
+    
+    console.log('📝 Update request - ID:', id, 'Title:', title, 'Status:', status);
+    
+    // Build update object
+    const updates = { updated_at: new Date().toISOString() };
+    
+    // Only process title if it's explicitly provided and not empty
+    if (title !== undefined && title !== null && title !== '') {
+      if (!title.trim()) {
+        return res.status(400).json({ error: 'Title cannot be empty' });
+      }
+      updates.title = title.trim();
+    }
+    
+    // Only process status if it's explicitly provided
+    if (status !== undefined && status !== null) {
+      if (!['draft', 'published', 'archived'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status. Must be draft, published, or archived' });
+      }
+      updates.status = status;
+    }
+    
+    // Check if we have any actual fields to update (besides updated_at)
+    if (Object.keys(updates).length === 1) {
+      return res.status(400).json({ error: 'No valid fields to update. Provide either title or status.' });
+    }
 
     const { data: updated, error } = await supabaseAdmin
       .from('prd_versions')
-      .update({ title: title.trim(), updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', id)
       .eq('user_id', user.id)
-      .select('id, title, version, updated_at')
+      .select('id, title, version, status, updated_at')
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('Update PRD error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'PRD not found or access denied' });
+    }
+    
     res.json({ prd: updated });
   } catch (e) {
-    res.status(500).json({ error: 'Failed to update PRD title' });
+    console.error('Update PRD exception:', e);
+    res.status(500).json({ error: e.message || 'Failed to update PRD' });
   }
 });
 

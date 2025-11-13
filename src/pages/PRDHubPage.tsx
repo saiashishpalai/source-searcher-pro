@@ -108,17 +108,11 @@ export default function PRDHubPage() {
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-10">
           <div className="max-w-5xl mx-auto">
-            <div className="flex items-center justify-between mb-10">
+            <div className="mb-10">
               <div>
                 <h1 className="text-3xl font-semibold text-white">PRD Library</h1>
                 <p className="mt-2 text-sm text-white/60">Track every product requirements document, iterate on versions, and keep teams aligned.</p>
               </div>
-              <Button
-                onClick={() => navigate('/prd/new')}
-                className="rounded-full border border-white/15 bg-white/10 px-6 py-3 text-sm font-medium text-white/70 transition-colors hover:border-white/25 hover:bg-white/15 hover:text-white"
-              >
-                <Plus className="mr-2 h-4 w-4" /> New PRD
-              </Button>
             </div>
             <PRDList />
           </div>
