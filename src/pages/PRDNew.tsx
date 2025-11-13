@@ -304,7 +304,7 @@ export default function PRDNew() {
   const [sidebarError, setSidebarError] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [uploadedWireframe, setUploadedWireframe] = useState<{ file: File; preview: string; storageUrl?: string; storagePath?: string } | null>(null);
+  const [uploadedWireframe, setUploadedWireframe] = useState<{ file: File; preview: string; storageUrl?: string } | null>(null);
   const [isGeneratingFromWireframe, setIsGeneratingFromWireframe] = useState(false);
   const { toast } = useToast();
 
@@ -800,8 +800,7 @@ export default function PRDNew() {
               const wireframeMetadata = {
                 filename: uploadedWireframe.file.name,
                 size: uploadedWireframe.file.size,
-                uploaded_at: new Date().toISOString(),
-                ...(uploadedWireframe.storagePath ? { storage_path: uploadedWireframe.storagePath } : {})
+                uploaded_at: new Date().toISOString()
               };
               await ApiClient.savePRDSectionWithWireframe(
                 prdId,
@@ -1066,8 +1065,8 @@ export default function PRDNew() {
     setConsecutiveLowResults(0);
   };
 
-  const handleWireframeUpload = (file: File, preview: string, storage: { storageUrl?: string; storagePath?: string }) => {
-    setUploadedWireframe({ file, preview, storageUrl: storage.storageUrl, storagePath: storage.storagePath });
+  const handleWireframeUpload = (file: File, preview: string, storageUrl: string) => {
+    setUploadedWireframe({ file, preview, storageUrl });
     toast({
       title: 'Wireframe uploaded',
       description: 'You can now generate requirements from this wireframe in the next step.',

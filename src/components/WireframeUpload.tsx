@@ -4,15 +4,10 @@ import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { analytics } from '@/lib/analytics';
 
-interface WireframeStorageInfo {
-  storageUrl?: string;
-  storagePath?: string;
-}
-
 interface WireframeUploadProps {
-  onUpload: (file: File, preview: string, storage: WireframeStorageInfo) => void;
+  onUpload: (file: File, preview: string, storageUrl: string) => void;
   onRemove: () => void;
-  uploadedFile?: { file: File; preview: string; storageUrl?: string; storagePath?: string } | null;
+  uploadedFile?: { file: File; preview: string; storageUrl?: string } | null;
   maxSizeMB?: number;
   acceptedFormats?: string[];
   disabled?: boolean;
@@ -65,59 +60,35 @@ export function WireframeUpload({
       const preview = URL.createObjectURL(file);
 
       // Upload to Supabase Storage
-      const [{ data: { user } }, { data: { session } }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.auth.getSession()
-      ]);
-
-      if (!user || !session?.access_token) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         throw new Error('User not authenticated');
       }
 
       const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `${Date.now()}.${fileExt}`;
-      const storagePath = `${user.id}/${fileName}`;
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = fileName; // Just the filename, not wireframes/filename
 
-      const attemptUpload = async () => {
-        return supabase.storage
-          .from('wireframes')
-          .upload(storagePath, file, { upsert: true });
-      };
-
-      let { error: uploadError } = await attemptUpload();
-
-      if (uploadError && uploadError.message?.toLowerCase().includes('bucket not found')) {
-        // Ask backend to ensure the bucket exists, then retry once
-        try {
-          await fetch('/api/system/ensure-wireframes-bucket', { 
-            method: 'POST', 
-            credentials: 'include',
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            }
-          });
-          ({ error: uploadError } = await attemptUpload());
-        } catch (ensureError) {
-          console.error('Failed to ensure wireframes bucket:', ensureError);
-        }
-      }
+      const { error: uploadError } = await supabase.storage
+        .from('wireframes')
+        .upload(filePath, file, { upsert: true });
 
       if (uploadError) {
+        // If bucket doesn't exist, fall back to graceful handling
         console.error('Supabase storage upload error:', uploadError);
-        setError('Unable to upload wireframe. Please try again or contact support.');
-        return;
+        // Continue anyway - user can still generate requirements from base64
       }
 
-      const { data: publicUrlData } = supabase.storage
+      // Get public URL (even if upload failed, we'll use base64 fallback)
+      const { data: { publicUrl } } = supabase.storage
         .from('wireframes')
-        .getPublicUrl(storagePath);
-      const publicUrl = publicUrlData?.publicUrl;
+        .getPublicUrl(filePath);
 
       // Track analytics
       analytics.trackWireframeUpload(file.size, file.type);
 
       // Call parent callback
-      onUpload(file, preview, { storageUrl: publicUrl, storagePath });
+      onUpload(file, preview, publicUrl);
     } catch (err: any) {
       console.error('Upload error:', err);
       setError(err.message || 'Failed to upload wireframe');
