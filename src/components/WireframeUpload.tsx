@@ -65,18 +65,14 @@ export function WireframeUpload({
       const preview = URL.createObjectURL(file);
 
       // Upload to Supabase Storage
-      const [{ data: { user } }, { data: { session } }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.auth.getSession()
-      ]);
-
-      if (!user || !session?.access_token) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         throw new Error('User not authenticated');
       }
 
       const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `${Date.now()}.${fileExt}`;
-      const storagePath = `${user.id}/${fileName}`;
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const storagePath = fileName;
 
       const attemptUpload = async () => {
         return supabase.storage
