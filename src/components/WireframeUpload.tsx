@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Loader2, Image as ImageIcon, Sparkles, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { analytics } from '@/lib/analytics';
 import { useAuth } from '@/contexts/AuthContext';
@@ -172,11 +172,20 @@ export function WireframeUpload({
 
   if (uploadedFile) {
     return (
-      <div className="space-y-3">
-        <div className="relative rounded-xl border border-white/15 bg-white/[0.03] p-4">
-          <div className="flex items-start gap-4">
-            {/* Preview thumbnail */}
-            <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+      <div className="space-y-3 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+        <div className="relative rounded-xl border border-white/15 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4 overflow-hidden group">
+          {/* Animated gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-r from-violet-500/5 via-fuchsia-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          
+          {/* Success shimmer effect */}
+          {uploadedFile.storageUrl && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-shimmer" 
+                 style={{ animation: 'shimmer 2s infinite' }} />
+          )}
+          
+          <div className="relative flex items-start gap-4">
+            {/* Preview thumbnail with hover effect */}
+            <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-white/15 bg-white/5 group-hover:scale-105 transition-transform duration-300">
               {uploadedFile.file.type.startsWith('image/') ? (
                 <img
                   src={uploadedFile.preview}
@@ -185,31 +194,44 @@ export function WireframeUpload({
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <ImageIcon className="h-8 w-8 text-white/40" />
+                  <ImageIcon className="h-10 w-10 text-white/40" />
+                </div>
+              )}
+              
+              {/* Success badge overlay */}
+              {uploadedFile.storageUrl && (
+                <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/30 to-transparent flex items-end justify-center pb-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-300 drop-shadow-lg animate-in zoom-in-50 duration-300" />
                 </div>
               )}
             </div>
 
-            {/* File info */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {uploadedFile.file.name}
-              </p>
-              <p className="text-xs text-white/50 mt-1">
-                {(uploadedFile.file.size / 1024).toFixed(1)} KB
+            {/* File info with animations */}
+            <div className="flex-1 min-w-0 py-1">
+              <div className="flex items-start gap-2 mb-1">
+                <Sparkles className="h-4 w-4 text-violet-400 flex-shrink-0 mt-0.5 animate-pulse" />
+                <p className="text-sm font-medium text-white truncate">
+                  {uploadedFile.file.name}
+                </p>
+              </div>
+              <p className="text-xs text-white/50 mb-2">
+                {(uploadedFile.file.size / (1024 * 1024)).toFixed(2)} MB
               </p>
               {uploadedFile.storageUrl && (
-                <p className="text-xs text-emerald-300/70 mt-1">✓ Uploaded</p>
+                <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 animate-in fade-in-0 slide-in-from-left-2 duration-300">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-medium text-emerald-300">Ready for AI analysis</span>
+                </div>
               )}
             </div>
 
-            {/* Remove button */}
+            {/* Remove button with hover effect */}
             <Button
               variant="ghost"
               size="icon"
               onClick={handleRemove}
               disabled={disabled}
-              className="h-8 w-8 rounded-full border border-white/10 bg-white/5 text-white/60 hover:bg-red-500/20 hover:text-red-300"
+              className="h-9 w-9 rounded-full border border-white/10 bg-white/5 text-white/60 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 hover:scale-110 transition-all duration-200"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -217,7 +239,7 @@ export function WireframeUpload({
         </div>
 
         {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200 animate-in fade-in-0 slide-in-from-top-2 duration-300">
             {error}
           </div>
         )}
@@ -228,16 +250,38 @@ export function WireframeUpload({
   return (
     <div className="space-y-3">
       <div
-        className={`relative rounded-xl border-2 border-dashed transition-colors ${
+        className={`relative rounded-xl border-2 border-dashed overflow-hidden transition-all duration-300 ${
           isDragging
-            ? 'border-white/40 bg-white/10'
-            : 'border-white/20 bg-white/[0.03]'
-        } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-white/30 hover:bg-white/[0.05]'}`}
+            ? 'border-violet-400/60 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/5 to-violet-500/10 scale-[1.02]'
+            : 'border-white/20 bg-gradient-to-br from-white/[0.04] to-white/[0.02]'
+        } ${
+          disabled 
+            ? 'cursor-not-allowed opacity-50' 
+            : 'cursor-pointer hover:border-white/35 hover:bg-gradient-to-br hover:from-white/[0.06] hover:to-white/[0.03] hover:scale-[1.01]'
+        }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={handleClick}
       >
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-violet-500/0 via-fuchsia-500/5 to-violet-500/0 opacity-0 group-hover:opacity-100 animate-pulse" />
+        
+        {/* Sparkle effects on drag */}
+        {isDragging && (
+          <>
+            <div className="absolute top-4 left-4 animate-ping">
+              <Sparkles className="h-3 w-3 text-violet-400" />
+            </div>
+            <div className="absolute top-4 right-4 animate-ping animation-delay-200">
+              <Sparkles className="h-3 w-3 text-fuchsia-400" />
+            </div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-ping animation-delay-400">
+              <Sparkles className="h-3 w-3 text-violet-400" />
+            </div>
+          </>
+        )}
+        
         <input
           ref={fileInputRef}
           type="file"
@@ -247,32 +291,60 @@ export function WireframeUpload({
           className="hidden"
         />
 
-        <div className="flex flex-col items-center justify-center p-8 text-center">
+        <div className="relative flex flex-col items-center justify-center p-10 text-center">
           {isUploading ? (
-            <>
-              <Loader2 className="h-10 w-10 animate-spin text-white/40 mb-3" />
-              <p className="text-sm font-medium text-white/70">Uploading wireframe...</p>
-            </>
+            <div className="animate-in fade-in-0 zoom-in-50 duration-300">
+              <div className="relative mb-4">
+                <Loader2 className="h-12 w-12 animate-spin text-violet-400" />
+                <div className="absolute inset-0 h-12 w-12 animate-ping text-violet-400/20">
+                  <Loader2 className="h-12 w-12" />
+                </div>
+              </div>
+              <p className="text-sm font-medium text-white/80 mb-1">Uploading wireframe...</p>
+              <div className="flex items-center gap-1 justify-center mt-2">
+                <div className="h-1 w-1 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="h-1 w-1 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="h-1 w-1 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
           ) : (
-            <>
-              <Upload className="h-10 w-10 text-white/40 mb-3" />
-              <p className="text-sm font-medium text-white/80 mb-1">
-                Upload Wireframe
+            <div className="animate-in fade-in-0 duration-300">
+              <div className="relative mb-4 group">
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-300" />
+                <div className="relative flex items-center justify-center h-14 w-14 rounded-full border border-white/15 bg-gradient-to-br from-white/10 to-white/5 group-hover:scale-110 transition-transform duration-300">
+                  <Upload className="h-7 w-7 text-white/70 group-hover:text-white transition-colors duration-300" />
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 justify-center mb-2">
+                <Sparkles className="h-4 w-4 text-violet-400 animate-pulse" />
+                <p className="text-sm font-semibold text-white/90">
+                  Upload Wireframe
+                </p>
+                <Sparkles className="h-4 w-4 text-fuchsia-400 animate-pulse animation-delay-300" />
+              </div>
+              
+              <p className="text-sm text-white/60 mb-1">
+                {isDragging ? 'Drop to upload' : 'Drag and drop or click to select'}
               </p>
-              <p className="text-xs text-white/50">
-                Drag and drop or click to select
-              </p>
-              <p className="text-xs text-white/40 mt-2">
-                PNG, JPG, PDF • Max {maxSizeMB}MB
-              </p>
-            </>
+              
+              <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <span className="text-xs text-white/50">PNG, JPG, PDF</span>
+                </div>
+                <div className="h-3 w-px bg-white/10" />
+                <span className="text-xs text-white/50">Max {maxSizeMB}MB</span>
+              </div>
+            </div>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-          {error}
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200 animate-in fade-in-0 slide-in-from-top-2 duration-300 flex items-start gap-2">
+          <X className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
     </div>
