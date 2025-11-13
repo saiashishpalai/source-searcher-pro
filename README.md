@@ -10,19 +10,19 @@ Source Searcher Pro is an AI workbench for product teams. It combines multi-sour
   Federated search across Google Drive, Slack, and Notion with BM25 + pgvector hybrid retrieval, duplicate suppression, and automatic recency boosts.
 
 - **PRD Builder & Assembly**  
-  Five-question wizard captures the core problem, scope, metrics, dependencies, and timeline, then synthesizes a 14-section PRD using a deterministic GPT-4o-mini system prompt.
+  Seven-question wizard captures the objective, background, scope, requirements, success metrics, and timeline, then synthesizes a 14-section PRD using a deterministic GPT-4o-mini system prompt.
+
+- **Sketch-to-Requirements**  
+  Upload wireframes (PNG, JPG, PDF) during creation or while editing. GPT-4o Vision extracts UI components, generates Functional/Non-Functional requirements, and stores provenance metadata alongside the PRD.
 
 - **Context-Aware Drafting**  
-  Dual-phase retrieval streams lexical hits instantly, then upgrades to a hybrid RRF + MMR shortlist. Drafts and assembled PRDs cite the exact chunks they reference.
+  Dual-phase retrieval streams lexical hits instantly, then upgrades to a hybrid RRF + MMR shortlist. Drafts, regenerated sections, and assembled PRDs cite the exact chunks they reference.
 
-- **Speech to Text Capture**  
-  Push-to-talk recording routes through OpenAI Whisper, auto-translating to English and piping transcripts directly into the active section with insert/replace controls.
-
-- **Collapsible Assist Controls**  
-  Dependency hints, context toggles, and advanced grounding settings live in a settings menu to keep the drafting surface clean while still enabling power features.
+- **Voice & AI Editing Loop**  
+  Every PRD section supports push-to-talk recording (Whisper transcription) plus “Improve with AI” drafting with insert/replace controls—ensuring parity between creation and post-generation editing.
 
 - **Production-Ready UX**  
-  Updated PRD view includes modern card layout, rich markdown rendering, metadata hydration, and preview modals for the assembled document.
+  Updated PRD view includes modern card layout, rich markdown rendering, per-section confidence badges, preview modals, and analytics instrumentation for wireframe and AI interactions.
 
 ---
 
@@ -36,11 +36,12 @@ Source Searcher Pro is an AI workbench for product teams. It combines multi-sour
 | AI | OpenAI GPT-4o-mini & text-embedding-3-small | GPT handles PRD drafting/assembly; embeddings power semantic retrieval. |
 | Storage | Supabase buckets | Document sync and PRD assets. |
 
-### Retrieval Flow
+### Retrieval & Authoring Flow
 1. **Phase 1:** Instant BM25 lexical search (Supabase `ILIKE` + elasticlunr) returns first batch within ~300 ms.  
 2. **Phase 2:** Hybrid vector search via `search_document_chunks` RPC, reciprocal-rank fusion, iterative grounding boosts, dependency hint boosts, and maximal marginal relevance for diversity.  
 3. **Drafting:** Results trimmed, deduped, and passed to GPT with numbered references; citations map back to chunk IDs.  
-4. **Assembly:** Final PRD prompt merges user answers + citations, enforces 14-section output with strict spacing and inferred content.
+4. **Wireframe Assist (optional):** GPT-4o Vision analyses uploaded sketches, producing Markdown-ready requirements plus confidence scoring and metadata payload.  
+5. **Assembly:** Final PRD prompt merges user answers, citations, and optional wireframe-derived requirements; enforces 14-section output with strict spacing and inferred content.
 
 ---
 
@@ -109,6 +110,10 @@ Legacy `backend/` artifacts have been removed in favor of the unified `server/` 
 
 ## 📚 Further Reading
 
+- [PRD Edit Cycle](docs/prd/edit-cycle.md) – full create → edit → iterate workflow
+- [PRD Edit Enhancements](docs/prd/edit-enhancements.md) – voice + AI tooling breakdown
+- [Wireframe Setup](docs/wireframe/setup.md) – Supabase storage, RLS, migrations
+- [Wireframe Quickstart](docs/wireframe/quickstart.md) – sanity checks & testing plan
 - [Setup Guide](docs/setup/QUICK_START.md) – step-by-step onboarding
 - [API Reference](docs/api/API_REFERENCE.md) – REST contract details
 - [Database Schema](docs/database/DATABASE_SCHEMA.md) – ERD and table docs
