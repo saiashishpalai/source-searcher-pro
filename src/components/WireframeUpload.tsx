@@ -4,6 +4,7 @@ import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { analytics } from '@/lib/analytics';
 import { useAuth } from '@/contexts/AuthContext';
+import { getEnvVar } from '@/lib/env';
 
 interface WireframeUploadProps {
   onUpload: (file: File, preview: string, storageUrl: string) => void;
@@ -85,7 +86,13 @@ export function WireframeUpload({
       form.append('file', file);
 
       const { data: { session } } = await supabase.auth.getSession();
-      const resp = await fetch('/api/storage/upload-wireframe', {
+      
+      // Get the API base URL (Render backend in production, localhost in dev)
+      const API_BASE_URL = import.meta.env.DEV 
+        ? (import.meta.env.VITE_API_URL || '') 
+        : (getEnvVar('VITE_API_URL') || 'https://source-searcher-pro.onrender.com');
+      
+      const resp = await fetch(`${API_BASE_URL}/api/storage/upload-wireframe`, {
         method: 'POST',
         headers: {
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
