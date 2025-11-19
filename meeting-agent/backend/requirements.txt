@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-dotenv
+supabase
+python-multipart
+openai
+deepgram-sdk
+pydantic
+slack_sdk
+notion_client
+todoist-api-python

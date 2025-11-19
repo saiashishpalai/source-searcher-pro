@@ -1,0 +1,4 @@
+Paragraphs keys: dict_keys(['transcript', 'paragraphs'])
+First paragraph keys: dict_keys(['sentences', 'speaker', 'num_words', 'start', 'end'])
+First sentence keys: dict_keys(['text', 'start', 'end'])
+CRITICAL: 'words' not found in sentence
