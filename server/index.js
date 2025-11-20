@@ -20,6 +20,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { DocumentSync } from './services/document-sync.js';
 import { GoogleDriveSync } from './services/google-drive-sync.js';
 import { SearchService } from './services/search-service.js';
@@ -31,9 +32,10 @@ import multer from 'multer';
 import OpenAI from 'openai';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8085;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.VITE_APP_URL || 'https://localhost:8081';
 const API_BASE_URL = process.env.API_BASE_URL || `https://localhost:${PORT}`;
+const AGENT_API_URL = process.env.AGENT_API_URL || 'http://localhost:8000';
 
 
 app.use(cors({ 
@@ -46,6 +48,37 @@ app.use(cors({
   ],
   credentials: true 
 }));
+console.log('🔧 Setting up agent proxy:', AGENT_API_URL);
+app.use('/api/agent', createProxyMiddleware({
+  target: AGENT_API_URL,
+  changeOrigin: true,
+  timeout: 120000,
+  pathRewrite: (path) => {
+    const newPath = `/api/v1${path}`;
+    console.log(`[Agent Proxy] Rewriting: ${path} → ${newPath}`);
+    return newPath;
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[Agent Proxy] ✅ FORWARDING ${req.method} ${req.url}`);
+    // Fix for body parsing issue: if body exists, re-write it to the proxy request
+    if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`[Agent Proxy] ✅ RESPONSE ${proxyRes.statusCode}`);
+  },
+  onError: (err, req, res) => {
+    console.error('[Agent Proxy] ❌ ERROR:', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Agent unavailable', message: err.message });
+    }
+  }
+}));
+
 // Increase body size limits to accommodate base64-encoded wireframe uploads (default is 100kb)
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
@@ -71,6 +104,12 @@ app.use((req, _res, next) => {
 app.get('/healthz', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Proxy for meeting agent API (Python FastAPI)
+// Forward /api/agent/* to http://localhost:8000/api/v1/*
+// Moved definition to top of file
+
+// Proxy setup moved to top of file before express.json()
 
 // Check for required environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -1048,6 +1087,238 @@ app.get('/api/auth/notion/callback', async (req, res) => {
   }
 });
 
+// TODOIST OAUTH INITIAL REDIRECT
+app.get('/api/auth/todoist', async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const clientId = process.env.TODOIST_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({ error: 'Todoist OAuth not configured' });
+    }
+
+    // Generate state parameter for security
+    const state = crypto.randomBytes(32).toString('hex');
+    const stateWithUserId = `${state}:${userId}`;
+
+    const authorizationUrl = `https://todoist.com/oauth/authorize?` +
+      `client_id=${clientId}&` +
+      `scope=${encodeURIComponent('data:read_write')}&` +
+      `state=${stateWithUserId}&` +
+      `redirect_uri=${encodeURIComponent(`${API_BASE_URL}/api/auth/todoist/callback`)}`;
+
+    console.log('🔗 Redirecting to Todoist OAuth:', authorizationUrl);
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error('Todoist OAuth redirect error:', error);
+    res.status(500).json({ error: 'OAuth redirect failed' });
+  }
+});
+
+// TODOIST API TOKEN CONNECTION (Alternative to OAuth) - COMMENTED OUT - USING OAUTH NOW
+// app.post('/api/auth/todoist/connect', async (req, res) => {
+//   console.log('🎯 TODOIST API TOKEN CONNECTION REQUEST');
+//   try {
+//     const authHeader = req.headers.authorization;
+//     if (!authHeader) {
+//       console.log('❌ No authorization header');
+//       return res.status(401).json({ error: 'Unauthorized' });
+//     }
+//     
+//     const token = authHeader.replace('Bearer ', '');
+//     console.log('🔑 Verifying user token...');
+//     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+//     
+//     if (authError || !user) {
+//       console.error('❌ Auth error:', authError);
+//       return res.status(401).json({ error: 'Invalid token' });
+//     }
+
+//     console.log('✅ User authenticated:', user.id);
+//     const { api_token } = req.body;
+//     
+//     if (!api_token) {
+//       console.log('❌ No API token provided');
+//       return res.status(400).json({ error: 'API token is required' });
+//     }
+
+//     console.log('🔍 Verifying Todoist API token...');
+//     // Verify the token works by making a test API call
+//     try {
+//       const testResponse = await fetch('https://api.todoist.com/rest/v2/projects', {
+//         headers: {
+//           'Authorization': `Bearer ${api_token}`
+//         }
+//       });
+//       
+//       console.log('📡 Todoist API response status:', testResponse.status);
+//       
+//       if (!testResponse.ok) {
+//         const errorText = await testResponse.text();
+//         console.error('❌ Todoist API error:', testResponse.status, errorText);
+//         return res.status(400).json({ error: 'Invalid API token' });
+//       }
+//       
+//       const projects = await testResponse.json();
+//       console.log('✅ Todoist API token verified, projects count:', projects?.length || 0);
+//       
+//       // Store connection in database
+//       console.log('💾 Saving connection to database...');
+//       const { error: dbError, data } = await supabaseAdmin
+//         .from('user_connections')
+//         .upsert({
+//           user_id: user.id,
+//           source_type: 'todoist',
+//           source_user_id: 'todoist_user',
+//           access_token: api_token,
+//           refresh_token: null,
+//           token_expires_at: null,
+//           is_active: true,
+//           metadata: {
+//             connection_type: 'api_token',
+//             verified: true
+//           },
+//           updated_at: new Date().toISOString(),
+//         }, { 
+//           onConflict: 'user_id,source_type' 
+//         });
+
+//       if (dbError) {
+//         console.error('❌ Database error:', JSON.stringify(dbError, null, 2));
+//         return res.status(500).json({ error: 'Failed to save connection', details: dbError.message });
+//       }
+//       
+//       console.log('✓ Todoist API token connection saved to database');
+//       return res.json({ success: true, message: 'Todoist connected successfully' });
+//       
+//     } catch (error) {
+//       console.error('❌ Token verification error:', error);
+//       console.error('Error stack:', error.stack);
+//       return res.status(400).json({ error: 'Failed to verify API token', details: error.message });
+//     }
+//   } catch (error) {
+//     console.error('❌ Todoist API token connection error:', error);
+//     console.error('Error stack:', error.stack);
+//     return res.status(500).json({ error: 'Connection failed', details: error.message });
+//   }
+// });
+
+// TODOIST OAUTH CALLBACK
+app.get('/api/auth/todoist/callback', async (req, res) => {
+  console.log('🎯 TODOIST CALLBACK RECEIVED!');
+  console.log('   Query params:', req.query);
+  
+  const { code, state } = req.query;
+  
+  if (!code || !state) {
+    console.log('❌ Missing code or state in callback');
+    return res.redirect(`${APP_URL}/connect-sources?error=missing_params`);
+  }
+
+  try {
+    // Parse state format: "randomHex:userId"
+    const [stateHex, userId] = state.split(':');
+    console.log('   Parsed state - hex:', stateHex?.substring(0, 10) + '...', 'userId:', userId);
+    
+    if (!userId) {
+      console.log('❌ Invalid state format');
+      return res.redirect(`${APP_URL}/connect-sources?error=invalid_state`);
+    }
+
+    const clientId = process.env.TODOIST_CLIENT_ID;
+    const clientSecret = process.env.TODOIST_CLIENT_SECRET;
+    console.log('   Using clientId:', clientId ? '✅ Found' : '❌ Missing');
+
+    if (!clientId || !clientSecret) {
+      console.error('❌ Todoist OAuth credentials not configured');
+      return res.redirect(`${APP_URL}/connect-sources?error=no_credentials`);
+    }
+    
+    console.log('🔄 Attempting Todoist token exchange...');
+
+    const tokenResponse = await fetch('https://todoist.com/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: `${API_BASE_URL}/api/auth/todoist/callback`,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.json();
+      console.error('Token exchange failed:', error);
+      return res.redirect(`${APP_URL}/connect-sources?error=token_failed`);
+    }
+
+    const tokens = await tokenResponse.json();
+    console.log('✓ Todoist tokens received:', { hasAccessToken: !!tokens.access_token });
+    
+    // Fetch user info from Todoist API
+    let todoistUserId = 'todoist_user';
+    let userEmail = '';
+    try {
+      const userInfoResponse = await fetch('https://api.todoist.com/sync/v9/sync', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${tokens.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sync_token: '*',
+          resource_types: '["user"]'
+        })
+      });
+      if (userInfoResponse.ok) {
+        const userInfo = await userInfoResponse.json();
+        if (userInfo.user) {
+          todoistUserId = userInfo.user.id || 'todoist_user';
+          userEmail = userInfo.user.email || '';
+          console.log('✓ Todoist user info retrieved:', { id: todoistUserId, email: userEmail });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Todoist user info:', error.message);
+    }
+
+    const { error: dbError } = await supabaseAdmin
+      .from('user_connections')
+      .upsert({
+        user_id: userId,
+        source_type: 'todoist',
+        source_user_id: todoistUserId,
+        access_token: tokens.access_token,
+        refresh_token: null, // Todoist doesn't provide refresh tokens
+        token_expires_at: null, // Todoist tokens don't expire
+        is_active: true,
+        metadata: {
+          email: userEmail,
+        },
+        updated_at: new Date().toISOString(),
+      }, { 
+        onConflict: 'user_id,source_type' 
+      });
+
+    if (dbError) {
+      console.error('❌ Database error:', dbError);
+      return res.redirect(`${APP_URL}/connect-sources?error=db_failed`);
+    }
+    
+    console.log('✓ Todoist connection saved to database');
+
+    return res.redirect(`${APP_URL}/connected-sources?connected=todoist`);
+  } catch (error) {
+    console.error('Todoist OAuth callback error:', error);
+    return res.redirect(`${APP_URL}/connect-sources?error=failed`);
+  }
+});
+
 // SYNC DOCUMENTS ENDPOINT
 app.post('/api/sync/google-drive', async (req, res) => {
   try {
@@ -1352,6 +1623,280 @@ app.post('/api/sync/slack', async (req, res) => {
   }
 });
 
+// TODOIST STATUS ENDPOINT (Test connection and get task count)
+app.get('/api/todoist/status', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Get Todoist connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token, updated_at')
+      .eq('user_id', user.id)
+      .eq('source_type', 'todoist')
+      .single();
+
+    if (connError || !connection) {
+      return res.status(400).json({ 
+        error: 'Todoist not connected',
+        code: 'NOT_CONNECTED'
+      });
+    }
+
+    // Test connection by fetching tasks
+    try {
+      const tasksResponse = await fetch('https://api.todoist.com/rest/v2/tasks', {
+        headers: {
+          'Authorization': `Bearer ${connection.access_token}`
+        }
+      });
+
+      if (!tasksResponse.ok) {
+        return res.status(401).json({ 
+          error: 'Todoist API token invalid or expired',
+          code: 'TOKEN_INVALID'
+        });
+      }
+
+      const tasks = await tasksResponse.json();
+      const taskCount = tasks?.length || 0;
+
+      return res.json({
+        connected: true,
+        taskCount,
+        lastSyncTime: connection.updated_at,
+        status: 'healthy'
+      });
+    } catch (error) {
+      console.error('Todoist API error:', error);
+      return res.status(500).json({ 
+        error: 'Failed to connect to Todoist',
+        code: 'API_ERROR'
+      });
+    }
+  } catch (error) {
+    console.error('Todoist status endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// SYNC TODOIST ENDPOINT
+app.post('/api/sync/todoist', async (req, res) => {
+  console.log('🎯 TODOIST SYNC ENDPOINT HIT');
+  try {
+    const authHeader = req.headers.authorization;
+    console.log('🔑 Auth header present:', !!authHeader);
+    if (!authHeader) {
+      console.log('❌ No auth header');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // Get Todoist connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('source_type', 'todoist')
+      .single();
+    
+    if (connError || !connection) {
+      return res.status(400).json({ 
+        error: 'Todoist not connected',
+        code: 'NOT_CONNECTED'
+      });
+    }
+    
+    console.log('✓ Starting Todoist sync for user:', user.id);
+    
+    // Fetch all tasks from Todoist
+    const tasksResponse = await fetch('https://api.todoist.com/rest/v2/tasks', {
+      headers: {
+        'Authorization': `Bearer ${connection.access_token}`
+      }
+    });
+    
+    if (!tasksResponse.ok) {
+      if (tasksResponse.status === 401) {
+        return res.status(401).json({ 
+          error: 'Todoist API token invalid or expired',
+          code: 'TOKEN_EXPIRED'
+        });
+      }
+      return res.status(500).json({ 
+        error: 'Failed to fetch tasks from Todoist',
+        code: 'API_ERROR'
+      });
+    }
+    
+    const tasks = await tasksResponse.json();
+    console.log(`📋 Found ${tasks.length} tasks in Todoist`);
+    
+    // Fetch projects for task context
+    const projectsResponse = await fetch('https://api.todoist.com/rest/v2/projects', {
+      headers: {
+        'Authorization': `Bearer ${connection.access_token}`
+      }
+    });
+    const projects = projectsResponse.ok ? await projectsResponse.json() : [];
+    const projectMap = new Map(projects.map(p => [p.id, p.name]));
+    
+    let synced = 0;
+    let errors = 0;
+    const syncDetails = [];
+    
+    // Process each task
+    for (const task of tasks) {
+      try {
+        // Build task content (title + description)
+        const taskContent = [
+          task.content,
+          task.description || '',
+          task.due ? `Due: ${task.due.string || task.due.date}` : '',
+          task.priority > 1 ? `Priority: ${task.priority === 2 ? 'Normal' : task.priority === 3 ? 'High' : task.priority === 4 ? 'Urgent' : 'Low'}` : '',
+          projectMap.get(task.project_id) ? `Project: ${projectMap.get(task.project_id)}` : ''
+        ].filter(Boolean).join('\n\n');
+        
+        // Store task as document
+        const { data: doc, error: docError } = await supabaseAdmin
+          .from('documents')
+          .upsert({
+            user_id: user.id,
+            source_type: 'todoist',
+            source_id: task.id.toString(),
+            title: task.content,
+            content: taskContent,
+            url: task.url || `https://todoist.com/app/task/${task.id}`,
+            author: 'Todoist',
+            metadata: {
+              task_id: task.id,
+              project_id: task.project_id,
+              project_name: projectMap.get(task.project_id),
+              due_date: task.due?.date || null,
+              due_string: task.due?.string || null,
+              priority: task.priority,
+              is_completed: task.is_completed || false,
+              created_at: task.created_at,
+              updated_at: task.updated_at || task.created_at
+            },
+            last_modified_at: task.updated_at || task.created_at,
+            synced_at: new Date().toISOString(),
+          }, { 
+            onConflict: 'user_id,source_type,source_id' 
+          })
+          .select()
+          .single();
+        
+        if (docError) {
+          console.error(`  ❌ Error storing task ${task.id}:`, docError);
+          errors++;
+          syncDetails.push({ 
+            name: task.content, 
+            status: 'failed', 
+            reason: 'Database error' 
+          });
+          continue;
+        }
+        
+        // Create chunks and embeddings
+        const chunks = createChunks(taskContent, 1500, 200, 10);
+        if (chunks.length > 0) {
+          const embeddings = await openai.embeddings.create({
+            model: 'text-embedding-3-small',
+            input: chunks
+          });
+          
+          const chunkRows = chunks.map((chunk, idx) => ({
+            document_id: doc.id,
+            user_id: user.id,
+            content: chunk,
+            chunk_index: idx,
+            embedding: embeddings.data[idx].embedding,
+            metadata: { 
+              source_type: 'todoist',
+              task_id: task.id,
+              project_name: projectMap.get(task.project_id)
+            }
+          }));
+          
+          // Delete old chunks and insert new ones
+          await supabaseAdmin.from('document_chunks').delete().eq('document_id', doc.id);
+          await supabaseAdmin.from('document_chunks').insert(chunkRows);
+        }
+        
+        synced++;
+        syncDetails.push({ 
+          name: task.content, 
+          status: 'success',
+          chunks: chunks.length
+        });
+        
+      } catch (error) {
+        console.error(`  ❌ Error processing task ${task.id}:`, error);
+        errors++;
+        syncDetails.push({ 
+          name: task.content || 'Unknown task', 
+          status: 'failed', 
+          reason: error.message 
+        });
+      }
+    }
+    
+    console.log(`✓ Todoist sync complete: ${synced} tasks synced, ${errors} errors`);
+    
+    res.json({
+      synced,
+      total: tasks.length,
+      errors,
+      details: syncDetails,
+      message: `Successfully synced ${synced} tasks from Todoist`
+    });
+    
+  } catch (error) {
+    console.error('✗ Todoist sync error:', error);
+    
+    if (error.message.includes('invalid') || error.message.includes('expired')) {
+      return res.status(401).json({ 
+        error: 'Todoist API token expired',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message || 'Sync failed',
+      code: 'SYNC_FAILED'
+    });
+  }
+});
+
+// Helper function to create chunks
+function createChunks(text, chunkSize, overlap, maxChunks) {
+  const chunks = [];
+  let i = 0;
+  while (i < text.length && chunks.length < maxChunks) {
+    const end = Math.min(i + chunkSize, text.length);
+    chunks.push(text.slice(i, end));
+    i += chunkSize - overlap;
+  }
+  return chunks;
+}
+
 // SYNC STATUS ENDPOINT
 app.get('/api/sync/status', async (req, res) => {
   try {
@@ -1368,7 +1913,7 @@ app.get('/api/sync/status', async (req, res) => {
     }
 
     // Get stats for all sources
-    const sources = ['google_drive', 'notion', 'slack'];
+    const sources = ['google_drive', 'notion', 'slack', 'todoist'];
     const statsBySource = {};
 
     for (const sourceType of sources) {
@@ -1409,12 +1954,41 @@ app.get('/api/sync/status', async (req, res) => {
           console.log(`📊 Slack file stats for user ${user.id}: ${filesProcessed}/${filesTotal} files`);
         }
 
+        // For Todoist, fetch total task count from API
+        let totalTasks = 0;
+        if (sourceType === 'todoist') {
+          try {
+            const { data: todoistConn } = await supabaseAdmin
+              .from('user_connections')
+              .select('access_token')
+              .eq('user_id', user.id)
+              .eq('source_type', 'todoist')
+              .single();
+            
+            if (todoistConn?.access_token) {
+              const tasksResponse = await fetch('https://api.todoist.com/rest/v2/tasks', {
+                headers: {
+                  'Authorization': `Bearer ${todoistConn.access_token}`
+                }
+              });
+              
+              if (tasksResponse.ok) {
+                const tasks = await tasksResponse.json();
+                totalTasks = tasks?.length || 0;
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching Todoist task count:', error);
+          }
+        }
+
         statsBySource[sourceType] = {
           totalDocuments,
           totalChunks: chunks?.length || 0,
           lastSyncTime,
           isSyncing: false,
-          ...(sourceType === 'slack' && { filesProcessed, filesTotal })
+          ...(sourceType === 'slack' && { filesProcessed, filesTotal }),
+          ...(sourceType === 'todoist' && { totalTasks })
         };
       } else {
         statsBySource[sourceType] = {

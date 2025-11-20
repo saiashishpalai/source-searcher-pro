@@ -27,7 +27,7 @@ export default function Home() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const res = await fetch(`/v1/agent/upload`, {
+      const res = await fetch(`/api/agent/upload`, {
         method: 'POST',
         body: formData
       })
@@ -42,7 +42,7 @@ export default function Home() {
       // Navigate to the meeting page
       if (data.id) {
         console.log('Navigating to:', `/meetings/${data.id}`)
-        navigate(`/meetings/${data.id}`)
+        navigate(`/v1/agent/meetings/${data.id}`)
       } else {
         console.error('No ID in response:', data)
         setError('Server returned no meeting ID')

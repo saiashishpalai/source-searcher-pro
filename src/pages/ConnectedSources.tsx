@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -17,6 +19,7 @@ import {
   ExternalLink, 
   Shield, 
   Eye, 
+  EyeOff,
   Lock, 
   X, 
   RefreshCw,
@@ -107,8 +110,200 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+const TodoistIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    className={className}
+    fill="none"
+  >
+    {/* Todoist official logo - rounded square with three checkmarks */}
+    <rect
+      x="2"
+      y="2"
+      width="20"
+      height="20"
+      rx="4.5"
+      fill="#E44332"
+    />
+    {/* Three checkmarks stacked vertically, aligned left */}
+    <path
+      d="M7 8.5L9 10.5L13 6.5"
+      stroke="white"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <path
+      d="M7 12L9 14L13 10"
+      stroke="white"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <path
+      d="M7 15.5L9 17.5L13 13.5"
+      stroke="white"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </svg>
+);
+
+// Todoist API Token Dialog Component - COMMENTED OUT - USING OAUTH NOW
+/* const TodoistTokenDialog = ({ 
+  isOpen, 
+  onClose, 
+  onConnect 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConnect: (token: string) => void; 
+}) => {
+  const [apiToken, setApiToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { session } = useAuth();
+
+  const handleSubmit = async () => {
+    if (!apiToken.trim()) {
+      setError('API token is required');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'https://localhost:8085'
+        : getEnvVar('VITE_API_URL') || 'https://source-searcher-pro.onrender.com';
+
+      const response = await fetch(`${apiUrl}/api/auth/todoist/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ api_token: apiToken.trim() })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to connect Todoist');
+      }
+
+      onConnect(apiToken.trim());
+      onClose();
+      setApiToken('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect Todoist');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl bg-card/95 backdrop-blur-sm border-border/50">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className="w-8 h-8 rounded-lg bg-[#E44332] flex items-center justify-center text-white">
+              <TodoistIcon className="w-5 h-5" />
+            </div>
+            Connect Todoist
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Enter your Todoist API token to connect your account
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="api-token">API Token</Label>
+            <div className="flex gap-2 mt-1">
+              <Input
+                id="api-token"
+                type={showToken ? 'text' : 'password'}
+                value={apiToken}
+                onChange={(e) => {
+                  setApiToken(e.target.value);
+                  setError(null);
+                }}
+                placeholder="9be84ce8947a340a44d565be1773a9c25299ad7c"
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setShowToken(!showToken)}
+              >
+                {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              You can find your API token in Todoist Settings → Integrations → Developer → API token
+            </p>
+          </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="w-4 h-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="font-medium mb-1">How to get your API token:</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Go to Todoist Settings → Integrations</li>
+                  <li>Click on the "Developer" tab</li>
+                  <li>Copy your API token</li>
+                  <li>Paste it above and click "Connect"</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-3">
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isLoading || !apiToken.trim()}
+            className="bg-[#E44332] hover:bg-[#E44332]/90"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              'Connect'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}; 
+*/
+
 // Connection Status Component
-    const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing, onSyncDocuments, isSyncing, syncStatus, syncStatusLoading = false, syncError = null, setSyncError, onClearData, incrementalSyncResults, limitReached, limitInfo, onLimitDialogOpen }: {
+    const ConnectionStatus = ({ connection, onRefresh, onDisconnect, isRefreshing, onSyncDocuments, isSyncing, syncStatus, syncStatusLoading = false, syncError = null, setSyncError, onClearData, incrementalSyncResults, limitReached, limitInfo, onLimitDialogOpen, onTestConnection, isTestingConnection }: {
       connection: any;
       onRefresh: () => void;
       onDisconnect: () => void;
@@ -124,6 +319,8 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
       limitReached?: boolean;
       limitInfo?: any;
       onLimitDialogOpen?: () => void;
+      onTestConnection?: () => void;
+      isTestingConnection?: boolean;
     }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -246,8 +443,8 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
 
       {/* Action Buttons */}
       <div className="space-y-2 mb-3">
-          {/* Sync Documents Button for Google Drive, Notion, and Slack */}
-          {(connection.source_type === 'google_drive' || connection.source_type === 'notion' || connection.source_type === 'slack') && onSyncDocuments && (
+          {/* Sync Documents Button for Google Drive, Notion, Slack, and Todoist */}
+          {(connection.source_type === 'google_drive' || connection.source_type === 'notion' || connection.source_type === 'slack' || connection.source_type === 'todoist') && onSyncDocuments && (
             <div className="space-y-2">
               <Button
                 variant="default"
@@ -264,7 +461,10 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                 ) : (
                   <>
                     <Database className="w-4 h-4 mr-2" />
-                    {(syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 ? 'Re-sync Documents' : 'Sync Documents'}
+                    {connection.source_type === 'todoist' 
+                      ? ((syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 ? 'Re-sync Tasks' : 'Sync Tasks')
+                      : ((syncStatus?.[connection.source_type]?.totalDocuments || 0) > 0 ? 'Re-sync Documents' : 'Sync Documents')
+                    }
                   </>
                 )}
               </Button>
@@ -372,7 +572,27 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                       )}
                     </>
                   )}
-                  {connection.source_type !== 'slack' && (
+                  {connection.source_type === 'todoist' ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Tasks Synced:</span>
+                        <span className="font-medium">{syncStatus?.[connection.source_type]?.totalDocuments ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Tasks:</span>
+                        <span className="font-medium">{syncStatus?.[connection.source_type]?.totalTasks ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Last Sync:</span>
+                        <span className="font-medium">
+                          {syncStatus?.[connection.source_type]?.lastSyncTime 
+                            ? new Date(syncStatus[connection.source_type].lastSyncTime).toLocaleString()
+                            : 'Never'
+                          }
+                        </span>
+                      </div>
+                    </>
+                  ) : connection.source_type !== 'slack' && (
                     <>
                       <div className="flex justify-between">
                         <span>
@@ -391,15 +611,17 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
                       )}
                     </>
                   )}
-                  <div className="flex justify-between">
-                    <span>Last Sync:</span>
-                    <span className="font-medium">
-                      {syncStatus?.[connection.source_type]?.lastSyncTime 
-                        ? new Date(syncStatus[connection.source_type].lastSyncTime).toLocaleString()
-                        : 'Never'
-                      }
-                    </span>
-                  </div>
+                  {connection.source_type !== 'todoist' && (
+                    <div className="flex justify-between">
+                      <span>Last Sync:</span>
+                      <span className="font-medium">
+                        {syncStatus?.[connection.source_type]?.lastSyncTime 
+                          ? new Date(syncStatus[connection.source_type].lastSyncTime).toLocaleString()
+                          : 'Never'
+                        }
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
             </>
@@ -508,6 +730,21 @@ const PermissionModal = ({
             'Cannot change workspace settings'
           ]
         };
+      case 'todoist':
+        return {
+          willAccess: [
+            'Create tasks in your Todoist account',
+            'Set due dates for tasks',
+            'Add task descriptions and context',
+            'Organize tasks with priorities'
+          ],
+          wontAccess: [
+            'Cannot delete or modify existing tasks',
+            'Cannot access your personal information',
+            'Cannot modify your Todoist settings',
+            'Cannot access tasks you haven\'t created'
+          ]
+        };
       default:
         return { willAccess: [], wontAccess: [] };
     }
@@ -611,8 +848,10 @@ const ConnectedSources = () => {
   const [refreshingConnection, setRefreshingConnection] = useState<string | null>(null);
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
+  const [todoistTokenDialogOpen, setTodoistTokenDialogOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
   const [syncingDocuments, setSyncingDocuments] = useState<Record<string, boolean>>({});
+  const [testingConnection, setTestingConnection] = useState<Record<string, boolean>>({});
   const [syncStatus, setSyncStatus] = useState<Record<string, any>>({});
   const [syncStatusLoading, setSyncStatusLoading] = useState(false);
   const [syncError, setSyncError] = useState<Record<string, string | null>>({});
@@ -661,6 +900,19 @@ const ConnectedSources = () => {
         'Pages you have access to',
         'Database content',
         'Page comments'
+      ]
+    },
+    {
+      id: 'todoist',
+      name: 'Todoist',
+      description: 'Connect Todoist to create tasks from meeting action items',
+      icon: TodoistIcon,
+      color: 'bg-[#E44332]',
+      available: true,
+      permissions: [
+        'Create tasks',
+        'Set due dates',
+        'Add task descriptions'
       ]
     }
   ];
@@ -740,7 +992,17 @@ const ConnectedSources = () => {
 
   const handleConnectClick = (source: any) => {
     setSelectedSource(source);
+    // Todoist now uses OAuth only - API token flow is commented out
     setPermissionModalOpen(true);
+  };
+
+  const handleTodoistTokenConnect = async (token: string) => {
+    // Connection is handled in the dialog component
+    // Just refresh connections list
+    await fetchConnections();
+    toast.success('Todoist connected successfully!', {
+      description: 'You can now create tasks from meeting action items.',
+    });
   };
 
   const handleConnect = async (sourceId: string) => {
@@ -750,9 +1012,37 @@ const ConnectedSources = () => {
     
     try {
       // Build OAuth URLs - redirect to API server for callback
-      // Use VITE_API_URL which can be set to ngrok URL for local dev with HTTPS
-      const apiUrl = getEnvVar('VITE_API_URL') || 'https://source-searcher-pro.onrender.com';
-      console.log('🔍 API URL:', apiUrl);
+      // In development, use local backend. In production, use VITE_API_URL or fallback to production URL
+      let apiUrl: string;
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+      const isDevPort = port === '8081' || port === '5173' || port === '3000';
+      
+      // Check if VITE_API_URL is explicitly set (for ngrok or other local HTTPS tunnels)
+      const viteApiUrl = getEnvVar('VITE_API_URL');
+      
+      console.log('🔍 Hostname:', hostname);
+      console.log('🔍 Port:', port);
+      console.log('🔍 Is localhost:', isLocalhost);
+      console.log('🔍 Is dev port:', isDevPort);
+      console.log('🔍 VITE_API_URL:', viteApiUrl);
+      
+      // Force localhost if we're clearly in local development
+      if ((isLocalhost && isDevPort) || hostname.includes('localhost')) {
+        // Local development - use local backend
+        apiUrl = 'https://localhost:8085';
+        console.log('✅ Using local backend:', apiUrl);
+      } else if (viteApiUrl && !viteApiUrl.includes('onrender.com')) {
+        // Use explicitly set VITE_API_URL (but not production URL)
+        apiUrl = viteApiUrl;
+        console.log('✅ Using VITE_API_URL:', apiUrl);
+      } else {
+        // Production - use fallback
+        apiUrl = 'https://source-searcher-pro.onrender.com';
+        console.log('✅ Using production URL:', apiUrl);
+      }
+      console.log('🔍 Final API URL:', apiUrl);
       console.log('🔍 Source ID:', sourceId);
       console.log('👤 User ID:', user?.id);
       const redirectUri = `${apiUrl}/api/auth/${sourceId === 'googleDrive' ? 'google' : sourceId}/callback`;
@@ -776,6 +1066,11 @@ const ConnectedSources = () => {
         const backendOAuthUrl = `${apiUrl}/api/auth/notion?userId=${user?.id}`;
         console.log('🔗 Redirecting to backend Notion OAuth:', backendOAuthUrl);
         console.log('🌐 About to redirect to:', backendOAuthUrl);
+        window.location.href = backendOAuthUrl;
+      } else if (sourceId === 'todoist') {
+        // Todoist OAuth flow
+        const backendOAuthUrl = `${apiUrl}/api/auth/todoist?userId=${user?.id}`;
+        console.log('🔗 Redirecting to backend Todoist OAuth:', backendOAuthUrl);
         window.location.href = backendOAuthUrl;
       }
     } catch (error) {
@@ -847,6 +1142,47 @@ const ConnectedSources = () => {
     }
   };
 
+  const handleTestTodoistConnection = async () => {
+    console.log('🧪 Testing Todoist connection...');
+    setTestingConnection(prev => ({ ...prev, todoist: true }));
+    setSyncError(prev => ({ ...prev, todoist: null }));
+    
+    if (!session?.access_token) {
+      setSyncError(prev => ({ ...prev, todoist: 'Your session has expired. Please refresh the page to log in again.' }));
+      setTestingConnection(prev => ({ ...prev, todoist: false }));
+      return;
+    }
+    
+    try {
+      const data = await ApiClient.get('/api/todoist/status');
+      
+      if (data.code === 'NOT_CONNECTED') {
+        setSyncError(prev => ({ ...prev, todoist: 'Todoist is not connected. Please connect first.' }));
+        return;
+      } else if (data.code === 'TOKEN_INVALID') {
+        setSyncError(prev => ({ ...prev, todoist: 'Todoist API token is invalid or expired. Please reconnect.' }));
+        return;
+      }
+      
+      console.log('✅ Todoist connection test successful:', data);
+      
+      // Refresh sync status to update task count
+      await fetchSyncStatus();
+      
+      toast.success("Connection Successful", {
+        description: `Todoist is connected. Found ${data.taskCount || 0} tasks.`,
+      });
+    } catch (error: any) {
+      console.error('❌ Todoist connection test failed:', error);
+      setSyncError(prev => ({ ...prev, todoist: error.message || 'Failed to test Todoist connection. Please try again.' }));
+      toast.error("Connection Test Failed", {
+        description: error.message || 'Failed to test Todoist connection.',
+      });
+    } finally {
+      setTestingConnection(prev => ({ ...prev, todoist: false }));
+    }
+  };
+
   const handleSyncDocuments = async (sourceType: string) => {
     console.log(`📄 Starting ${sourceType} document sync...`);
     console.log('🔑 Session token:', session?.access_token ? 'Present' : 'Missing');
@@ -871,6 +1207,8 @@ const ConnectedSources = () => {
         ? '/api/sync/notion'
         : sourceType === 'slack'
         ? '/api/sync/slack'
+        : sourceType === 'todoist'
+        ? '/api/sync/todoist'
         : null;
       
       if (!endpoint) {
@@ -880,6 +1218,7 @@ const ConnectedSources = () => {
       const sourceName = sourceType === 'google_drive' ? 'Google Drive' 
         : sourceType === 'notion' ? 'Notion'
         : sourceType === 'slack' ? 'Slack'
+        : sourceType === 'todoist' ? 'Todoist'
         : sourceType;
       console.log(`🔄 Calling endpoint: ${endpoint}`);
       
@@ -1009,7 +1348,8 @@ const ConnectedSources = () => {
       const sourceTypeMap: Record<string, string> = {
         'googleDrive': 'google_drive',
         'notion': 'notion',
-        'slack': 'slack'
+        'slack': 'slack',
+        'todoist': 'todoist'
       };
       const dbSourceType = sourceTypeMap[source.id] || source.id;
       
@@ -1183,28 +1523,30 @@ const ConnectedSources = () => {
           <ConnectionStatus
           connection={source.connection}
           onRefresh={() => {
-            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack', 'todoist': 'todoist' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleRefreshConnection(dbSourceType);
           }}
           onDisconnect={() => {
-            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack', 'todoist': 'todoist' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleDisconnect(dbSourceType);
           }}
           isRefreshing={refreshingConnection === (source.id === 'googleDrive' ? 'google_drive' : source.id)}
-          onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion' || source.id === 'slack') ? () => {
-            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+          onSyncDocuments={(source.id === 'googleDrive' || source.id === 'notion' || source.id === 'slack' || source.id === 'todoist') ? () => {
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack', 'todoist': 'todoist' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleSyncDocuments(dbSourceType);
           } : undefined}
+          onTestConnection={source.id === 'todoist' ? handleTestTodoistConnection : undefined}
+          isTestingConnection={testingConnection[source.id] || false}
           isSyncing={syncingDocuments[source.id === 'googleDrive' ? 'google_drive' : source.id] || false}
           syncStatus={syncStatus}
           syncStatusLoading={syncStatusLoading}
           syncError={syncError[source.id === 'googleDrive' ? 'google_drive' : source.id] || null}
           setSyncError={(error: string | null) => setSyncError(prev => ({ ...prev, [source.id === 'googleDrive' ? 'google_drive' : source.id]: error }))}
           onClearData={() => {
-            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+            const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack', 'todoist': 'todoist' };
             const dbSourceType = sourceTypeMap[source.id] || source.id;
             handleClearData(dbSourceType);
           }}
@@ -1337,9 +1679,16 @@ const ConnectedSources = () => {
         onConnect={() => handleConnect(selectedSource?.id)}
       />
 
+      {/* Todoist API Token Dialog - COMMENTED OUT - USING OAUTH NOW */}
+      {/* <TodoistTokenDialog
+        isOpen={todoistTokenDialogOpen}
+        onClose={() => setTodoistTokenDialogOpen(false)}
+        onConnect={handleTodoistTokenConnect}
+      /> */}
+
       {/* Document Limit Dialogs */}
       {connectedSources.map((source) => {
-        const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack' };
+        const sourceTypeMap: Record<string, string> = { 'googleDrive': 'google_drive', 'notion': 'notion', 'slack': 'slack', 'todoist': 'todoist' };
         const dbSourceType = sourceTypeMap[source.id] || source.id;
         
         return (

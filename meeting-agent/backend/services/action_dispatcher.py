@@ -1,12 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any
 from services.integrations import IntegrationService
 from services.storage import StorageService
 
 class AgentAction(BaseModel):
-    type: str # 'create_task', 'send_slack', 'create_page'
-    params: Dict[str, Any]
-    user_id: str
+    model_config = ConfigDict(extra='forbid')
+    
+    type: str = Field(description="Type of action: 'create_task', 'send_slack', 'create_page'")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for the action")
+    user_id: str = Field(description="User ID")
 
 class ActionDispatcher:
     def __init__(self):
@@ -22,7 +24,11 @@ class ActionDispatcher:
                 await self.integrations.create_todoist_task(
                     user_id=action.user_id,
                     content=action.params.get('content'),
-                    due_string=action.params.get('due_string')
+                    due_string=action.params.get('due_string'),
+                    meeting_title=action.params.get('meeting_title'),
+                    assignee_name=action.params.get('assignee_name'),
+                    source_quote=action.params.get('source_quote'),
+                    priority=action.params.get('priority', 2)
                 )
             elif action.type == 'send_slack':
                 await self.integrations.send_slack_message(

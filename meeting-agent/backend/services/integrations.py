@@ -54,10 +54,52 @@ class IntegrationService:
             ]
         )
 
-    async def create_todoist_task(self, user_id: str, content: str, due_string: Optional[str] = None):
+    async def create_todoist_task(
+        self, 
+        user_id: str, 
+        content: str, 
+        due_string: Optional[str] = None,
+        meeting_title: Optional[str] = None,
+        assignee_name: Optional[str] = None,
+        source_quote: Optional[str] = None,
+        priority: int = 2
+    ):
         token = await self.get_token(user_id, 'todoist')
         if not token:
             raise ValueError("Todoist not connected")
         
+        # Format task name: "[Action Item] {content}" (truncate to ~85 chars to keep total under 100)
+        task_name_prefix = "[Action Item] "
+        max_content_length = 100 - len(task_name_prefix)
+        if len(content) > max_content_length:
+            content_truncated = content[:max_content_length - 3] + "..."
+        else:
+            content_truncated = content
+        task_name = f"{task_name_prefix}{content_truncated}"
+        
+        # Format description
+        description_parts = []
+        if meeting_title:
+            description_parts.append(f"**From Meeting:** {meeting_title}")
+        description_parts.append("")  # Empty line
+        
+        if assignee_name:
+            description_parts.append(f"**Assigned to:** {assignee_name}")
+        else:
+            description_parts.append("**Assigned to:** Unassigned")
+        
+        if source_quote:
+            description_parts.append(f"**Context:** {source_quote}")
+        else:
+            description_parts.append("**Context:** No additional context")
+        
+        formatted_description = "\n".join(description_parts)
+        
         api = TodoistAPI(token)
-        api.add_task(content=content, due_string=due_string)
+        task = api.add_task(
+            content=task_name,
+            description=formatted_description,
+            due_string=due_string,
+            priority=priority
+        )
+        return task

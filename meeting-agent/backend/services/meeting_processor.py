@@ -10,12 +10,16 @@ async def process_meeting_background(meeting_id: str, audio_url: str):
     2. Save transcript to DB
     3. Update meeting status
     """
-    print(f"Processing meeting {meeting_id}...")
+    import traceback
+    print(f"[MEETING PROCESSOR] Starting processing for meeting {meeting_id}")
+    print(f"[MEETING PROCESSOR] Audio URL: {audio_url}")
     
     try:
         # 1. Transcribe
+        print(f"[MEETING PROCESSOR] Starting transcription for meeting {meeting_id}...")
         transcription_service = TranscriptionService()
         result = await transcription_service.transcribe_url(audio_url)
+        print(f"[MEETING PROCESSOR] Transcription completed for meeting {meeting_id}")
         
         # Extract text and segments
         # Deepgram structure: results.channels[0].alternatives[0]
@@ -98,9 +102,15 @@ async def process_meeting_background(meeting_id: str, audio_url: str):
         print(f"Meeting {meeting_id} processed successfully.")
         
     except Exception as e:
-        print(f"Error processing meeting {meeting_id}: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[MEETING PROCESSOR] ERROR processing meeting {meeting_id}: {e}")
+        print(f"[MEETING PROCESSOR] Traceback:\n{error_trace}")
         # Update status to failed
-        storage = StorageService()
-        storage.supabase.table("meetings").update({
-            "status": "failed"
-        }).eq("id", meeting_id).execute()
+        try:
+            storage = StorageService()
+            storage.supabase.table("meetings").update({
+                "status": "failed"
+            }).eq("id", meeting_id).execute()
+        except Exception as db_error:
+            print(f"[MEETING PROCESSOR] Failed to update status in DB: {db_error}")

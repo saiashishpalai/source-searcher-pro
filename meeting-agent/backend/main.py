@@ -1,10 +1,23 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
+from pathlib import Path
+
+# Load environment variables from multiple locations
+# 1. Current directory .env
+load_dotenv()
+# 2. Parent directory .env.local (for shared config)
+parent_env = Path(__file__).parent.parent.parent / '.env.local'
+if parent_env.exists():
+    load_dotenv(parent_env)
+# 3. Also check for SUPABASE_URL vs VITE_SUPABASE_URL
+if not os.environ.get('SUPABASE_URL') and os.environ.get('VITE_SUPABASE_URL'):
+    os.environ['SUPABASE_URL'] = os.environ['VITE_SUPABASE_URL']
+if not os.environ.get('SUPABASE_KEY') and os.environ.get('VITE_SUPABASE_ANON_KEY'):
+    os.environ['SUPABASE_KEY'] = os.environ['VITE_SUPABASE_ANON_KEY']
 
 from routers import upload, agent
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = FastAPI(title="Meeting Agent API")
 

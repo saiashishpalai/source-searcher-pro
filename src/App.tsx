@@ -19,6 +19,8 @@ import PRDView from "./pages/PRDView";
 import PRDNew from "./pages/PRDNew";
 import PRDHubPage from "./pages/PRDHubPage";
 import PRDCompare from "./components/PRDCompare";
+import MeetingAgentHome from "./pages/meeting-agent/Home";
+import MeetingReview from "./pages/meeting-agent/MeetingReview";
 
 const App = () => {
   return (
@@ -75,6 +77,10 @@ const App = () => {
         </ProtectedRoute>
       } />
       <Route path="/docs" element={<Documentation />} />
+      
+      {/* Meeting Agent routes */}
+      <Route path="/v1/agent" element={<MeetingAgentHome />} />
+      <Route path="/v1/agent/meetings/:id" element={<MeetingReview />} />
       
       {/* Catch-all route */}
       <Route path="*" element={<NotFound />} />
