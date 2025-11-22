@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
@@ -24,8 +24,19 @@ export default function Home() {
     setError(null)
 
     try {
+      // Get user ID from auth
+      const { supabase } = await import('@/integrations/supabase/client')
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user?.id) {
+        setError('Please log in to upload meetings')
+        setUploading(false)
+        return
+      }
+
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('user_id', user.id)
 
       const res = await fetch(`/api/agent/upload`, {
         method: 'POST',
@@ -42,7 +53,7 @@ export default function Home() {
       // Navigate to the meeting page
       if (data.id) {
         console.log('Navigating to:', `/meetings/${data.id}`)
-        navigate(`/v1/agent/meetings/${data.id}`)
+        navigate(`/agent/meetings/${data.id}`)
       } else {
         console.error('No ID in response:', data)
         setError('Server returned no meeting ID')
@@ -57,9 +68,20 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-4xl mx-auto">
+        <div className="mb-6">
+          <Link 
+            to="/agent"
+            className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-2 mb-4"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Dashboard
+          </Link>
+        </div>
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Meeting Agent
+            Upload Meeting
           </h1>
           <p className="text-gray-600 text-lg">
             Upload meeting audio to automatically generate transcripts, extract insights, and create action plans

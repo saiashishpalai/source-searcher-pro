@@ -21,6 +21,7 @@ import PRDHubPage from "./pages/PRDHubPage";
 import PRDCompare from "./components/PRDCompare";
 import MeetingAgentHome from "./pages/meeting-agent/Home";
 import MeetingReview from "./pages/meeting-agent/MeetingReview";
+import Dashboard from "./pages/meeting-agent/Dashboard";
 
 const App = () => {
   return (
@@ -79,8 +80,21 @@ const App = () => {
       <Route path="/docs" element={<Documentation />} />
       
       {/* Meeting Agent routes */}
-      <Route path="/v1/agent" element={<MeetingAgentHome />} />
-      <Route path="/v1/agent/meetings/:id" element={<MeetingReview />} />
+      <Route path="/agent" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/agent/upload" element={
+        <ProtectedRoute>
+          <MeetingAgentHome />
+        </ProtectedRoute>
+      } />
+      <Route path="/agent/meetings/:id" element={
+        <ProtectedRoute>
+          <MeetingReview />
+        </ProtectedRoute>
+      } />
       
       {/* Catch-all route */}
       <Route path="*" element={<NotFound />} />

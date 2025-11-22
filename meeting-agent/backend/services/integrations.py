@@ -102,4 +102,10 @@ class IntegrationService:
             due_string=due_string,
             priority=priority
         )
-        return task
+        
+        # Return task ID and URL for tracking
+        return {
+            "id": str(task.id),
+            "url": f"https://todoist.com/app/task/{task.id}",
+            "content": task.content
+        }

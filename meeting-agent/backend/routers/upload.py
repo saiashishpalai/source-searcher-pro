@@ -1,13 +1,18 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Form, Header
 from services.storage import StorageService
 from services.meeting_processor import process_meeting_background
 import uuid
 import os
+from typing import Optional
 
 router = APIRouter()
 
 @router.post("/upload")
-async def upload_audio(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_audio(
+    background_tasks: BackgroundTasks, 
+    file: UploadFile = File(...),
+    user_id: Optional[str] = Form(None)
+):
     if not file.filename.endswith(('.mp3', '.wav', '.m4a', '.mp4')):
         raise HTTPException(status_code=400, detail="Invalid file format")
     
@@ -26,13 +31,23 @@ async def upload_audio(background_tasks: BackgroundTasks, file: UploadFile = Fil
             "status": "processing"
         }
         
+        # Add user_id if provided
+        if user_id:
+            meeting_data["user_id"] = user_id
+            print(f"[UPLOAD] 👤 User ID provided: {user_id}")
+        else:
+            print(f"[UPLOAD] ⚠️ No user_id provided - auto-execution will be skipped")
+        
         # We need to access supabase client from storage service or create new one
         # For MVP, let's reuse storage.supabase
         data = storage.supabase.table("meetings").insert(meeting_data).execute()
         meeting_id = data.data[0]['id']
         
         # Trigger Background Transcription
+        print(f"[UPLOAD] 📤 Meeting uploaded: {meeting_id}, file: {file.filename}")
+        print(f"[UPLOAD] 🎬 Adding background task for processing...")
         background_tasks.add_task(process_meeting_background, meeting_id, public_url)
+        print(f"[UPLOAD] ✅ Background task added successfully")
         
         return {
             "id": meeting_id,

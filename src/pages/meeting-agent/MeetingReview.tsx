@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 // Types import
 import type { Meeting, TranscriptSegment, ActionItem } from '@/types/meeting-agent/meeting'
 import SpeakerRenamer from '@/components/meeting-agent/SpeakerRenamer'
-import ActionPlanViewer from '@/components/meeting-agent/ActionPlanViewer'
+import ExecutionLog from '@/components/meeting-agent/ExecutionLog'
 
 export default function MeetingReview() {
   const { id } = useParams<{ id: string }>()
@@ -15,6 +15,7 @@ export default function MeetingReview() {
   const [transcript, setTranscript] = useState<TranscriptSegment[]>([])
   const [actions, setActions] = useState<ActionItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [executingActions, setExecutingActions] = useState(false)
 
   const handleRetry = async () => {
     try {
@@ -25,6 +26,47 @@ export default function MeetingReview() {
     } catch (e) {
       console.error(e)
       alert('Failed to retry processing')
+    }
+  }
+
+  const handleExecuteActions = async () => {
+    if (!meeting || !id) return
+    
+    setExecutingActions(true)
+    try {
+      const { supabase } = await import('@/integrations/supabase/client')
+      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user?.id) {
+        alert('Please log in')
+        return
+      }
+
+      const res = await fetch(`/api/agent/meetings/${id}/execute-actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
+        },
+        body: JSON.stringify({ user_id: user.id })
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.detail || 'Failed to execute actions')
+      }
+
+      const result = await res.json()
+      alert(`Actions executed! ${result.tasks_created} tasks created, ${result.tasks_failed} failed`)
+      
+      // Reload page to show execution log
+      window.location.reload()
+    } catch (e: any) {
+      console.error(e)
+      alert(`Failed to execute actions: ${e.message}`)
+    } finally {
+      setExecutingActions(false)
     }
   }
 
@@ -101,16 +143,25 @@ export default function MeetingReview() {
                   Retry Processing
                 </button>
               )}
+              {meeting.insights && actions.length > 0 && (
+                <button 
+                  onClick={handleExecuteActions}
+                  disabled={executingActions}
+                  className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {executingActions ? 'Executing...' : 'Execute Actions'}
+                </button>
+              )}
             </div>
           </div>
           <button
-            onClick={() => navigate('/v1/agent')}
+            onClick={() => navigate('/agent')}
             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            New Meeting
+            Back to Dashboard
           </button>
         </header>
 
@@ -147,7 +198,10 @@ export default function MeetingReview() {
           </div>
 
           <div className="space-y-8">
-            <ActionPlanViewer meetingId={id!} />
+            <section className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900">Automated Actions</h2>
+              <ExecutionLog meetingId={id!} />
+            </section>
 
             {meeting.insights?.summary && (
               <section className="bg-white p-6 rounded-lg shadow">
