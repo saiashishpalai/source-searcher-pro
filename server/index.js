@@ -3617,6 +3617,69 @@ app.get('/api/debug/check-duplicates', async (req, res) => {
   }
 });
 
+// n8n Webhook Proxy - Forward webhook calls from frontend to avoid CORS issues
+app.post('/api/webhook/n8n', async (req, res) => {
+  try {
+    const webhookUrl = process.env.N8N_WEBHOOK_URL || process.env.VITE_N8N_WEBHOOK_URL;
+    
+    if (!webhookUrl) {
+      return res.status(500).json({ 
+        error: 'N8N_WEBHOOK_URL not configured',
+        hint: 'Add N8N_WEBHOOK_URL to your .env.local file'
+      });
+    }
+
+    const { email, user_id, sources_connected, onboarding_stage } = req.body;
+
+    if (!email || !user_id) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['email', 'user_id']
+      });
+    }
+
+    console.log('🔗 [n8n] Forwarding webhook request:', { email, user_id });
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        user_id,
+        sources_connected: sources_connected || 0,
+        onboarding_stage: onboarding_stage || 'New User',
+      }),
+    });
+
+    const responseText = await response.text();
+    console.log('🔗 [n8n] Response status:', response.status);
+    console.log('🔗 [n8n] Response body:', responseText);
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: 'Webhook request failed',
+        status: response.status,
+        message: responseText,
+        hint: response.status === 404 ? 'Make sure the n8n workflow is ACTIVE (toggle in top-right)' : undefined
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Webhook sent successfully',
+      response: responseText
+    });
+  } catch (error) {
+    console.error('❌ [n8n] Webhook proxy error:', error);
+    res.status(500).json({
+      error: 'Failed to forward webhook',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 // DEBUG ENDPOINT: Reset dismissed duplicates for testing
 app.post('/api/debug/reset-dismissed-duplicates', async (req, res) => {
   try {

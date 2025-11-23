@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { syncToN8n } from '@/lib/webhook-sync';
 
 interface AuthContextType {
   user: User | null;
@@ -55,7 +56,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signup = async (email: string, password: string) => {
+  const signup = async (email: string, password: string, phone_number?: string) => {
     try {
       console.log('🔍 Step 1: Checking if user exists for email:', email);
       
@@ -113,6 +114,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       console.log('✅ Signup successful!');
+      console.log('✅ Signup user data:', { 
+        id: data?.user?.id, 
+        email: data?.user?.email || email,
+        hasUser: !!data?.user 
+      });
+
+      // Sync to n8n workflow (non-blocking)
+      if (data?.user) {
+        syncToN8n({
+          email: data.user.email || email,
+          user_id: data.user.id,
+          sources_connected: 0,
+          onboarding_stage: 'New User',
+          phone_number: phone_number || undefined,
+        }).catch(() => {
+          // Silent fail - webhook is non-critical
+        });
+      }
+
       return {
         success: true,
         message: 'Account created! Please check your email to verify your account.',

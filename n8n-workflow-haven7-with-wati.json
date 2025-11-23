@@ -1,0 +1,247 @@
+{
+  "name": "Haven7 User Onboarding with WATI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "a89019d3-9e5d-4771-b4f7-757299657df4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format data for HubSpot with custom properties\nconst items = $input.all();\n\nreturn items.map(item => {\n  return {\n    json: {\n      email: item.json.email,\n      phone_number: item.json.phone_number || item.json.phone || '',\n      properties: {\n        email: item.json.email,\n        haven7_user_id: item.json.user_id,\n        sources_connected: item.json.sources_connected.toString(),\n        onboarding_stage: item.json.onboarding_stage\n      }\n    }\n  };\n});"
+      },
+      "id": "code-node",
+      "name": "Format Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        350,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "contact",
+        "operation": "createOrUpdate",
+        "email": "={{ $json.email }}",
+        "additionalFields": {
+          "fields": "={{ $json.properties }}"
+        },
+        "resolveData": true
+      },
+      "id": "hubspot-node",
+      "name": "HubSpot",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "hubspotApi": {
+          "id": "1",
+          "name": "HubSpot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format phone number for WATI (remove +, spaces, dashes)\nconst phone = $json.phone_number || '';\nconst formattedPhone = phone.replace(/[\\+\\s\\-\\(\\)]/g, '');\n\nreturn {\n  json: {\n    ...$json,\n    phone_number: formattedPhone,\n    has_phone: formattedPhone.length > 0\n  }\n};"
+      },
+      "id": "format-phone-node",
+      "name": "Format Phone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-phone-condition",
+              "leftValue": "={{ $json.has_phone }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-node",
+      "name": "Has Phone Number?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://live-server-XXXXX.wati.io/api/v1/sendSessionMessage/{{ $json.phone_number }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_WATI_ACCESS_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messageText",
+              "value": "=Welcome to Haven7! 🎉\n\nYour account is ready. Connect your first source to start searching.\n\nGet started: https://haven7.com/connect-sources"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wati-node",
+      "name": "Send WhatsApp (WATI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "WATI API"
+        }
+      },
+      "notes": "Replace XXXXX with your WATI server ID and YOUR_WATI_ACCESS_TOKEN with your actual token"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Workflow executed successfully\" } }}",
+        "options": {}
+      },
+      "id": "respond-node",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        950,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Format Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data": {
+      "main": [
+        [
+          {
+            "node": "HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Format Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Phone": {
+      "main": [
+        [
+          {
+            "node": "Has Phone Number?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Phone Number?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp (WATI)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp (WATI)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-11-22T20:00:00.000Z",
+  "versionId": "1"
+}
+

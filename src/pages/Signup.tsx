@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Mail, Lock, Loader2, ArrowLeft, Sparkles, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Loader2, ArrowLeft, Sparkles, CheckCircle, Phone } from 'lucide-react';
 import { debugRedirectUrl } from '@/utils/debug-redirect';
 import authBg6 from '@/assets/auth-bg-6.png';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -14,21 +14,250 @@ const Signup = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    phone_number: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; isExistingUser?: boolean } | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
 
   
   const { signup } = useAuth();
 
+  // Get country flag emoji from country code
+  const getCountryFlag = (phone: string): string | null => {
+    if (!phone || !phone.startsWith('+')) return null;
+    
+    // Extract country code (part after + and before -)
+    const match = phone.match(/^\+(\d{1,3})-/);
+    if (!match) return null;
+    
+    const countryCode = match[1];
+    
+    // Map of common country codes to flag emojis
+    const countryFlags: { [key: string]: string } = {
+      '1': '🇺🇸', // USA/Canada
+      '7': '🇷🇺', // Russia/Kazakhstan
+      '20': '🇪🇬', // Egypt
+      '27': '🇿🇦', // South Africa
+      '30': '🇬🇷', // Greece
+      '31': '🇳🇱', // Netherlands
+      '32': '🇧🇪', // Belgium
+      '33': '🇫🇷', // France
+      '34': '🇪🇸', // Spain
+      '36': '🇭🇺', // Hungary
+      '39': '🇮🇹', // Italy
+      '40': '🇷🇴', // Romania
+      '41': '🇨🇭', // Switzerland
+      '43': '🇦🇹', // Austria
+      '44': '🇬🇧', // UK
+      '45': '🇩🇰', // Denmark
+      '46': '🇸🇪', // Sweden
+      '47': '🇳🇴', // Norway
+      '48': '🇵🇱', // Poland
+      '49': '🇩🇪', // Germany
+      '51': '🇵🇪', // Peru
+      '52': '🇲🇽', // Mexico
+      '53': '🇨🇺', // Cuba
+      '54': '🇦🇷', // Argentina
+      '55': '🇧🇷', // Brazil
+      '56': '🇨🇱', // Chile
+      '57': '🇨🇴', // Colombia
+      '58': '🇻🇪', // Venezuela
+      '60': '🇲🇾', // Malaysia
+      '61': '🇦🇺', // Australia
+      '62': '🇮🇩', // Indonesia
+      '63': '🇵🇭', // Philippines
+      '64': '🇳🇿', // New Zealand
+      '65': '🇸🇬', // Singapore
+      '66': '🇹🇭', // Thailand
+      '81': '🇯🇵', // Japan
+      '82': '🇰🇷', // South Korea
+      '84': '🇻🇳', // Vietnam
+      '86': '🇨🇳', // China
+      '90': '🇹🇷', // Turkey
+      '91': '🇮🇳', // India
+      '92': '🇵🇰', // Pakistan
+      '93': '🇦🇫', // Afghanistan
+      '94': '🇱🇰', // Sri Lanka
+      '95': '🇲🇲', // Myanmar
+      '98': '🇮🇷', // Iran
+      '212': '🇲🇦', // Morocco
+      '213': '🇩🇿', // Algeria
+      '216': '🇹🇳', // Tunisia
+      '218': '🇱🇾', // Libya
+      '220': '🇬🇲', // Gambia
+      '221': '🇸🇳', // Senegal
+      '222': '🇲🇷', // Mauritania
+      '223': '🇲🇱', // Mali
+      '224': '🇬🇳', // Guinea
+      '225': '🇨🇮', // Côte d'Ivoire
+      '226': '🇧🇫', // Burkina Faso
+      '227': '🇳🇪', // Niger
+      '228': '🇹🇬', // Togo
+      '229': '🇧🇯', // Benin
+      '230': '🇲🇺', // Mauritius
+      '231': '🇱🇷', // Liberia
+      '232': '🇸🇱', // Sierra Leone
+      '233': '🇬🇭', // Ghana
+      '234': '🇳🇬', // Nigeria
+      '235': '🇹🇩', // Chad
+      '236': '🇨🇫', // Central African Republic
+      '237': '🇨🇲', // Cameroon
+      '238': '🇨🇻', // Cape Verde
+      '239': '🇸🇹', // São Tomé and Príncipe
+      '240': '🇬🇶', // Equatorial Guinea
+      '241': '🇬🇦', // Gabon
+      '242': '🇨🇬', // Republic of the Congo
+      '243': '🇨🇩', // Democratic Republic of the Congo
+      '244': '🇦🇴', // Angola
+      '245': '🇬🇼', // Guinea-Bissau
+      '246': '🇮🇴', // British Indian Ocean Territory
+      '248': '🇸🇨', // Seychelles
+      '249': '🇸🇩', // Sudan
+      '250': '🇷🇼', // Rwanda
+      '251': '🇪🇹', // Ethiopia
+      '252': '🇸🇴', // Somalia
+      '253': '🇩🇯', // Djibouti
+      '254': '🇰🇪', // Kenya
+      '255': '🇹🇿', // Tanzania
+      '256': '🇺🇬', // Uganda
+      '257': '🇧🇮', // Burundi
+      '258': '🇲🇿', // Mozambique
+      '260': '🇿🇲', // Zambia
+      '261': '🇲🇬', // Madagascar
+      '262': '🇷🇪', // Réunion
+      '263': '🇿🇼', // Zimbabwe
+      '264': '🇳🇦', // Namibia
+      '265': '🇲🇼', // Malawi
+      '266': '🇱🇸', // Lesotho
+      '267': '🇧🇼', // Botswana
+      '268': '🇸🇿', // Eswatini
+      '269': '🇰🇲', // Comoros
+      '290': '🇸🇭', // Saint Helena
+      '291': '🇪🇷', // Eritrea
+      '297': '🇦🇼', // Aruba
+      '298': '🇫🇴', // Faroe Islands
+      '299': '🇬🇱', // Greenland
+      '350': '🇬🇮', // Gibraltar
+      '351': '🇵🇹', // Portugal
+      '352': '🇱🇺', // Luxembourg
+      '353': '🇮🇪', // Ireland
+      '354': '🇮🇸', // Iceland
+      '355': '🇦🇱', // Albania
+      '356': '🇲🇹', // Malta
+      '357': '🇨🇾', // Cyprus
+      '358': '🇫🇮', // Finland
+      '359': '🇧🇬', // Bulgaria
+      '370': '🇱🇹', // Lithuania
+      '371': '🇱🇻', // Latvia
+      '372': '🇪🇪', // Estonia
+      '373': '🇲🇩', // Moldova
+      '374': '🇦🇲', // Armenia
+      '375': '🇧🇾', // Belarus
+      '376': '🇦🇩', // Andorra
+      '377': '🇲🇨', // Monaco
+      '378': '🇸🇲', // San Marino
+      '380': '🇺🇦', // Ukraine
+      '381': '🇷🇸', // Serbia
+      '382': '🇲🇪', // Montenegro
+      '383': '🇽🇰', // Kosovo
+      '385': '🇭🇷', // Croatia
+      '386': '🇸🇮', // Slovenia
+      '387': '🇧🇦', // Bosnia and Herzegovina
+      '389': '🇲🇰', // North Macedonia
+      '420': '🇨🇿', // Czech Republic
+      '421': '🇸🇰', // Slovakia
+      '423': '🇱🇮', // Liechtenstein
+      '500': '🇫🇰', // Falkland Islands
+      '501': '🇧🇿', // Belize
+      '502': '🇬🇹', // Guatemala
+      '503': '🇸🇻', // El Salvador
+      '504': '🇭🇳', // Honduras
+      '505': '🇳🇮', // Nicaragua
+      '506': '🇨🇷', // Costa Rica
+      '507': '🇵🇦', // Panama
+      '508': '🇵🇲', // Saint Pierre and Miquelon
+      '509': '🇭🇹', // Haiti
+      '590': '🇬🇵', // Guadeloupe
+      '591': '🇧🇴', // Bolivia
+      '592': '🇬🇾', // Guyana
+      '593': '🇪🇨', // Ecuador
+      '594': '🇬🇫', // French Guiana
+      '595': '🇵🇾', // Paraguay
+      '596': '🇲🇶', // Martinique
+      '597': '🇸🇷', // Suriname
+      '598': '🇺🇾', // Uruguay
+      '599': '🇧🇶', // Bonaire
+      '670': '🇹🇱', // East Timor
+      '672': '🇦🇶', // Antarctica
+      '673': '🇧🇳', // Brunei
+      '674': '🇳🇷', // Nauru
+      '675': '🇵🇬', // Papua New Guinea
+      '676': '🇹🇴', // Tonga
+      '677': '🇸🇧', // Solomon Islands
+      '678': '🇻🇺', // Vanuatu
+      '679': '🇫🇯', // Fiji
+      '680': '🇵🇼', // Palau
+      '681': '🇼🇫', // Wallis and Futuna
+      '682': '🇨🇰', // Cook Islands
+      '683': '🇳🇺', // Niue
+      '685': '🇼🇸', // Samoa
+      '686': '🇰🇮', // Kiribati
+      '687': '🇳🇨', // New Caledonia
+      '688': '🇹🇻', // Tuvalu
+      '689': '🇵🇫', // French Polynesia
+      '850': '🇰🇵', // North Korea
+      '852': '🇭🇰', // Hong Kong
+      '853': '🇲🇴', // Macau
+      '855': '🇰🇭', // Cambodia
+      '856': '🇱🇦', // Laos
+      '880': '🇧🇩', // Bangladesh
+      '886': '🇹🇼', // Taiwan
+      '960': '🇲🇻', // Maldives
+      '961': '🇱🇧', // Lebanon
+      '962': '🇯🇴', // Jordan
+      '963': '🇸🇾', // Syria
+      '964': '🇮🇶', // Iraq
+      '965': '🇰🇼', // Kuwait
+      '966': '🇸🇦', // Saudi Arabia
+      '967': '🇾🇪', // Yemen
+      '968': '🇴🇲', // Oman
+      '970': '🇵🇸', // Palestine
+      '971': '🇦🇪', // UAE
+      '972': '🇮🇱', // Israel
+      '973': '🇧🇭', // Bahrain
+      '974': '🇶🇦', // Qatar
+      '975': '🇧🇹', // Bhutan
+      '976': '🇲🇳', // Mongolia
+      '977': '🇳🇵', // Nepal
+      '992': '🇹🇯', // Tajikistan
+      '993': '🇹🇲', // Turkmenistan
+      '994': '🇦🇿', // Azerbaijan
+      '995': '🇬🇪', // Georgia
+      '996': '🇰🇬', // Kyrgyzstan
+      '998': '🇺🇿', // Uzbekistan
+    };
+    
+    return countryFlags[countryCode] || null;
+  };
+
+  // Validate phone number format: +XX-XXXXXXXXXX (country code with +, dash, then digits)
+  const validatePhoneNumber = (phone: string): boolean => {
+    if (!phone) return true; // Optional field, empty is valid
+    // Format: + followed by 1-3 digits, then dash, then 6-15 digits
+    const phoneRegex = /^\+\d{1,3}-\d{6,15}$/;
+    return phoneRegex.test(phone);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage(null);
+    setPhoneError(null);
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
@@ -43,8 +272,15 @@ const Signup = () => {
       return;
     }
 
+    // Validate phone number format if provided
+    if (formData.phone_number && !validatePhoneNumber(formData.phone_number)) {
+      setPhoneError('Phone number must be in format: +XX-XXXXXXXXXX (e.g., +91-9979037839)');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const result = await signup(formData.email, formData.password);
+      const result = await signup(formData.email, formData.password, formData.phone_number || undefined);
       
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
@@ -67,9 +303,16 @@ const Signup = () => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    // Clear phone error when user starts typing
+    if (name === 'phone_number' && phoneError) {
+      setPhoneError(null);
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [name]: value
     }));
   };
 
@@ -207,6 +450,43 @@ const Signup = () => {
                   {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </Button>
               </div>
+            </div>
+
+            <div className="animate-fade-in-up" style={{ animationDelay: '1.3s' }}>
+              <Label className="block text-sm text-muted-foreground dark:text-gray-300 mb-2" htmlFor="phone_number">
+                Phone Number <span className="text-xs text-muted-foreground/70">(Optional)</span>
+              </Label>
+              <div className="relative">
+                {getCountryFlag(formData.phone_number) ? (
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-xl leading-none">
+                    {getCountryFlag(formData.phone_number)}
+                  </span>
+                ) : (
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground/80 dark:text-gray-500" />
+                )}
+                <Input
+                  id="phone_number"
+                  name="phone_number"
+                  type="tel"
+                  value={formData.phone_number}
+                  onChange={handleInputChange}
+                  placeholder="+1-5551234567"
+                  className={`${getCountryFlag(formData.phone_number) ? 'pl-12' : 'pl-10'} pr-4 bg-card/80 dark:bg-white/5 border rounded-xl py-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-500 focus:outline-none focus:bg-accent/10 dark:focus:bg-white/10 transition-all duration-200 placeholder:pl-0 ${
+                    phoneError 
+                      ? 'border-red-500 dark:border-red-500/50 focus:border-red-500' 
+                      : 'border-border/60 dark:border-gray-800/50 focus:border-[#A855F7]'
+                  }`}
+                />
+              </div>
+              {phoneError ? (
+                <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                  {phoneError}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Get product updates and tips via WhatsApp. Format: +XX-XXXXXXXXXX
+                </p>
+              )}
             </div>
 
             {/* Message Display */}
