@@ -11,13 +11,13 @@ export class NotionSync {
     this.supabaseAdmin = supabaseAdmin;
     this.embeddingModel = 'text-embedding-3-small';
     
-    // SAFETY LIMITS (matching Google Drive)
+    // SAFETY LIMITS - optimized for semantic precision
     this.SYNC_LIMITS = {
       MAX_DOCUMENTS: parseInt(process.env.MAX_NOTION_PAGES) || 200,  // 200 document limit
       MAX_TEXT_LENGTH: 15000,      // ~4000 tokens max
-      MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
-      CHUNK_SIZE: 1500,            // ~400 tokens
-      CHUNK_OVERLAP: 200,          // Prevent sentence splitting
+      MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 20,  // More smaller chunks
+      CHUNK_SIZE: parseInt(process.env.CHUNK_SIZE) || 600,  // ~150 tokens - smaller semantic units
+      CHUNK_OVERLAP: parseInt(process.env.CHUNK_OVERLAP) || 100,  // Reduced overlap
     };
   }
 
@@ -238,10 +238,10 @@ export class NotionSync {
   }
 
   /**
-   * Chunk text for embeddings with safety limits (legacy method)
+   * Chunk text for embeddings with sentence-boundary awareness
+   * Improved for semantic precision with smaller chunks
    */
   chunkText(text) {
-    const chunks = [];
     const CHUNK_SIZE = this.SYNC_LIMITS.CHUNK_SIZE;
     const OVERLAP = this.SYNC_LIMITS.CHUNK_OVERLAP;
     const MAX_CHUNKS = this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC;
@@ -252,11 +252,30 @@ export class NotionSync {
       console.log(`  ✂️ Truncated content to ${this.SYNC_LIMITS.MAX_TEXT_LENGTH} characters`);
     }
     
-    for (let i = 0; i < text.length && chunks.length < MAX_CHUNKS; i += CHUNK_SIZE - OVERLAP) {
-      const chunk = text.slice(i, i + CHUNK_SIZE);
-      if (chunk.length > 50) { // Min 50 chars
-        chunks.push(chunk);
+    // Split into sentences first for semantic chunking
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    const chunks = [];
+    let currentChunk = '';
+    
+    for (const sentence of sentences) {
+      if (chunks.length >= MAX_CHUNKS) break;
+      
+      if ((currentChunk + sentence).length > CHUNK_SIZE && currentChunk) {
+        // Finalize current chunk
+        if (currentChunk.trim().length > 50) {
+          chunks.push(currentChunk.trim());
+        }
+        // Start new chunk with overlap from last sentence
+        const overlapStart = Math.max(0, currentChunk.length - OVERLAP);
+        currentChunk = currentChunk.slice(overlapStart) + sentence;
+      } else {
+        currentChunk += sentence;
       }
+    }
+    
+    // Add final chunk
+    if (currentChunk.trim().length > 50 && chunks.length < MAX_CHUNKS) {
+      chunks.push(currentChunk.trim());
     }
     
     return chunks;
@@ -264,11 +283,12 @@ export class NotionSync {
 
   /**
    * Chunk by block hierarchy for better RAG results
+   * Uses configurable chunk size for semantic precision
    */
   chunkByHierarchy(structuredBlocks, pageTitle) {
     const chunks = [];
-    const CHUNK_SIZE = 1000; // 800-1000 chars as specified
-    const OVERLAP = 100; // Smaller overlap for hierarchical chunks
+    const CHUNK_SIZE = this.SYNC_LIMITS.CHUNK_SIZE; // Use configurable chunk size (~600 chars)
+    const OVERLAP = this.SYNC_LIMITS.CHUNK_OVERLAP; // Use configurable overlap (~100 chars)
     const MAX_CHUNKS = this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC;
     
     let currentChunk = '';

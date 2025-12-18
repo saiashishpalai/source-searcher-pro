@@ -19,6 +19,7 @@ import PRDView from "./pages/PRDView";
 import PRDNew from "./pages/PRDNew";
 import PRDHubPage from "./pages/PRDHubPage";
 import PRDCompare from "./components/PRDCompare";
+import PRDExecution from "./pages/PRDExecution";
 
 const App = () => {
   return (
@@ -72,6 +73,16 @@ const App = () => {
       <Route path="/prd/compare/:id1/:id2" element={
         <ProtectedRoute>
           <PRDCompare />
+        </ProtectedRoute>
+      } />
+      <Route path="/prd/:id/execution" element={
+        <ProtectedRoute>
+          <PRDExecution />
+        </ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <ProfileSettings />
         </ProtectedRoute>
       } />
       <Route path="/docs" element={<Documentation />} />

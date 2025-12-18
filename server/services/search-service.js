@@ -725,11 +725,11 @@ Follow the format from the examples above. Write Answer sections as single unbro
           // Generate query embedding
           const queryEmbedding = await this.generateQueryEmbedding(query);
 
-          // Run vector search
+          // Run vector search - optimized thresholds for quality
           const { data: vectorResults } = await supabaseAdmin.rpc('search_document_chunks', {
             query_embedding: queryEmbedding,
-            match_threshold: 0.3,
-            match_count: 20,
+            match_threshold: parseFloat(process.env.RAG_MATCH_THRESHOLD) || 0.7,
+            match_count: parseInt(process.env.RAG_MAX_CHUNKS) || 7,
             user_id_param: userId
           }) || { data: [] };
 
@@ -1303,11 +1303,11 @@ Follow the format from the examples above. Write Answer sections as single unbro
       console.log('🚀 Running vector and BM25 searches in parallel...');
       
       const [vectorResult, bm25Result] = await Promise.allSettled([
-        // Vector search
+        // Vector search - optimized thresholds for quality
         supabaseAdmin.rpc('search_document_chunks', {
           query_embedding: queryEmbedding,
-          match_threshold: 0.3,
-          match_count: 20,
+          match_threshold: parseFloat(process.env.RAG_MATCH_THRESHOLD) || 0.7,  // Higher threshold for better relevance
+          match_count: parseInt(process.env.RAG_MAX_CHUNKS) || 7,  // Fewer, higher quality chunks
           user_id_param: userId
         }),
         // BM25 search
@@ -1407,24 +1407,43 @@ Follow the format from the examples above. Write Answer sections as single unbro
       console.log('🎯 Applying MMR for diversity...');
       let mmrResults = await this.applyMMR(mergedResults, queryEmbedding, 0.6, 20);
 
-      // 7. Apply recency boost AFTER MMR
+      // 6.5 Quality filter: remove low-relevance chunks after MMR
+      // Note: BM25-only results may not have similarity scores, so we check multiple fields
+      const relevanceThreshold = parseFloat(process.env.RAG_RELEVANCE_THRESHOLD) || 0.65;
+      const qualityFilteredChunks = mmrResults.filter(chunk => {
+        // Check various score fields (different sources use different names)
+        const score = chunk.similarity || chunk.final_score || chunk.rrf_score || chunk.score || 0;
+        // For BM25-only results (no vector search), be more lenient
+        if (vectorResults.length === 0 && score === 0) {
+          // BM25 results without scores - keep top results by position
+          return true;
+        }
+        return score >= relevanceThreshold;
+      });
+      // If quality filter removed everything but we had BM25 results, keep top 5 BM25
+      const finalQualityChunks = qualityFilteredChunks.length > 0 
+        ? qualityFilteredChunks 
+        : mmrResults.slice(0, 5);
+      console.log(`🔍 Quality filtered: ${mmrResults.length} → ${finalQualityChunks.length} chunks (threshold: ${relevanceThreshold})`);
+
+      // 7. Apply recency boost AFTER MMR and quality filtering
       console.log('📈 Applying recency boost...');
-      let chunks = this.applyRecencyBoost(mmrResults);
+      let chunks = this.applyRecencyBoost(finalQualityChunks);
       console.log(`📊 After recency boost: ${chunks.length} chunks`);
 
       // 8. Deduplicate versions
       const deduplicatedChunks = this.deduplicateVersions(chunks);
       console.log(`🔄 Deduplicated versions: ${chunks.length} → ${deduplicatedChunks.length} chunks`);
 
-      // 9. Limit to top 8-10 chunks for model input (token control)
-      const finalChunks = deduplicatedChunks.slice(0, 10);
+      // 9. Limit to top 5 chunks for model input (optimized token control)
+      const finalChunks = deduplicatedChunks.slice(0, 5);
       console.log(`📊 Final chunks for model: ${finalChunks.length}`);
 
       // 10. Re-rank with boost terms if available (optional enhancement)
       if (queryClassification.boostTerms.length > 0) {
         const boostedChunks = this.reRankChunks(finalChunks, queryClassification.boostTerms);
-        // Keep top 10 after boost
-        chunks = boostedChunks.slice(0, 10);
+        // Keep top 5 after boost
+        chunks = boostedChunks.slice(0, 5);
       } else {
         chunks = finalChunks;
       }
@@ -1984,7 +2003,8 @@ Follow the format from the examples above. Write Answer sections as single unbro
         }
       }));
 
-      const maxChunks = 10;
+      // Optimized: fewer, higher quality chunks
+      const maxChunks = 5;
       const contextChunks = chunks.slice(0, maxChunks);
 
       if (contextChunks.length === 0) {
@@ -2052,8 +2072,8 @@ Answer using only these documents. Be specific and cite sources.`;
    */
   async generateSummary(query, chunks) {
     try {
-      // Cost control
-      const maxChunks = 10;
+      // Optimized: fewer, higher quality chunks for better responses
+      const maxChunks = 5;
       const contextChunks = chunks.slice(0, maxChunks);
 
       if (contextChunks.length === 0) {

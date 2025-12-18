@@ -40,6 +40,7 @@ import { ApiClient } from '@/lib/api-client';
 import IncrementalSyncFeedback from '@/components/IncrementalSyncFeedback';
 import DocumentLimitDialog from '@/components/DocumentLimitDialog';
 import { toast } from '@/components/ui/sonner';
+import { JiraConnectionCard } from '@/components/jira';
 
 // SVG Icon Components (reusing from existing components)
 const SlackIcon = ({ className = "" }: { className?: string }) => (
@@ -1250,6 +1251,11 @@ const ConnectedSources = () => {
                   </CardContent>
                 </Card>
               ))}
+              
+              {/* Jira Integration */}
+              <div className="h-full">
+                <JiraConnectionCard className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-lg group h-full flex flex-col" />
+              </div>
             </div>
 
             {/* Additional Features */}

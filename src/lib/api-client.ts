@@ -73,6 +73,24 @@ export class ApiClient {
     return response.json();
   }
 
+  static async patch<T = any>(endpoint: string, data: any): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(data),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(error.message || 'API request failed');
+    }
+
+    return response.json();
+  }
+
   // PRD management
   static async createPRD(title: string): Promise<{ prd: any }> {
     return this.post('/api/prd/create', { title });
@@ -307,5 +325,231 @@ export class ApiClient {
   // AI section draft generation
   static async generateSectionDraft(sectionId: string, context: any): Promise<{ draft: string; confidence?: number }> {
     return this.post('/api/prd/generate-section-draft', { section_id: sectionId, context });
+  }
+
+  // ============================================================================
+  // Jira Integration
+  // ============================================================================
+
+  // Start Jira OAuth flow
+  static async startJiraAuth(): Promise<{ url: string; state: string }> {
+    return this.get('/api/jira/auth/start');
+  }
+
+  // Get Jira connection status
+  static async getJiraConnection(): Promise<{
+    connected: boolean;
+    reason?: string;
+    error?: string;
+    siteUrl?: string;
+    email?: string;
+    displayName?: string;
+    defaultProject?: { key: string; name: string } | null;
+  }> {
+    return this.get('/api/jira/connection');
+  }
+
+  // Disconnect Jira
+  static async disconnectJira(): Promise<{ success: boolean }> {
+    return this.delete('/api/jira/connection');
+  }
+
+  // Get available Jira projects
+  static async getJiraProjects(): Promise<{
+    projects: Array<{
+      id: string;
+      key: string;
+      name: string;
+      projectTypeKey: string;
+      avatarUrls?: Record<string, string>;
+    }>;
+    defaultProject: { key: string; name: string } | null;
+  }> {
+    return this.get('/api/jira/projects');
+  }
+
+  // Select default Jira project
+  static async selectJiraProject(projectKey: string): Promise<{
+    success: boolean;
+    project: {
+      key: string;
+      name: string;
+      issueTypes: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        subtask: boolean;
+        hierarchyLevel?: number;
+      }>;
+    };
+  }> {
+    return this.post('/api/jira/projects/select', { projectKey });
+  }
+
+  // Get issue types for a project
+  static async getJiraProjectIssueTypes(projectKey: string): Promise<{
+    issueTypes: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      subtask: boolean;
+      hierarchyLevel?: number;
+    }>;
+  }> {
+    return this.get(`/api/jira/projects/${projectKey}/types`);
+  }
+
+  // Mark PRD as ready for execution
+  static async markPRDReady(prdId: string, options?: {
+    jiraProjectKey?: string;
+    granularityMode?: 'rolled_up' | 'balanced' | 'granular';
+  }): Promise<{ success: boolean; prd: any }> {
+    return this.post(`/api/prd/${prdId}/mark-ready`, {
+      jiraProjectKey: options?.jiraProjectKey,
+      granularityMode: options?.granularityMode || 'rolled_up'
+    });
+  }
+
+  // Classify PRD size
+  static async classifyPRD(prdId: string): Promise<{
+    classification: 'small' | 'medium' | 'large';
+    reasoning: string;
+    featureAreas: string[];
+    estimatedStoryCount: number;
+  }> {
+    return this.post(`/api/prd/${prdId}/classify`, {});
+  }
+
+  // Generate draft tickets from PRD
+  static async generateDraftTickets(prdId: string, options?: {
+    granularityMode?: 'rolled_up' | 'balanced' | 'granular';
+    classification?: 'small' | 'medium' | 'large';
+  }): Promise<{
+    success: boolean;
+    tickets: Array<{
+      id: string;
+      issueType: string;
+      summary: string;
+      description: string;
+      acceptanceCriteria: string;
+      priority: string;
+      featureArea: string;
+      parentTicketId?: string;
+    }>;
+    classification: string;
+  }> {
+    return this.post(`/api/prd/${prdId}/draft-tickets`, options || {});
+  }
+
+  // Get tickets for a PRD
+  static async getPRDTickets(prdId: string): Promise<{
+    tickets: Array<{
+      id: string;
+      jira_issue_key?: string;
+      issue_type: string;
+      draft_summary: string;
+      draft_description?: string;
+      draft_acceptance_criteria?: string;
+      draft_priority: string;
+      feature_area?: string;
+      status: 'draft' | 'approved' | 'rejected' | 'published';
+      jira_status?: string;
+      jira_assignee_name?: string;
+      parent_ticket_id?: string;
+      parent_jira_key?: string;
+      sort_order: number;
+      depth: number;
+    }>;
+    progress: {
+      total_tickets: number;
+      published_tickets: number;
+      draft_tickets: number;
+      approved_tickets: number;
+      rejected_tickets: number;
+      jira_todo: number;
+      jira_in_progress: number;
+      jira_qa: number;
+      jira_done: number;
+      jira_blocked: number;
+      completion_percentage: number;
+    } | null;
+  }> {
+    return this.get(`/api/prd/${prdId}/tickets`);
+  }
+
+  // Update a draft ticket
+  static async updateDraftTicket(prdId: string, ticketId: string, data: {
+    summary?: string;
+    description?: string;
+    acceptanceCriteria?: string;
+    priority?: string;
+  }): Promise<{ success: boolean; ticket: any }> {
+    return this.patch(`/api/prd/${prdId}/tickets/${ticketId}`, data);
+  }
+
+  // Approve a ticket
+  static async approveTicket(prdId: string, ticketId: string): Promise<{ success: boolean; ticket: any }> {
+    return this.post(`/api/prd/${prdId}/tickets/${ticketId}/approve`, {});
+  }
+
+  // Reject a ticket
+  static async rejectTicket(prdId: string, ticketId: string): Promise<{ success: boolean; ticket: any }> {
+    return this.post(`/api/prd/${prdId}/tickets/${ticketId}/reject`, {});
+  }
+
+  // Bulk approve all tickets
+  static async approveAllTickets(prdId: string): Promise<{ success: boolean; approvedCount: number }> {
+    return this.post(`/api/prd/${prdId}/tickets/approve-all`, {});
+  }
+
+  // Publish approved tickets to Jira
+  static async publishTicketsToJira(prdId: string): Promise<{
+    success: boolean;
+    published: Array<{
+      ticketId: string;
+      jiraKey: string;
+      jiraUrl: string;
+    }>;
+    errors: Array<{
+      ticketId: string;
+      error: string;
+    }>;
+  }> {
+    return this.post(`/api/prd/${prdId}/tickets/publish`, {});
+  }
+
+  // Sync Jira status for PRD tickets
+  static async syncJiraStatus(prdId: string): Promise<{
+    success: boolean;
+    synced: number;
+    tickets: any[];
+  }> {
+    return this.post(`/api/prd/${prdId}/sync-jira`, {});
+  }
+
+  // Get drift logs for a PRD
+  static async getPRDDriftLogs(prdId: string): Promise<{
+    logs: Array<{
+      id: string;
+      changeType: string;
+      changeSummary: string;
+      changedSections: string[];
+      severity: 'low' | 'medium' | 'high';
+      suggestedAction?: string;
+      status: 'pending' | 'acknowledged' | 'resolved';
+      detectedAt: string;
+    }>;
+  }> {
+    return this.get(`/api/prd/${prdId}/drift`);
+  }
+
+  // Acknowledge drift
+  static async acknowledgeDrift(prdId: string, logId: string): Promise<{ success: boolean }> {
+    return this.post(`/api/prd/${prdId}/drift/${logId}/acknowledge`, {});
+  }
+
+  // Resolve drift
+  static async resolveDrift(prdId: string, logId: string, resolution: string): Promise<{ success: boolean }> {
+    return this.post(`/api/prd/${prdId}/drift/${logId}/resolve`, { resolution });
   }
 }

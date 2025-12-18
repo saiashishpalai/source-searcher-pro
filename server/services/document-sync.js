@@ -13,14 +13,14 @@ export class DocumentSync {
     this.openai = new OpenAI({ apiKey: openaiApiKey });
     this.embeddingModel = 'text-embedding-3-small';
     
-    // CRITICAL SAFETY LIMITS
+    // CRITICAL SAFETY LIMITS - optimized for semantic precision
     this.SYNC_LIMITS = {
       MAX_DOCUMENTS: parseInt(process.env.MAX_GOOGLE_DRIVE_FILES) || 200,  // 200 document limit
       MAX_FILE_SIZE: 1000000,     // 1MB max per file
-      MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 10,  // 10 chunks max
+      MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOCUMENT) || 20,  // More smaller chunks
       MAX_TEXT_LENGTH: 15000,     // ~4000 tokens max
-      CHUNK_SIZE: 1500,           // ~400 tokens
-      CHUNK_OVERLAP: 200,         // Prevent sentence splitting
+      CHUNK_SIZE: parseInt(process.env.CHUNK_SIZE) || 600,  // ~150 tokens - smaller semantic units
+      CHUNK_OVERLAP: parseInt(process.env.CHUNK_OVERLAP) || 100,  // Reduced overlap
       STOP_AT_COST: 0.50          // Stop if cost exceeds $0.50
     };
   }
@@ -215,11 +215,12 @@ export class DocumentSync {
 
   /**
    * Smart sentence-boundary chunking for better RAG results
+   * Uses configurable chunk size for semantic precision
    */
   chunkTextSmart(text, fileType) {
     const chunks = [];
-    const CHUNK_SIZE = 1200; // 1000-1200 chars as specified
-    const OVERLAP = 150; // 150 chars overlap
+    const CHUNK_SIZE = this.SYNC_LIMITS.CHUNK_SIZE; // Use configurable chunk size (~600 chars)
+    const OVERLAP = this.SYNC_LIMITS.CHUNK_OVERLAP; // Use configurable overlap (~100 chars)
     const MAX_CHUNKS = this.SYNC_LIMITS.MAX_CHUNKS_PER_DOC;
     
     // Split text into sentences first

@@ -1828,227 +1828,229 @@ const SearchInterface = () => {
         {/* Main search interface, search results, or conversation view */}
         {showSearchResults ? (
           <div className="w-full relative z-10 pb-8">
-            {/* Advanced Filters for Search Results */}
-            <div className="mb-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Filter Results</span>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={clearAllFilters}
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  Clear all
-                </Button>
-              </div>
-
-              {/* Compact Filter Row */}
-              <div className="flex flex-wrap gap-2">
-                {/* Applications Filter */}
-                <div className="relative" ref={dropdownRefs.applications}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleDropdown('applications')}
-                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
-                      openDropdowns.applications ? 'bg-secondary/30 border-primary/50' : ''
-                    }`}
+            {/* Advanced Filters for Search Results - Hidden */}
+            {false && (
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Filter Results</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearAllFilters}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span>Apps</span>
-                      {getFilterCounts().applications > 0 && (
-                        <Badge variant="secondary" className="h-4 px-1 text-xs">
-                          {getFilterCounts().applications}
-                        </Badge>
-                      )}
-                    </div>
-                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
-                      openDropdowns.applications ? 'rotate-180' : ''
-                    }`} />
+                    <RotateCcw className="w-3 h-3" />
+                    Clear all
                   </Button>
+                </div>
 
-                  {openDropdowns.applications && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
-                      <div className="p-2">
-                        <div className="space-y-1">
-                          {['Slack', 'Google Drive', 'Notion'].map((source) => (
-                            <button
-                              key={source}
-                              onClick={() => toggleFilter('applications', source)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                {getApplicationIcon(source)}
-                                <span>{source}</span>
-                              </div>
-                              {filters.applications.includes(source) && (
-                                <Check className="w-3 h-3 text-primary ml-auto" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
+                {/* Compact Filter Row */}
+                <div className="flex flex-wrap gap-2">
+                  {/* Applications Filter */}
+                  <div className="relative" ref={dropdownRefs.applications}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleDropdown('applications')}
+                      className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                        openDropdowns.applications ? 'bg-secondary/30 border-primary/50' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Apps</span>
+                        {getFilterCounts().applications > 0 && (
+                          <Badge variant="secondary" className="h-4 px-1 text-xs">
+                            {getFilterCounts().applications}
+                          </Badge>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
+                      <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                        openDropdowns.applications ? 'rotate-180' : ''
+                      }`} />
+                    </Button>
 
-                {/* Authors Filter */}
-                <div className="relative" ref={dropdownRefs.authors}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleDropdown('authors')}
-                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
-                      openDropdowns.authors ? 'bg-secondary/30 border-primary/50' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Authors</span>
-                      {getFilterCounts().authors > 0 && (
-                        <Badge variant="secondary" className="h-4 px-1 text-xs">
-                          {getFilterCounts().authors}
-                        </Badge>
-                      )}
-                    </div>
-                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
-                      openDropdowns.authors ? 'rotate-180' : ''
-                    }`} />
-                  </Button>
-
-                  {openDropdowns.authors && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
-                      <div className="p-2">
-                        <div className="space-y-1">
-                          {['Sarah Chen', 'Mike Johnson', 'Alex Rivera', 'Emma Wilson', 'David Kim'].map((author) => (
-                            <button
-                              key={author}
-                              onClick={() => toggleFilter('authors', author)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
-                                  {author.charAt(0)}
+                    {openDropdowns.applications && (
+                      <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                        <div className="p-2">
+                          <div className="space-y-1">
+                            {['Slack', 'Google Drive', 'Notion'].map((source) => (
+                              <button
+                                key={source}
+                                onClick={() => toggleFilter('applications', source)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  {getApplicationIcon(source)}
+                                  <span>{source}</span>
                                 </div>
-                                <span>{author}</span>
-                              </div>
-                              {filters.authors.includes(author) && (
-                                <Check className="w-3 h-3 text-primary ml-auto" />
-                              )}
-                            </button>
-                          ))}
+                                {filters.applications.includes(source) && (
+                                  <Check className="w-3 h-3 text-primary ml-auto" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                {/* Document Types Filter */}
-                <div className="relative" ref={dropdownRefs.documentTypes}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleDropdown('documentTypes')}
-                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
-                      openDropdowns.documentTypes ? 'bg-secondary/30 border-primary/50' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Types</span>
-                      {getFilterCounts().documentTypes > 0 && (
-                        <Badge variant="secondary" className="h-4 px-1 text-xs">
-                          {getFilterCounts().documentTypes}
-                        </Badge>
-                      )}
-                    </div>
-                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
-                      openDropdowns.documentTypes ? 'rotate-180' : ''
-                    }`} />
-                  </Button>
+                  {/* Authors Filter */}
+                  <div className="relative" ref={dropdownRefs.authors}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleDropdown('authors')}
+                      className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                        openDropdowns.authors ? 'bg-secondary/30 border-primary/50' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Authors</span>
+                        {getFilterCounts().authors > 0 && (
+                          <Badge variant="secondary" className="h-4 px-1 text-xs">
+                            {getFilterCounts().authors}
+                          </Badge>
+                        )}
+                      </div>
+                      <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                        openDropdowns.authors ? 'rotate-180' : ''
+                      }`} />
+                    </Button>
 
-                  {openDropdowns.documentTypes && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
-                      <div className="p-2">
-                        <div className="space-y-1">
-                          {['message', 'pdf', 'doc', 'excel', 'page'].map((type) => (
-                            <button
-                              key={type}
-                              onClick={() => toggleFilter('documentTypes', type)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-4 h-4 rounded-md bg-secondary/30 flex items-center justify-center text-xs font-medium">
-                                  {type.charAt(0).toUpperCase()}
+                    {openDropdowns.authors && (
+                      <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                        <div className="p-2">
+                          <div className="space-y-1">
+                            {['Sarah Chen', 'Mike Johnson', 'Alex Rivera', 'Emma Wilson', 'David Kim'].map((author) => (
+                              <button
+                                key={author}
+                                onClick={() => toggleFilter('authors', author)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
+                                    {author.charAt(0)}
+                                  </div>
+                                  <span>{author}</span>
                                 </div>
-                                <span className="capitalize">{type}</span>
-                              </div>
-                              {filters.documentTypes.includes(type) && (
-                                <Check className="w-3 h-3 text-primary ml-auto" />
-                              )}
-                            </button>
-                          ))}
+                                {filters.authors.includes(author) && (
+                                  <Check className="w-3 h-3 text-primary ml-auto" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                {/* Time Range Filter */}
-                <div className="relative" ref={dropdownRefs.sort}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleDropdown('sort')}
-                    className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
-                      openDropdowns.sort ? 'bg-secondary/30 border-primary/50' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" />
-                      <span>Time</span>
-                      {getFilterCounts().sort > 0 && (
-                        <Badge variant="secondary" className="h-4 px-1 text-xs">
-                          1
-                        </Badge>
-                      )}
-                    </div>
-                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
-                      openDropdowns.sort ? 'rotate-180' : ''
-                    }`} />
-                  </Button>
+                  {/* Document Types Filter */}
+                  <div className="relative" ref={dropdownRefs.documentTypes}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleDropdown('documentTypes')}
+                      className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                        openDropdowns.documentTypes ? 'bg-secondary/30 border-primary/50' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Types</span>
+                        {getFilterCounts().documentTypes > 0 && (
+                          <Badge variant="secondary" className="h-4 px-1 text-xs">
+                            {getFilterCounts().documentTypes}
+                          </Badge>
+                        )}
+                      </div>
+                      <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                        openDropdowns.documentTypes ? 'rotate-180' : ''
+                      }`} />
+                    </Button>
 
-                  {openDropdowns.sort && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
-                      <div className="p-2">
-                        <div className="space-y-1">
-                          {['latest', 'last-week', 'last-month', 'last-year'].map((timeRange) => (
-                            <button
-                              key={timeRange}
-                              onClick={() => {
-                                setFilters(prev => ({ ...prev, timeRange }));
-                                toggleDropdown('sort');
-                              }}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <Clock className="w-3 h-3" />
-                                <span className="capitalize">{timeRange.replace('-', ' ')}</span>
-                              </div>
-                              {filters.timeRange === timeRange && (
-                                <Check className="w-3 h-3 text-primary ml-auto" />
-                              )}
-                            </button>
-                          ))}
+                    {openDropdowns.documentTypes && (
+                      <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                        <div className="p-2">
+                          <div className="space-y-1">
+                            {['message', 'pdf', 'doc', 'excel', 'page'].map((type) => (
+                              <button
+                                key={type}
+                                onClick={() => toggleFilter('documentTypes', type)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-4 h-4 rounded-md bg-secondary/30 flex items-center justify-center text-xs font-medium">
+                                    {type.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="capitalize">{type}</span>
+                                </div>
+                                {filters.documentTypes.includes(type) && (
+                                  <Check className="w-3 h-3 text-primary ml-auto" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  {/* Time Range Filter */}
+                  <div className="relative" ref={dropdownRefs.sort}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleDropdown('sort')}
+                      className={`h-8 px-3 text-xs font-medium transition-all duration-200 hover:bg-secondary/50 ${
+                        openDropdowns.sort ? 'bg-secondary/30 border-primary/50' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        <span>Time</span>
+                        {getFilterCounts().sort > 0 && (
+                          <Badge variant="secondary" className="h-4 px-1 text-xs">
+                            1
+                          </Badge>
+                        )}
+                      </div>
+                      <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${
+                        openDropdowns.sort ? 'rotate-180' : ''
+                      }`} />
+                    </Button>
+
+                    {openDropdowns.sort && (
+                      <div className="absolute top-full left-0 mt-1 w-48 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-200">
+                        <div className="p-2">
+                          <div className="space-y-1">
+                            {['latest', 'last-week', 'last-month', 'last-year'].map((timeRange) => (
+                              <button
+                                key={timeRange}
+                                onClick={() => {
+                                  setFilters(prev => ({ ...prev, timeRange }));
+                                  toggleDropdown('sort');
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-secondary/50 transition-colors duration-150"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <Clock className="w-3 h-3" />
+                                  <span className="capitalize">{timeRange.replace('-', ' ')}</span>
+                                </div>
+                                {filters.timeRange === timeRange && (
+                                  <Check className="w-3 h-3 text-primary ml-auto" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {conversationThread.length > 0 ? (
               <>

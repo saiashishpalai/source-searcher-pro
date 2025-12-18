@@ -27,6 +27,11 @@ import { PRDAssemblyService } from './services/prd-assembly.js';
 import { WireframeAnalysisService } from './services/wireframe-analysis-service.js';
 import { NotionSync } from './services/notion-sync.js';
 import { SlackSync } from './services/slack-sync.js';
+import { JiraAuthService } from './services/jira-auth.js';
+import { JiraApiService } from './services/jira-api.js';
+import { TicketDraftingService } from './services/ticket-drafting.js';
+import { JiraSyncService } from './services/jira-sync.js';
+import { DriftDetectionService } from './services/drift-detection.js';
 import multer from 'multer';
 import OpenAI from 'openai';
 
@@ -98,7 +103,16 @@ const prdAssemblyService = new PRDAssemblyService(process.env.OPENAI_API_KEY);
 const wireframeAnalysisService = new WireframeAnalysisService(process.env.OPENAI_API_KEY);
 const notionSync = new NotionSync(process.env.OPENAI_API_KEY, supabaseAdmin);
 const slackSync = new SlackSync(process.env.OPENAI_API_KEY, supabaseAdmin);
+const jiraAuthService = new JiraAuthService(supabaseAdmin);
+const ticketDraftingService = new TicketDraftingService(process.env.OPENAI_API_KEY, supabaseAdmin);
+const jiraSyncService = new JiraSyncService(supabaseAdmin);
+const driftDetectionService = new DriftDetectionService(process.env.OPENAI_API_KEY, supabaseAdmin);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Start Jira sync service (only in production or if explicitly enabled)
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_JIRA_SYNC === 'true') {
+  jiraSyncService.startPeriodicSync();
+}
 
 // Multer setup for audio uploads
 const uploadAudio = multer({
@@ -3085,6 +3099,1024 @@ app.post('/api/debug/reset-dismissed-duplicates', async (req, res) => {
   }
 });
 
+
+// ============================================================================
+// Jira Integration Routes
+// ============================================================================
+
+// Start Jira OAuth flow
+app.get('/api/jira/auth/start', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { url, state } = jiraAuthService.getAuthorizationUrl(user.id);
+    res.json({ url, state });
+  } catch (error) {
+    console.error('Jira auth start error:', error);
+    res.status(500).json({ 
+      error: 'Failed to start Jira authentication',
+      message: error.message || 'Unknown error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Handle Jira OAuth callback
+app.get('/api/jira/auth/callback', async (req, res) => {
+  try {
+    const { code, state, error: oauthError } = req.query;
+
+    if (oauthError) {
+      console.error('Jira OAuth error:', oauthError);
+      return res.redirect(`${APP_URL}/settings?jira_error=${encodeURIComponent(oauthError)}`);
+    }
+
+    if (!code || !state) {
+      return res.redirect(`${APP_URL}/settings?jira_error=missing_params`);
+    }
+
+    // Validate state
+    const stateData = jiraAuthService.validateState(state);
+    if (!stateData) {
+      return res.redirect(`${APP_URL}/settings?jira_error=invalid_state`);
+    }
+
+    const userId = stateData.userId;
+
+    // Exchange code for tokens
+    const tokens = await jiraAuthService.exchangeCodeForTokens(code);
+
+    // Get accessible resources to find Jira site
+    const resources = await jiraAuthService.getAccessibleResources(tokens.accessToken);
+    
+    if (!resources || resources.length === 0) {
+      return res.redirect(`${APP_URL}/settings?jira_error=no_jira_access`);
+    }
+
+    // Use first available Jira site
+    const jiraSite = resources.find(r => r.scopes.includes('read:jira-work')) || resources[0];
+    const cloudId = jiraSite.id;
+    const siteUrl = jiraSite.url;
+
+    // Get user's Jira profile
+    const profile = await jiraAuthService.getJiraUserProfile(tokens.accessToken, cloudId);
+
+    // Save connection
+    await jiraAuthService.saveConnection(userId, {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
+      cloudId,
+      siteUrl,
+      jiraAccountId: profile.accountId,
+      jiraEmail: profile.emailAddress,
+      jiraDisplayName: profile.displayName,
+      scopes: tokens.scope
+    });
+
+    res.redirect(`${APP_URL}/settings?jira_connected=true`);
+  } catch (error) {
+    console.error('Jira OAuth callback error:', error);
+    res.redirect(`${APP_URL}/settings?jira_error=${encodeURIComponent(error.message)}`);
+  }
+});
+
+// Get Jira connection status
+app.get('/api/jira/connection', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const status = await jiraAuthService.verifyConnection(user.id);
+    res.json(status);
+  } catch (error) {
+    console.error('Jira connection check error:', error);
+    res.status(500).json({ error: 'Failed to check Jira connection' });
+  }
+});
+
+// Disconnect Jira
+app.delete('/api/jira/connection', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    await jiraAuthService.deleteConnection(user.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Jira disconnect error:', error);
+    res.status(500).json({ error: 'Failed to disconnect Jira' });
+  }
+});
+
+// Get available Jira projects
+app.get('/api/jira/projects', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const connection = await jiraAuthService.getValidConnection(user.id);
+    if (!connection) {
+      return res.status(404).json({ error: 'Jira not connected' });
+    }
+
+    const jiraApi = new JiraApiService(connection.access_token, connection.cloud_id, connection.site_url);
+    const projects = await jiraApi.getProjects();
+    
+    res.json({ 
+      projects: projects.map(p => ({
+        id: p.id,
+        key: p.key,
+        name: p.name,
+        projectTypeKey: p.projectTypeKey,
+        avatarUrls: p.avatarUrls
+      })),
+      defaultProject: connection.default_project_key ? {
+        key: connection.default_project_key,
+        name: connection.default_project_name
+      } : null
+    });
+  } catch (error) {
+    console.error('Jira projects error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get projects' });
+  }
+});
+
+// Set default Jira project
+app.post('/api/jira/projects/select', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { projectKey } = req.body;
+    if (!projectKey) {
+      return res.status(400).json({ error: 'projectKey required' });
+    }
+
+    const connection = await jiraAuthService.getValidConnection(user.id);
+    if (!connection) {
+      return res.status(404).json({ error: 'Jira not connected' });
+    }
+
+    const jiraApi = new JiraApiService(connection.access_token, connection.cloud_id, connection.site_url);
+    
+    // Get project details and issue types
+    const project = await jiraApi.getProject(projectKey);
+    const issueTypes = await jiraApi.getProjectIssueTypes(projectKey);
+
+    // Update default project
+    const updated = await jiraAuthService.updateDefaultProject(user.id, {
+      projectKey: project.key,
+      projectId: project.id,
+      projectName: project.name,
+      issueTypes: issueTypes.map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        subtask: t.subtask,
+        hierarchyLevel: t.hierarchyLevel
+      }))
+    });
+
+    res.json({ 
+      success: true,
+      project: {
+        key: project.key,
+        name: project.name,
+        issueTypes: updated.available_issue_types
+      }
+    });
+  } catch (error) {
+    console.error('Jira project select error:', error);
+    res.status(500).json({ error: error.message || 'Failed to set default project' });
+  }
+});
+
+// Get issue types for a project
+app.get('/api/jira/projects/:projectKey/types', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { projectKey } = req.params;
+
+    const connection = await jiraAuthService.getValidConnection(user.id);
+    if (!connection) {
+      return res.status(404).json({ error: 'Jira not connected' });
+    }
+
+    const jiraApi = new JiraApiService(connection.access_token, connection.cloud_id, connection.site_url);
+    const issueTypes = await jiraApi.getProjectIssueTypes(projectKey);
+
+    res.json({ 
+      issueTypes: issueTypes.map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        subtask: t.subtask,
+        hierarchyLevel: t.hierarchyLevel
+      }))
+    });
+  } catch (error) {
+    console.error('Jira issue types error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get issue types' });
+  }
+});
+
+// Mark PRD as ready for execution
+app.post('/api/prd/:id/mark-ready', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+    const { jiraProjectKey, granularityMode } = req.body;
+
+    // Update PRD status
+    const { data, error } = await supabaseAdmin
+      .from('prd_versions')
+      .update({ 
+        status: 'ready_for_execution',
+        jira_project_key: jiraProjectKey || null,
+        granularity_mode: granularityMode || 'rolled_up',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Mark PRD ready error:', error);
+      return res.status(500).json({ error: 'Failed to update PRD status' });
+    }
+
+    res.json({ success: true, prd: data });
+  } catch (error) {
+    console.error('Mark PRD ready error:', error);
+    res.status(500).json({ error: 'Failed to mark PRD ready' });
+  }
+});
+
+// Get tickets for a PRD
+app.get('/api/prd/:id/tickets', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+
+    // Verify PRD ownership
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id, user_id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (prdError || !prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    // Get tickets using the helper function
+    const { data: tickets, error: ticketsError } = await supabaseAdmin
+      .rpc('get_prd_tickets_with_hierarchy', { p_prd_version_id: id });
+
+    if (ticketsError) {
+      console.error('Get PRD tickets error:', ticketsError);
+      return res.status(500).json({ error: 'Failed to get tickets' });
+    }
+
+    // Get progress stats
+    const { data: progress, error: progressError } = await supabaseAdmin
+      .rpc('get_prd_execution_progress', { p_prd_version_id: id });
+
+    res.json({ 
+      tickets: tickets || [],
+      progress: progress?.[0] || null
+    });
+  } catch (error) {
+    console.error('Get PRD tickets error:', error);
+    res.status(500).json({ error: 'Failed to get tickets' });
+  }
+});
+
+// Update a draft ticket
+app.patch('/api/prd/:prdId/tickets/:ticketId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { prdId, ticketId } = req.params;
+    const { summary, description, acceptanceCriteria, priority } = req.body;
+
+    // Verify ownership through PRD
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', prdId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (prdError || !prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    // Update ticket
+    const updateData = { updated_at: new Date().toISOString() };
+    if (summary !== undefined) updateData.draft_summary = summary;
+    if (description !== undefined) updateData.draft_description = description;
+    if (acceptanceCriteria !== undefined) updateData.draft_acceptance_criteria = acceptanceCriteria;
+    if (priority !== undefined) updateData.draft_priority = priority;
+
+    const { data: ticket, error: ticketError } = await supabaseAdmin
+      .from('prd_jira_tickets')
+      .update(updateData)
+      .eq('id', ticketId)
+      .eq('prd_version_id', prdId)
+      .select()
+      .single();
+
+    if (ticketError) {
+      console.error('Update ticket error:', ticketError);
+      return res.status(500).json({ error: 'Failed to update ticket' });
+    }
+
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Update ticket error:', error);
+    res.status(500).json({ error: 'Failed to update ticket' });
+  }
+});
+
+// Approve a ticket
+app.post('/api/prd/:prdId/tickets/:ticketId/approve', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { prdId, ticketId } = req.params;
+
+    // Verify ownership
+    const { data: prd } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', prdId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    const { data: ticket, error } = await supabaseAdmin
+      .from('prd_jira_tickets')
+      .update({ 
+        status: 'approved',
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', ticketId)
+      .eq('prd_version_id', prdId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to approve ticket' });
+    }
+
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Approve ticket error:', error);
+    res.status(500).json({ error: 'Failed to approve ticket' });
+  }
+});
+
+// Reject a ticket
+app.post('/api/prd/:prdId/tickets/:ticketId/reject', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { prdId, ticketId } = req.params;
+
+    // Verify ownership
+    const { data: prd } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', prdId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    const { data: ticket, error } = await supabaseAdmin
+      .from('prd_jira_tickets')
+      .update({ 
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', ticketId)
+      .eq('prd_version_id', prdId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to reject ticket' });
+    }
+
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Reject ticket error:', error);
+    res.status(500).json({ error: 'Failed to reject ticket' });
+  }
+});
+
+// Bulk approve all tickets
+app.post('/api/prd/:id/tickets/approve-all', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+
+    // Verify ownership
+    const { data: prd } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    const { data: tickets, error } = await supabaseAdmin
+      .from('prd_jira_tickets')
+      .update({ 
+        status: 'approved',
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('prd_version_id', id)
+      .eq('status', 'draft')
+      .select();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to approve tickets' });
+    }
+
+    res.json({ success: true, approvedCount: tickets?.length || 0 });
+  } catch (error) {
+    console.error('Bulk approve error:', error);
+    res.status(500).json({ error: 'Failed to approve tickets' });
+  }
+});
+
+// Classify PRD size
+app.post('/api/prd/:id/classify', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+
+    // Get PRD with sections
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('*, prd_sections(*)')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (prdError || !prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    // Classify the PRD
+    const classification = await ticketDraftingService.classifyPRD({
+      title: prd.title,
+      sections: prd.prd_sections
+    });
+
+    // Update PRD with classification
+    await supabaseAdmin
+      .from('prd_versions')
+      .update({ 
+        classification: classification.classification,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    res.json(classification);
+  } catch (error) {
+    console.error('PRD classification error:', error);
+    res.status(500).json({ error: error.message || 'Failed to classify PRD' });
+  }
+});
+
+// Generate draft tickets from PRD
+app.post('/api/prd/:id/draft-tickets', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+    const { granularityMode, classification: providedClassification } = req.body;
+
+    // Get PRD with sections
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('*, prd_sections(*)')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (prdError || !prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    // Get or determine classification
+    let classification = providedClassification || prd.classification;
+    let featureAreas = [];
+
+    if (!classification) {
+      const classificationResult = await ticketDraftingService.classifyPRD({
+        title: prd.title,
+        sections: prd.prd_sections
+      });
+      classification = classificationResult.classification;
+      featureAreas = classificationResult.featureAreas;
+
+      // Save classification
+      await supabaseAdmin
+        .from('prd_versions')
+        .update({ 
+          classification,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+    }
+
+    // Generate tickets
+    const { tickets, generationNotes } = await ticketDraftingService.generateTickets(
+      { title: prd.title, sections: prd.prd_sections },
+      { 
+        granularityMode: granularityMode || prd.granularity_mode || 'rolled_up',
+        classification,
+        featureAreas
+      }
+    );
+
+    // Save draft tickets
+    const savedTickets = await ticketDraftingService.saveDraftTickets(id, tickets);
+
+    res.json({ 
+      success: true,
+      tickets: savedTickets,
+      classification,
+      generationNotes
+    });
+  } catch (error) {
+    console.error('Draft ticket generation error:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate tickets' });
+  }
+});
+
+// Publish approved tickets to Jira
+app.post('/api/prd/:id/tickets/publish', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+
+    // Get PRD
+    const { data: prd, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (prdError || !prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    // Get Jira connection
+    const connection = await jiraAuthService.getValidConnection(user.id);
+    if (!connection) {
+      return res.status(400).json({ error: 'Jira not connected' });
+    }
+
+    // Determine project key
+    const projectKey = prd.jira_project_key || connection.default_project_key;
+    if (!projectKey) {
+      return res.status(400).json({ error: 'No Jira project selected' });
+    }
+
+    // Get approved tickets
+    const { data: tickets, error: ticketsError } = await supabaseAdmin
+      .from('prd_jira_tickets')
+      .select('*')
+      .eq('prd_version_id', id)
+      .eq('status', 'approved')
+      .order('sort_order');
+
+    if (ticketsError || !tickets || tickets.length === 0) {
+      return res.status(400).json({ error: 'No approved tickets to publish' });
+    }
+
+    const jiraApi = new JiraApiService(connection.access_token, connection.cloud_id, connection.site_url);
+    
+    // Determine available issue types
+    const issueTypes = connection.available_issue_types || [];
+    const hasEpic = issueTypes.some(t => t.name.toLowerCase() === 'epic');
+    const storyType = issueTypes.find(t => t.name.toLowerCase() === 'story')?.name || 
+                      issueTypes.find(t => t.name.toLowerCase() === 'task')?.name || 
+                      'Task';
+
+    const published = [];
+    const errors = [];
+    const idMapping = new Map(); // local ID -> Jira key
+
+    // First pass: create epics
+    for (const ticket of tickets) {
+      if (ticket.issue_type === 'epic') {
+        try {
+          const issueType = hasEpic ? 'Epic' : storyType;
+          const result = await jiraApi.createIssue({
+            projectKey,
+            issueType,
+            summary: ticket.draft_summary,
+            description: `${ticket.draft_description || ''}\n\n## Acceptance Criteria\n${ticket.draft_acceptance_criteria || ''}`,
+            priority: ticket.draft_priority
+          });
+
+          // Update ticket with Jira details
+          await supabaseAdmin
+            .from('prd_jira_tickets')
+            .update({
+              jira_issue_key: result.key,
+              jira_issue_id: result.id,
+              status: 'published',
+              published_at: new Date().toISOString(),
+              jira_status: 'To Do',
+              jira_status_category: 'todo',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', ticket.id);
+
+          idMapping.set(ticket.id, result.key);
+          published.push({
+            ticketId: ticket.id,
+            jiraKey: result.key,
+            jiraUrl: result.url
+          });
+        } catch (err) {
+          console.error(`Failed to create epic ${ticket.draft_summary}:`, err);
+          errors.push({
+            ticketId: ticket.id,
+            error: err.message
+          });
+        }
+      }
+    }
+
+    // Second pass: create stories (with parent links if applicable)
+    for (const ticket of tickets) {
+      if (ticket.issue_type === 'story') {
+        try {
+          const parentKey = ticket.parent_ticket_id ? idMapping.get(ticket.parent_ticket_id) : null;
+          
+          const result = await jiraApi.createIssue({
+            projectKey,
+            issueType: storyType,
+            summary: ticket.draft_summary,
+            description: `${ticket.draft_description || ''}\n\n## Acceptance Criteria\n${ticket.draft_acceptance_criteria || ''}`,
+            priority: ticket.draft_priority,
+            parentKey: parentKey
+          });
+
+          // Update ticket with Jira details
+          await supabaseAdmin
+            .from('prd_jira_tickets')
+            .update({
+              jira_issue_key: result.key,
+              jira_issue_id: result.id,
+              status: 'published',
+              published_at: new Date().toISOString(),
+              jira_status: 'To Do',
+              jira_status_category: 'todo',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', ticket.id);
+
+          idMapping.set(ticket.id, result.key);
+          published.push({
+            ticketId: ticket.id,
+            jiraKey: result.key,
+            jiraUrl: result.url
+          });
+        } catch (err) {
+          console.error(`Failed to create story ${ticket.draft_summary}:`, err);
+          errors.push({
+            ticketId: ticket.id,
+            error: err.message
+          });
+        }
+      }
+    }
+
+    // Lock PRD after publishing
+    if (published.length > 0) {
+      await supabaseAdmin
+        .from('prd_versions')
+        .update({
+          locked_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+    }
+
+    res.json({
+      success: errors.length === 0,
+      published,
+      errors
+    });
+  } catch (error) {
+    console.error('Publish to Jira error:', error);
+    res.status(500).json({ error: error.message || 'Failed to publish to Jira' });
+  }
+});
+
+// Sync Jira status for PRD tickets
+app.post('/api/prd/:id/sync-jira', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+
+    // Verify ownership
+    const { data: prd } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    const result = await jiraSyncService.syncPRDTickets(id, user.id);
+    res.json(result);
+  } catch (error) {
+    console.error('Jira sync error:', error);
+    res.status(500).json({ error: error.message || 'Failed to sync Jira status' });
+  }
+});
+
+// Get drift logs for a PRD
+app.get('/api/prd/:id/drift', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { id } = req.params;
+
+    // Verify ownership
+    const { data: prd } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!prd) {
+      return res.status(404).json({ error: 'PRD not found' });
+    }
+
+    const logs = await driftDetectionService.getPendingDrift(id);
+    res.json({ logs });
+  } catch (error) {
+    console.error('Get drift logs error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get drift logs' });
+  }
+});
+
+// Acknowledge drift
+app.post('/api/prd/:id/drift/:logId/acknowledge', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { logId } = req.params;
+    const result = await driftDetectionService.acknowledgeDrift(logId, user.id);
+    res.json({ success: true, log: result });
+  } catch (error) {
+    console.error('Acknowledge drift error:', error);
+    res.status(500).json({ error: error.message || 'Failed to acknowledge drift' });
+  }
+});
+
+// Resolve drift
+app.post('/api/prd/:id/drift/:logId/resolve', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { logId } = req.params;
+    const { resolution } = req.body;
+    
+    const result = await driftDetectionService.resolveDrift(logId, user.id, resolution);
+    res.json({ success: true, log: result });
+  } catch (error) {
+    console.error('Resolve drift error:', error);
+    res.status(500).json({ error: error.message || 'Failed to resolve drift' });
+  }
+});
+
+// Manual Jira sync trigger
+app.post('/api/jira/sync', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    // Sync all tickets for this user
+    await jiraSyncService.syncAllActiveTickets();
+    res.json({ success: true, message: 'Sync triggered' });
+  } catch (error) {
+    console.error('Manual sync error:', error);
+    res.status(500).json({ error: error.message || 'Failed to trigger sync' });
+  }
+});
 
 // Serve static files from the dist directory (AFTER all API routes)
 app.use(express.static('dist'));

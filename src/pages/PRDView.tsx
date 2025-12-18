@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, Menu, Sparkles, Loader2, Image as ImageIcon, Mic, Square, RotateCcw, Plus, Send } from 'lucide-react';
+import { ArrowLeft, Edit, Save, X, Clock, Copy, Download, Share, Check, Menu, Sparkles, Loader2, Image as ImageIcon, Mic, Square, RotateCcw, Plus, Send, Play } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApiClient } from '@/lib/api-client';
 import { WireframeUpload } from '@/components/WireframeUpload';
@@ -687,8 +687,8 @@ export default function PRDView() {
               </Button>
             </div>
           ) : (
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
+            <div className="flex items-start justify-between gap-4 min-w-0">
+              <div className="space-y-2 min-w-0 flex-1">
                 <div className="inline-flex flex-col gap-1">
                   <span className="text-[11px] uppercase tracking-[0.55em] text-white/40">Haven7</span>
                   <span className="text-2xl font-semibold tracking-tight text-white">PRD Document</span>
@@ -696,7 +696,7 @@ export default function PRDView() {
                 <p className="text-sm leading-relaxed text-white/55 max-w-xs">
                   Review details, iterate, and align on every decision inside your product requirements document.
                 </p>
-                <div className="flex flex-wrap gap-2 pt-2">
+                <div className="flex flex-wrap items-center gap-2 pt-2">
             <Button
               variant="ghost"
                     onClick={() => { navigate('/prds'); setShowMobileSidebar(false); }}
@@ -705,36 +705,46 @@ export default function PRDView() {
                     <ArrowLeft className="mr-2 h-4 w-4" /> All PRDs
             </Button>
                   {!isEditing ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         onClick={handleEdit}
-                        className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:bg-white/15 hover:text-white"
+                        className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs sm:text-sm text-white/65 transition-colors hover:border-white/20 hover:bg-white/15 hover:text-white whitespace-nowrap"
                       >
-                        <Edit className="mr-2 h-4 w-4" /> Edit
+                        <Edit className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> Edit
                       </Button>
                       {prd?.status === 'draft' ? (
                         <Button
                           onClick={handlePublish}
                           disabled={isSaving}
-                          className="rounded-full border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 transition-colors hover:bg-green-500/20 hover:border-green-500/50"
+                          className="rounded-full border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs sm:text-sm text-green-400 transition-colors hover:bg-green-500/20 hover:border-green-500/50 whitespace-nowrap"
                         >
                           {isSaving ? (
                             <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing…
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4 animate-spin" /> Publishing…
                             </>
                           ) : (
                             <>
-                              <Check className="mr-2 h-4 w-4" /> Publish
+                              <Check className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> Publish
                             </>
                           )}
                         </Button>
-                      ) : prd?.status === 'published' ? (
-                        <Button
-                          disabled
-                          className="rounded-full border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 opacity-100 cursor-default"
-                        >
-                          <Check className="mr-2 h-4 w-4" /> Published
-                        </Button>
+                      ) : prd?.status === 'published' || prd?.status === 'ready_for_execution' ? (
+                        <>
+                          {prd?.status === 'published' && (
+                            <Button
+                              disabled
+                              className="rounded-full border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs sm:text-sm text-green-400 opacity-100 cursor-default whitespace-nowrap"
+                            >
+                              <Check className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> Published
+                            </Button>
+                          )}
+                          <Button
+                            onClick={() => navigate(`/prd/${id}/execution`)}
+                            className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs sm:text-sm text-blue-400 transition-colors hover:bg-blue-500/20 hover:border-blue-500/50 whitespace-nowrap"
+                          >
+                            <Play className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">View </span>Execution
+                          </Button>
+                        </>
                       ) : null}
                     </div>
                   ) : (

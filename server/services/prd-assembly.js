@@ -412,6 +412,9 @@ Generate all 14 sections following the rules above. Append a summary:
 
 Goal: Deliver a 70-90% complete PRD with Requirements detailed enough that engineering can build without asking additional questions.`;
 
+    // Compress citations if there are more than 3 to reduce token usage
+    const compressedCitations = await this.compressCitations(citations);
+    
     const userPrompt = [
       '### USER INPUTS',
       '',
@@ -425,10 +428,10 @@ Goal: Deliver a 70-90% complete PRD with Requirements detailed enough that engin
       '### ADDITIONAL CONTEXT',
       `Dependencies: ${sections.dependencies || ''}`,
       '',
-      citations.length > 0
+      compressedCitations.length > 0
         ? [
             '### WORKSPACE CHUNKS',
-            ...citations.map((c, i) => `[${i + 1}] ${c}`),
+            ...compressedCitations.map((c, i) => `[${i + 1}] ${c}`),
             ''
           ].join('\n')
         : '',
@@ -558,6 +561,9 @@ Goal: Deliver a 70-90% complete PRD with Requirements detailed enough that engin
 
       console.log('PRD assembly generated sections:', generatedSections.length, 'summary:', JSON.stringify(summary));
 
+      // Validate and attempt to fill empty/low-confidence sections
+      const validatedSections = await this.validateAndFillSections(generatedSections, sections, compressedCitations);
+
       const renderSection = (section) => {
         const number = section.number ?? '';
         const title = section.title ?? 'Section';
@@ -588,7 +594,7 @@ Goal: Deliver a 70-90% complete PRD with Requirements detailed enough that engin
         return `**${number}. ${title}**\n\n${body.trim()}`;
       };
 
-      const prdText = generatedSections
+      const prdText = validatedSections
         .map(renderSection)
         .filter(Boolean)
         .join('\n\n\n')
@@ -596,7 +602,7 @@ Goal: Deliver a 70-90% complete PRD with Requirements detailed enough that engin
 
       return {
         prd_text: prdText,
-        structured_sections: generatedSections,
+        structured_sections: validatedSections,
         summary,
         citations_used: citations
       };
@@ -607,7 +613,140 @@ Goal: Deliver a 70-90% complete PRD with Requirements detailed enough that engin
   }
 
   /**
+   * Compress citations to reduce token count while preserving key information
+   * Used when citations exceed a threshold to improve PRD quality
+   */
+  async compressCitations(citations) {
+    // If 3 or fewer citations, return as-is (no compression needed)
+    if (!citations || citations.length <= 3) {
+      return citations;
+    }
+
+    try {
+      console.log(`🗜️ Compressing ${citations.length} citations for PRD generation...`);
+      
+      const response = await this.openai.chat.completions.create({
+        model: this.llmModel,
+        messages: [{
+          role: 'system',
+          content: `You are a document summarizer. Extract and preserve:
+- Specific data points, metrics, and numbers
+- Names, dates, and concrete details
+- Key decisions and requirements
+- Technical specifications
+
+Output as bullet points. Be concise but preserve ALL specific information.`
+        }, {
+          role: 'user',
+          content: `Summarize these document excerpts into key points:\n\n${citations.join('\n\n---\n\n')}`
+        }],
+        max_tokens: 800,
+        temperature: 0.3
+      });
+
+      const compressed = response.choices[0]?.message?.content;
+      if (compressed) {
+        console.log(`✅ Compressed ${citations.length} citations to summary (${compressed.length} chars)`);
+        return [compressed];
+      }
+      
+      // Fallback to original citations if compression fails
+      return citations;
+    } catch (error) {
+      console.error('❌ Citation compression failed:', error);
+      // Fallback to original citations
+      return citations;
+    }
+  }
+
+  /**
+   * Validate generated sections and attempt to fill empty/low-confidence ones
+   * This improves PRD quality by regenerating problematic sections
+   */
+  async validateAndFillSections(generatedSections, userInputs, citations) {
+    // Identify empty or low-confidence sections
+    const emptySections = generatedSections.filter(s => 
+      s.confidence_percent < 50 || 
+      !s.content || 
+      s.content.includes('[EMPTY')
+    );
+
+    if (emptySections.length === 0) {
+      console.log('✅ All sections have sufficient content');
+      return generatedSections;
+    }
+
+    console.log(`🔄 Attempting to fill ${emptySections.length} empty/low-confidence sections...`);
+
+    // Only attempt to regenerate critical sections (Requirements, Success Metrics)
+    const criticalSections = ['Requirements', 'Success Metrics', 'Objective', 'Scope'];
+    const sectionsToRegenerate = emptySections.filter(s => 
+      criticalSections.some(critical => s.title?.includes(critical))
+    );
+
+    if (sectionsToRegenerate.length === 0) {
+      console.log('ℹ️ No critical sections need regeneration');
+      return generatedSections;
+    }
+
+    // Regenerate each critical empty section with focused prompts
+    for (const section of sectionsToRegenerate) {
+      try {
+        console.log(`🔄 Regenerating section: ${section.title}`);
+        
+        const focusedPrompt = `Generate ONLY the "${section.title}" section for a PRD.
+
+User Context:
+- Objective: ${userInputs.objective || 'Not provided'}
+- Background: ${userInputs.background || 'Not provided'}
+- Scope: ${userInputs.scope || 'Not provided'}
+- Requirements: ${userInputs.requirements || 'Not provided'}
+
+${citations.length > 0 ? `Workspace Context:\n${citations.join('\n---\n')}` : ''}
+
+Generate detailed, actionable content for ${section.title}. Be specific and comprehensive.
+If you cannot generate meaningful content, explain what information is needed.`;
+
+        const response = await this.openai.chat.completions.create({
+          model: this.llmModel,
+          messages: [{
+            role: 'system',
+            content: `You are a senior PM generating a specific PRD section. Be detailed and actionable.`
+          }, {
+            role: 'user',
+            content: focusedPrompt
+          }],
+          max_tokens: 600,
+          temperature: 0.3
+        });
+
+        const regeneratedContent = response.choices[0]?.message?.content;
+        if (regeneratedContent && regeneratedContent.length > 50) {
+          // Update the section with regenerated content
+          const sectionIndex = generatedSections.findIndex(s => s.number === section.number);
+          if (sectionIndex !== -1) {
+            generatedSections[sectionIndex] = {
+              ...generatedSections[sectionIndex],
+              content: regeneratedContent,
+              confidence_percent: 65, // Medium confidence for regenerated content
+              confidence_rationale: 'Regenerated with focused prompt due to low initial confidence',
+              needs_validation: ['Please review regenerated content for accuracy']
+            };
+            console.log(`✅ Successfully regenerated: ${section.title}`);
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Failed to regenerate ${section.title}:`, error);
+        // Keep original section content
+      }
+    }
+
+    return generatedSections;
+  }
+
+  /**
    * Fetch citation chunk contents from database
+   * Optimized: limit to top 5 most relevant citations for quality
    */
   async fetchCitationContents(citationIds, supabaseAdmin, userId) {
     if (!citationIds || citationIds.length === 0 || !supabaseAdmin) {
@@ -615,12 +754,13 @@ Goal: Deliver a 70-90% complete PRD with Requirements detailed enough that engin
     }
 
     try {
+      const maxCitations = parseInt(process.env.PRD_MAX_CITATIONS) || 5;
       const { data: chunks, error } = await supabaseAdmin
         .from('document_chunks')
         .select('id, content')
         .in('id', citationIds)
         .eq('user_id', userId)
-        .limit(20); // Cap at 20 citations
+        .limit(maxCitations); // Optimized: fewer, higher quality citations
 
       if (error) {
         console.error('Error fetching citations:', error);
