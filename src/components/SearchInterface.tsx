@@ -1683,27 +1683,10 @@ const SearchInterface = () => {
                         <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors duration-200">
                           {thread.title}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
-                          <Clock className="w-3 h-3" />
+                        <p className="text-xs text-muted-foreground mt-2">
                           {formatTimestamp(thread.timestamp)}
                         </p>
-                        <div className="mt-2 flex items-center gap-2">
-                          <div className="flex -space-x-1">
-                            {getThreadResultsForDisplay(thread).slice(0, 3).map((result: any, idx: number) => (
-                              <div
-                                key={idx}
-                                className="w-5 h-5 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30 flex items-center justify-center text-xs font-medium"
-                                title={result?.source || 'Unknown'}
-                              >
-                                {result?.source?.charAt(0) || '?'}
-                              </div>
-                            ))}
-                            {getThreadResultCount(thread) > 3 && (
-                              <div className="w-5 h-5 rounded-full bg-secondary/50 border border-border/50 flex items-center justify-center text-xs font-medium">
-                                +{getThreadResultCount(thread) - 3}
-                              </div>
-                            )}
-                          </div>
+                        <div className="mt-2">
                           <span className="text-xs text-muted-foreground">
                             {getThreadResultCount(thread)} result{getThreadResultCount(thread) !== 1 ? 's' : ''}
                           </span>
