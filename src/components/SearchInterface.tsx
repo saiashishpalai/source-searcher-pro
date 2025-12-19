@@ -156,6 +156,21 @@ const NotionIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+const JiraIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      d="M9.051 15.434H7.734c-1.988 0-3.413-1.218-3.413-3h7.085c.367 0 .605.26.605.63v7.13c-1.772 0-2.96-1.435-2.96-3.434zm3.5-3.543h-1.318c-1.987 0-3.413-1.196-3.413-2.978h7.085c.367 0 .627.239.627.608v7.13c-1.772 0-2.981-1.435-2.981-3.434zm3.52-3.522h-1.317c-1.987 0-3.413-1.217-3.413-3h7.085c.367 0 .605.262.605.61v7.129c-1.771 0-2.96-1.435-2.96-3.434z"
+    />
+  </svg>
+);
+
 // Enhanced dummy data with more detailed results
 const dummyConversations = [
   {
@@ -307,6 +322,7 @@ const SearchInterface = () => {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
   const [isCheckingConnections, setIsCheckingConnections] = useState(true);
+  const [connectedSourceTypes, setConnectedSourceTypes] = useState<Set<string>>(new Set());
 
   // Fetch profile data for avatar
   useEffect(() => {
@@ -402,13 +418,44 @@ const SearchInterface = () => {
       }
 
       try {
-        const connectionsData = await ApiClient.get<{ connections: any[] }>('/api/connections/get');
-        const hasConnections = connectionsData.connections && connectionsData.connections.length > 0;
-        setHasConnections(hasConnections);
+        const connectedTypes = new Set<string>();
+        
+        // Fetch regular connections (slack, google_drive, notion)
+        try {
+          const connectionsData = await ApiClient.get<{ connections: any[] }>('/api/connections/get');
+          if (connectionsData.connections && connectionsData.connections.length > 0) {
+            connectionsData.connections.forEach((conn: any) => {
+              // Map source_type to display names
+              if (conn.source_type === 'slack') {
+                connectedTypes.add('slack');
+              } else if (conn.source_type === 'google_drive') {
+                connectedTypes.add('google_drive');
+              } else if (conn.source_type === 'notion') {
+                connectedTypes.add('notion');
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching regular connections:', error);
+        }
+
+        // Fetch Jira connection separately
+        try {
+          const jiraConnection = await ApiClient.getJiraConnection();
+          if (jiraConnection.connected) {
+            connectedTypes.add('jira');
+          }
+        } catch (error) {
+          console.error('Error fetching Jira connection:', error);
+        }
+
+        setConnectedSourceTypes(connectedTypes);
+        setHasConnections(connectedTypes.size > 0);
       } catch (error) {
         console.error('Error checking connections:', error);
         // Default to showing empty state if check fails
         setHasConnections(false);
+        setConnectedSourceTypes(new Set());
       } finally {
         setIsCheckingConnections(false);
       }
@@ -591,26 +638,42 @@ const SearchInterface = () => {
     }
   };
 
-  const connectedSources = [
+  // All available sources
+  const allSources = [
     { 
       name: 'Slack', 
       icon: SlackIcon, 
       color: 'slack',
-      tooltip: 'Search Slack'
+      tooltip: 'Search Slack',
+      sourceType: 'slack'
     },
     { 
       name: 'Google Drive', 
       icon: GoogleDriveIcon, 
       color: 'google',
-      tooltip: 'Search Google Drive'
+      tooltip: 'Search Google Drive',
+      sourceType: 'google_drive'
     },
     { 
       name: 'Notion', 
       icon: NotionIcon, 
       color: 'notion',
-      tooltip: 'Search Notion'
+      tooltip: 'Search Notion',
+      sourceType: 'notion'
+    },
+    { 
+      name: 'Jira', 
+      icon: JiraIcon, 
+      color: 'jira',
+      tooltip: 'Search Jira',
+      sourceType: 'jira'
     },
   ];
+
+  // Filter to show only connected sources
+  const connectedSources = allSources.filter(source => 
+    connectedSourceTypes.has(source.sourceType)
+  );
 
   const detectPRDIntent = (_query: string): boolean => {
     // PRD creation via slash command is deprecated; use dashboard button instead
@@ -2814,6 +2877,7 @@ const SearchInterface = () => {
         </div>
 
         {/* Connected sources */}
+        {connectedSources.length > 0 && (
             <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
               <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60 group">
                 <span className="font-medium group-hover:text-foreground transition-colors duration-300">Connected sources:</span>
@@ -2832,6 +2896,8 @@ const SearchInterface = () => {
                                 'hover:text-[#4A154B]' :
                                 source.color === 'google' ?
                                 'hover:text-[#4285F4]' :
+                                source.color === 'jira' ?
+                                'hover:text-[#0052CC]' :
                                 'hover:text-[#000000]'
                               }
                             `}
@@ -2851,6 +2917,7 @@ const SearchInterface = () => {
                 </div>
               </div>
             </div>
+        )}
           </div>
         )}
         </div>

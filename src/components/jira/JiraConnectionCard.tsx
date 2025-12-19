@@ -7,6 +7,21 @@ import { Loader2, CheckCircle2, XCircle, ExternalLink, Unplug } from 'lucide-rea
 import { useToast } from '@/hooks/use-toast';
 import { JiraProjectSelector } from './JiraProjectSelector';
 
+const JiraIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      d="M9.051 15.434H7.734c-1.988 0-3.413-1.218-3.413-3h7.085c.367 0 .605.26.605.63v7.13c-1.772 0-2.96-1.435-2.96-3.434zm3.5-3.543h-1.318c-1.987 0-3.413-1.196-3.413-2.978h7.085c.367 0 .627.239.627.608v7.13c-1.772 0-2.981-1.435-2.981-3.434zm3.52-3.522h-1.317c-1.987 0-3.413-1.217-3.413-3h7.085c.367 0 .605.262.605.61v7.129c-1.771 0-2.96-1.435-2.96-3.434z"
+    />
+  </svg>
+);
+
 interface JiraConnectionStatus {
   connected: boolean;
   reason?: string;
@@ -114,7 +129,7 @@ export function JiraConnectionCard({ className }: JiraConnectionCardProps) {
       <Card className={className}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <img src="https://cdn.worldvectorlogo.com/logos/jira-3.svg" alt="Jira" className="w-6 h-6" />
+            <JiraIcon className="w-6 h-6" />
             Jira
           </CardTitle>
         </CardHeader>
@@ -130,7 +145,7 @@ export function JiraConnectionCard({ className }: JiraConnectionCardProps) {
       <CardHeader className="pb-4 flex-shrink-0">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-[#0052CC] flex items-center justify-center text-white">
-            <img src="https://cdn.worldvectorlogo.com/logos/jira-3.svg" alt="Jira" className="w-6 h-6 invert brightness-0" />
+            <JiraIcon className="w-6 h-6" />
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between">

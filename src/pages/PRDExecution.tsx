@@ -37,6 +37,21 @@ import {
 import { TicketDraftCard } from '@/components/jira/TicketDraftCard';
 import { BulkActionsBar } from '@/components/jira/BulkActionsBar';
 
+const JiraIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      d="M9.051 15.434H7.734c-1.988 0-3.413-1.218-3.413-3h7.085c.367 0 .605.26.605.63v7.13c-1.772 0-2.96-1.435-2.96-3.434zm3.5-3.543h-1.318c-1.987 0-3.413-1.196-3.413-2.978h7.085c.367 0 .627.239.627.608v7.13c-1.772 0-2.981-1.435-2.981-3.434zm3.52-3.522h-1.317c-1.987 0-3.413-1.217-3.413-3h7.085c.367 0 .605.262.605.61v7.129c-1.771 0-2.96-1.435-2.96-3.434z"
+    />
+  </svg>
+);
+
 interface PRDData {
   id: string;
   title: string;
@@ -379,11 +394,9 @@ export default function PRDExecution() {
           
           <Card className="max-w-md mx-auto">
             <CardContent className="pt-6 text-center">
-              <img 
-                src="https://cdn.worldvectorlogo.com/logos/jira-3.svg" 
-                alt="Jira" 
-                className="h-16 w-16 mx-auto mb-4" 
-              />
+              <div className="h-16 w-16 mx-auto mb-4 flex items-center justify-center">
+                <JiraIcon className="h-16 w-16 text-[#0052CC]" />
+              </div>
               <h2 className="text-xl font-semibold mb-2">Connect Jira</h2>
               <p className="text-muted-foreground mb-4">
                 Connect your Jira account to create tickets from this PRD.
