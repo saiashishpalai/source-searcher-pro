@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users, HelpCircle, Lightbulb, ChevronUp, Mic, Square, Loader2 } from 'lucide-react';
+import { Search, MessageSquare, Edit2, Trash2, Plus, Filter, X, Calendar, FileText, File, Table, Clock, ChevronDown, Check, RotateCcw, ArrowLeft, Menu, Home, User, Settings, LogOut, Send, Link, Users, HelpCircle, Lightbulb, ChevronUp, Mic, Square, Loader2, LayoutDashboard } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -302,7 +302,7 @@ const SearchInterface = () => {
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [editingThread, setEditingThread] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
@@ -1684,16 +1684,8 @@ const SearchInterface = () => {
       <div className="flex-1 flex flex-col relative overflow-hidden h-screen">
         {/* Main Header - Fixed layout */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
-          {/* Left section: Sidebar toggle + Haven7 logo */}
+          {/* Left section: Haven7 logo */}
           <div className="flex items-center gap-3">
-            {/* Sidebar toggle button */}
-            <button
-              onClick={() => setShowMobileSidebar(true)}
-              className="lg:hidden h-10 w-10 flex items-center justify-center rounded-lg hover:bg-accent/10 transition-colors"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            
             {/* Haven7 logo */}
             <span className="text-xl font-semibold text-foreground leading-none group hover:cursor-pointer relative animate-subtle-glow">
               <span className="relative z-10 hover:bg-gradient-to-r hover:from-primary hover:via-accent hover:to-primary hover:bg-clip-text hover:text-transparent transition-all duration-700">
@@ -1708,6 +1700,16 @@ const SearchInterface = () => {
           
           {/* Right section: Theme toggle, PRD Studio, Profile */}
           <div className="flex items-center gap-4 pr-6">
+            <button
+              onClick={() => navigate('/tracker')}
+              className="group relative overflow-hidden rounded-xl border border-border/50 bg-background/70 px-3.5 py-1.5 text-sm font-semibold text-foreground/80 shadow-[0_12px_30px_rgba(144,96,255,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:bg-accent/10 hover:text-foreground sm:px-4 sm:py-2"
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                <LayoutDashboard className="h-4 w-4 text-green-400" />
+                Tracker
+              </span>
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-green-400/15 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            </button>
             <button
               onClick={() => navigate('/prd/new')}
               className="group relative overflow-hidden rounded-xl border border-border/50 bg-background/70 px-3.5 py-1.5 text-sm font-semibold text-foreground/80 shadow-[0_12px_30px_rgba(144,96,255,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:bg-accent/10 hover:text-foreground sm:px-4 sm:py-2"

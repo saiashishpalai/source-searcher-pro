@@ -20,6 +20,8 @@ import PRDNew from "./pages/PRDNew";
 import PRDHubPage from "./pages/PRDHubPage";
 import PRDCompare from "./components/PRDCompare";
 import PRDExecution from "./pages/PRDExecution";
+import ExecutionDashboard from "./pages/ExecutionDashboard";
+import WeeklyUpdates from "./pages/WeeklyUpdates";
 
 const App = () => {
   return (
@@ -78,6 +80,16 @@ const App = () => {
       <Route path="/prd/:id/execution" element={
         <ProtectedRoute>
           <PRDExecution />
+        </ProtectedRoute>
+      } />
+      <Route path="/tracker" element={
+        <ProtectedRoute>
+          <ExecutionDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/updates" element={
+        <ProtectedRoute>
+          <WeeklyUpdates />
         </ProtectedRoute>
       } />
       <Route path="/settings" element={

@@ -24,6 +24,9 @@ Welcome to the Haven7 documentation. This guide covers everything you need to kn
 - [Search Implementation](features/SEARCH_IMPLEMENTATION.md) - How search works
 - [Sync Implementation](features/SYNC_IMPLEMENTATION.md) - Content synchronization
 
+### UI Components
+- [UI Components](ui/UI_COMPONENTS.md) - Component behavior and documentation
+
 ### API Reference
 - [Backend API](api/API_REFERENCE.md) - Complete API documentation
 - [Authentication Endpoints](api/AUTHENTICATION.md) - OAuth and auth endpoints

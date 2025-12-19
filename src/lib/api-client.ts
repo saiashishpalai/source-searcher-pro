@@ -91,6 +91,24 @@ export class ApiClient {
     return response.json();
   }
 
+  static async put<T = any>(endpoint: string, data: any): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(error.message || 'API request failed');
+    }
+
+    return response.json();
+  }
+
   // PRD management
   static async createPRD(title: string): Promise<{ prd: any }> {
     return this.post('/api/prd/create', { title });
@@ -551,5 +569,129 @@ export class ApiClient {
   // Resolve drift
   static async resolveDrift(prdId: string, logId: string, resolution: string): Promise<{ success: boolean }> {
     return this.post(`/api/prd/${prdId}/drift/${logId}/resolve`, { resolution });
+  }
+
+  // Get execution dashboard data
+  static async getExecutionDashboard(): Promise<{
+    prds: any[];
+    summary: {
+      total: number;
+      todo: number;
+      inProgress: number;
+      qa: number;
+      done: number;
+      blocked: number;
+    };
+    jiraSiteUrl?: string;
+  }> {
+    return this.get('/api/execution/dashboard');
+  }
+
+  // Sync all execution data
+  static async syncAllExecution(): Promise<{ success: boolean; message: string }> {
+    return this.post('/api/execution/sync-all', {});
+  }
+
+  // ============================================================================
+  // Weekly Updates
+  // ============================================================================
+
+  // Get Slack channels where bot is present
+  static async getSlackChannels(): Promise<{
+    channels: Array<{
+      id: string;
+      name: string;
+      is_private: boolean;
+      num_members: number;
+    }>;
+  }> {
+    return this.get('/api/slack/channels');
+  }
+
+  // Get weekly update settings
+  static async getWeeklyUpdateSettings(): Promise<{
+    settings: {
+      id: string;
+      slack_channel_id?: string;
+      slack_channel_name?: string;
+      schedule_day: string;
+      schedule_time: string;
+      timezone: string;
+      last_sent_at?: string;
+      last_generated_at?: string;
+    } | null;
+  }> {
+    return this.get('/api/weekly-updates/settings');
+  }
+
+  // Save weekly update settings
+  static async saveWeeklyUpdateSettings(settings: {
+    slackChannelId?: string;
+    slackChannelName?: string;
+    scheduleDay: string;
+    scheduleTime: string;
+    timezone: string;
+  }): Promise<{ settings: any }> {
+    return this.post('/api/weekly-updates/settings', settings);
+  }
+
+  // Generate a new weekly update
+  static async generateWeeklyUpdate(): Promise<{
+    update: {
+      id: string;
+      title: string;
+      content: string;
+      status: string;
+      created_at: string;
+    };
+  }> {
+    return this.post('/api/weekly-updates/generate', {});
+  }
+
+  // Get update history
+  static async getWeeklyUpdateHistory(limit?: number): Promise<{
+    updates: Array<{
+      id: string;
+      title: string;
+      content: string;
+      status: string;
+      sent_at?: string;
+      sent_to?: string;
+      created_at: string;
+    }>;
+  }> {
+    const params = limit ? `?limit=${limit}` : '';
+    return this.get(`/api/weekly-updates/history${params}`);
+  }
+
+  // Get a specific update
+  static async getWeeklyUpdate(id: string): Promise<{
+    update: {
+      id: string;
+      title: string;
+      content: string;
+      status: string;
+      ticket_snapshot?: any;
+      sent_at?: string;
+      sent_to?: string;
+      created_at: string;
+    };
+  }> {
+    return this.get(`/api/weekly-updates/${id}`);
+  }
+
+  // Update draft content
+  static async updateWeeklyUpdateDraft(id: string, content: string): Promise<{
+    update: any;
+  }> {
+    return this.put(`/api/weekly-updates/${id}`, { content });
+  }
+
+  // Send update to Slack
+  static async sendWeeklyUpdateToSlack(id: string): Promise<{
+    success: boolean;
+    sentAt: string;
+  }> {
+    return this.post(`/api/weekly-updates/${id}/send`, {});
   }
 }

@@ -12,6 +12,7 @@ docs/
 ├── supabase/                     # Database setup and config (3 files)
 ├── implementation/               # Implementation tracking and migrations (3 files)
 ├── features/                     # Feature-specific documentation (3 files)
+├── ui/                           # UI components documentation (1 file)
 ├── setup/                        # Quick start and environment setup (2 files)
 └── guides/                       # Additional guides and utilities (1 file)
 ```
@@ -22,8 +23,8 @@ docs/
 
 ## 📊 Documentation Stats
 
-- **Total documents**: 24 organized files (23 moved from root + 1 index)
-- **Categories**: 7 logical groupings
+- **Total documents**: 25 organized files (24 moved from root + 1 index)
+- **Categories**: 8 logical groupings
 - **Main README**: Remains in project root for GitHub visibility
 
 ## 🔍 Quick Access

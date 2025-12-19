@@ -32,6 +32,7 @@ import { JiraApiService } from './services/jira-api.js';
 import { TicketDraftingService } from './services/ticket-drafting.js';
 import { JiraSyncService } from './services/jira-sync.js';
 import { DriftDetectionService } from './services/drift-detection.js';
+import { WeeklyUpdateService } from './services/weekly-update.js';
 import multer from 'multer';
 import OpenAI from 'openai';
 
@@ -107,6 +108,7 @@ const jiraAuthService = new JiraAuthService(supabaseAdmin);
 const ticketDraftingService = new TicketDraftingService(process.env.OPENAI_API_KEY, supabaseAdmin);
 const jiraSyncService = new JiraSyncService(supabaseAdmin);
 const driftDetectionService = new DriftDetectionService(process.env.OPENAI_API_KEY, supabaseAdmin);
+const weeklyUpdateService = new WeeklyUpdateService(supabaseAdmin);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Start Jira sync service (only in production or if explicitly enabled)
@@ -804,7 +806,7 @@ app.get('/api/auth/slack', async (req, res) => {
     const stateWithUserId = `${state}:${userId}`;
 
     // Bot token scopes (for app functionality)
-    const botScopes = 'channels:history,files:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,remote_files:read,team:read,usergroups:read,users:read,users:read.email';
+    const botScopes = 'channels:history,channels:read,chat:write,files:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,remote_files:read,team:read,usergroups:read,users:read,users:read.email';
     
     // User token scopes (for user data access - this will give us xoxp- tokens)
     const userScopes = 'channels:read,channels:history,files:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,users:read,team:read';
@@ -891,6 +893,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
       teamName, 
       userId: slackUserId,
       hasAccessToken: !!tokens.access_token,
+      hasBotToken: !!tokens.access_token, // Bot token is in access_token
       hasAuthedUserToken: !!tokens.authed_user?.access_token,
       tokenType: tokens.authed_user?.access_token ? 'user' : 'app',
       scopes: tokens.scope
@@ -911,7 +914,7 @@ app.get('/api/auth/slack/callback', async (req, res) => {
           team_name: teamName,
           scope: tokens.scope,
           authed_user: tokens.authed_user,
-          bot_token: process.env.SLACK_BOT_TOKEN, // Store bot token separately
+          bot_token: tokens.access_token, // Bot token from OAuth response (xoxb-)
         },
         updated_at: new Date().toISOString(),
       }, { 
@@ -4011,6 +4014,138 @@ app.post('/api/prd/:id/sync-jira', async (req, res) => {
   }
 });
 
+// Get execution dashboard data
+app.get('/api/execution/dashboard', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    // 1. Get PRDs
+    const { data: prds, error: prdError } = await supabaseAdmin
+      .from('prd_versions')
+      .select('id, title, status, jira_project_key, updated_at, version')
+      .eq('user_id', user.id)
+      .in('status', ['published', 'ready_for_execution'])
+      .order('updated_at', { ascending: false });
+
+    if (prdError) {
+      throw prdError;
+    }
+
+    if (!prds || prds.length === 0) {
+      return res.json({ prds: [], summary: { total: 0, todo: 0, inProgress: 0, qa: 0, done: 0, blocked: 0 } });
+    }
+
+    // 2. Get tickets for these PRDs
+    const prdIds = prds.map(p => p.id);
+    const { data: tickets, error: ticketError } = await supabaseAdmin
+      .from('prd_jira_tickets')
+      .select('*')
+      .in('prd_version_id', prdIds)
+      .order('sort_order');
+
+    if (ticketError) {
+      throw ticketError;
+    }
+
+    // 3. Aggregate data
+    const summary = { total: 0, todo: 0, inProgress: 0, qa: 0, done: 0, blocked: 0 };
+    
+    const dashboardData = prds.map(prd => {
+      const prdTickets = tickets.filter(t => t.prd_version_id === prd.id);
+      
+      const stats = {
+        total: prdTickets.length,
+        published: prdTickets.filter(t => t.status === 'published').length,
+        todo: 0,
+        inProgress: 0,
+        qa: 0,
+        done: 0,
+        blocked: 0
+      };
+
+      prdTickets.forEach(t => {
+        if (t.status === 'published' && t.jira_status) {
+          const status = t.jira_status.toLowerCase();
+          if (status.includes('done') || status.includes('complete') || status.includes('closed')) stats.done++;
+          else if (status.includes('progress')) stats.inProgress++;
+          else if (status.includes('qa') || status.includes('test') || status.includes('review')) stats.qa++;
+          else if (status.includes('block')) stats.blocked++;
+          else stats.todo++;
+        } else if (t.status === 'published') {
+          stats.todo++; // Default for published but no jira status mapped yet
+        }
+      });
+
+      // Update global summary
+      summary.total += stats.total; // Count all tickets, or just published? Let's count all.
+      summary.todo += stats.todo;
+      summary.inProgress += stats.inProgress;
+      summary.qa += stats.qa;
+      summary.done += stats.done;
+      summary.blocked += stats.blocked;
+
+      // Calculate completion %
+      const totalActive = stats.published;
+      stats.completion = totalActive > 0 ? Math.round((stats.done / totalActive) * 100) : 0;
+
+      return {
+        ...prd,
+        tickets: prdTickets,
+        stats
+      };
+    });
+
+    // Get Jira connection for site URL
+    const { data: connection } = await supabaseAdmin
+      .from('jira_connections')
+      .select('site_url')
+      .eq('user_id', user.id)
+      .single();
+
+    res.json({ prds: dashboardData, summary, jiraSiteUrl: connection?.site_url });
+  } catch (error) {
+    console.error('Execution dashboard error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get dashboard data' });
+  }
+});
+
+// Manual sync for dashboard (all PRDs)
+app.post('/api/execution/sync-all', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    // Trigger sync for all active tickets
+    await jiraSyncService.syncAllActiveTickets(); // This syncs all users, but good enough for MVP or we filter by user inside service
+    
+    // Better: sync just this user's tickets to be faster/safer
+    // We'll rely on the existing syncAllActiveTickets for now which handles all users
+    // Ideally we'd add syncUserTickets to the service public API
+    
+    res.json({ success: true, message: 'Sync started' });
+  } catch (error) {
+    console.error('Sync all error:', error);
+    res.status(500).json({ error: error.message || 'Failed to sync' });
+  }
+});
+
 // Get drift logs for a PRD
 app.get('/api/prd/:id/drift', async (req, res) => {
   try {
@@ -4115,6 +4250,244 @@ app.post('/api/jira/sync', async (req, res) => {
   } catch (error) {
     console.error('Manual sync error:', error);
     res.status(500).json({ error: error.message || 'Failed to trigger sync' });
+  }
+});
+
+// ============================================================================
+// Weekly Update Endpoints
+// ============================================================================
+
+// Get Slack channels where bot is present (for weekly updates)
+app.get('/api/slack/channels', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    // Get Slack connection
+    const { data: connection, error: connError } = await supabaseAdmin
+      .from('user_connections')
+      .select('access_token, metadata')
+      .eq('user_id', user.id)
+      .eq('source_type', 'slack')
+      .single();
+
+    if (connError || !connection) {
+      console.log('[Slack Channels] No Slack connection found for user:', user.id);
+      return res.status(404).json({ error: 'Slack not connected' });
+    }
+
+    // Use bot token from metadata, fall back to access_token
+    const botToken = connection.metadata?.bot_token || connection.access_token;
+    
+    console.log('[Slack Channels] Using token:', {
+      hasBotToken: !!connection.metadata?.bot_token,
+      hasAccessToken: !!connection.access_token,
+      tokenPrefix: botToken?.substring(0, 10) + '...'
+    });
+
+    if (!botToken) {
+      console.log('[Slack Channels] No valid token found');
+      return res.status(400).json({ error: 'No valid Slack token. Please reconnect Slack.' });
+    }
+
+    const { WebClient } = await import('@slack/web-api');
+    const slack = new WebClient(botToken);
+
+    // List channels where bot is a member
+    const result = await slack.conversations.list({
+      types: 'public_channel,private_channel',
+      exclude_archived: true,
+      limit: 200
+    });
+
+    // Filter to only channels where the bot is a member
+    const channels = (result.channels || [])
+      .filter(ch => ch.is_member)
+      .map(ch => ({
+        id: ch.id,
+        name: ch.name,
+        is_private: ch.is_private,
+        num_members: ch.num_members
+      }));
+
+    console.log('[Slack Channels] Found', channels.length, 'channels where bot is a member');
+    res.json({ channels });
+  } catch (error) {
+    console.error('[Slack Channels] Error:', error.message || error);
+    if (error.data?.error === 'invalid_auth' || error.data?.error === 'token_revoked') {
+      return res.status(401).json({ error: 'Slack token invalid. Please reconnect Slack.' });
+    }
+    if (error.data?.error === 'missing_scope') {
+      return res.status(403).json({ error: 'Missing Slack permissions. Please reconnect Slack to grant new permissions.' });
+    }
+    res.status(500).json({ error: error.message || 'Failed to get channels' });
+  }
+});
+
+// Get weekly update settings
+app.get('/api/weekly-updates/settings', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const settings = await weeklyUpdateService.getSettings(user.id);
+    res.json({ settings: settings || null });
+  } catch (error) {
+    console.error('Get weekly update settings error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get settings' });
+  }
+});
+
+// Save weekly update settings
+app.post('/api/weekly-updates/settings', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const settings = await weeklyUpdateService.saveSettings(user.id, req.body);
+    res.json({ settings });
+  } catch (error) {
+    console.error('Save weekly update settings error:', error);
+    res.status(500).json({ error: error.message || 'Failed to save settings' });
+  }
+});
+
+// Generate a new weekly update
+app.post('/api/weekly-updates/generate', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const update = await weeklyUpdateService.generateUpdate(user.id, req.body);
+    res.json({ update });
+  } catch (error) {
+    console.error('Generate weekly update error:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate update' });
+  }
+});
+
+// Get update history
+app.get('/api/weekly-updates/history', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const limit = parseInt(req.query.limit) || 10;
+    const updates = await weeklyUpdateService.getUpdateHistory(user.id, limit);
+    res.json({ updates });
+  } catch (error) {
+    console.error('Get update history error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get history' });
+  }
+});
+
+// Get a specific update
+app.get('/api/weekly-updates/:id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const update = await weeklyUpdateService.getUpdate(user.id, req.params.id);
+    if (!update) {
+      return res.status(404).json({ error: 'Update not found' });
+    }
+    res.json({ update });
+  } catch (error) {
+    console.error('Get update error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get update' });
+  }
+});
+
+// Update draft content
+app.put('/api/weekly-updates/:id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const { content } = req.body;
+    const update = await weeklyUpdateService.updateDraft(user.id, req.params.id, content);
+    res.json({ update });
+  } catch (error) {
+    console.error('Update draft error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update draft' });
+  }
+});
+
+// Send update to Slack
+app.post('/api/weekly-updates/:id/send', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Missing authorization header' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Invalid token' });
+    }
+
+    const result = await weeklyUpdateService.sendToSlack(user.id, req.params.id);
+    res.json(result);
+  } catch (error) {
+    console.error('Send to Slack error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send to Slack' });
   }
 });
 
